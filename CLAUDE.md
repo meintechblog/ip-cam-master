@@ -1,3 +1,11 @@
+## Project Configuration
+
+- **Language**: TypeScript
+- **Package Manager**: npm
+- **Add-ons**: tailwindcss, drizzle, vitest
+
+---
+
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 

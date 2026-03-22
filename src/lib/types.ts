@@ -82,3 +82,28 @@ export interface StreamInfo {
 	producers: number;
 	resolution: string | null;
 }
+
+export interface CameraCardData {
+	// Camera DB info
+	id: number;
+	vmid: number;
+	name: string;
+	cameraIp: string;
+	cameraType: CameraType;
+	containerIp: string | null;
+	streamName: string;
+	rtspUrl: string | null;
+	status: CameraStatus;
+	width: number;
+	height: number;
+	fps: number;
+	bitrate: number;
+	// Live status
+	containerStatus: ContainerStatus;
+	go2rtcRunning: boolean;
+	onvifRunning: boolean;
+	streamInfo: StreamInfo | null;
+	connectedClients: number;
+	snapshotUrl: string | null;
+	go2rtcWebUrl: string | null;
+}

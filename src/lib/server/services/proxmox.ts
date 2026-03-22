@@ -123,7 +123,7 @@ export async function createContainer(params: {
 		hostname: params.hostname,
 		ostemplate: params.ostemplate,
 		rootfs: `${storage}:8`,
-		memory: params.memory || 512,
+		memory: params.memory || 256,
 		cores: params.cores || 1,
 		net0: `name=eth0,bridge=${bridge},ip=dhcp`,
 		start: false
