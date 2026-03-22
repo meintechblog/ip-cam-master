@@ -109,11 +109,13 @@
 			if (data.fps) {
 				fps = data.fps;
 			}
-			// Auto-calculate bitrate from resolution + fps
-			// Rule: ~0.1 bits per pixel per frame, rounded to nearest 500
 			const pixels = width * height;
 			const calculatedBitrate = Math.round((pixels * fps * 0.1) / 1000 / 500) * 500;
 			bitrate = Math.max(1000, Math.min(calculatedBitrate, 10000));
+
+			// Auto-advance to next step
+			currentStep = 2;
+			runCreateContainer();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -135,6 +137,10 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'Container konnte nicht erstellt werden');
 			containerIp = data.containerIp;
+
+			// Auto-advance
+			currentStep = 3;
+			runConfigureGo2rtc();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -142,7 +148,7 @@
 		}
 	}
 
-	// Step 3: Configure go2rtc
+	// Step 3: Configure go2rtc + ONVIF
 	async function runConfigureGo2rtc() {
 		loading = true;
 		error = null;
@@ -155,8 +161,12 @@
 				body: JSON.stringify({ cameraId })
 			});
 			const data = await res.json();
-			if (!data.success) throw new Error(data.error || 'go2rtc konnte nicht konfiguriert werden');
+			if (!data.success) throw new Error(data.error || 'Konfiguration fehlgeschlagen');
 			go2rtcDone = true;
+
+			// Auto-advance
+			currentStep = 4;
+			runVerifyStream();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
