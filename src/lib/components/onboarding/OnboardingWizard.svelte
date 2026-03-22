@@ -100,6 +100,16 @@
 		if (subLogTimer) { clearInterval(subLogTimer); subLogTimer = null; }
 	}
 
+	// Auto-scroll sub-log to bottom
+	$effect(() => {
+		if (subLog.length > 0) {
+			setTimeout(() => {
+				const el = document.getElementById('sublog');
+				if (el) el.scrollTop = el.scrollHeight;
+			}, 50);
+		}
+	});
+
 	// Load snapshot from camera
 	async function loadSnapshot() {
 		if (!ip || !username || !password) return;
@@ -408,7 +418,7 @@
 
 					<!-- Sub-log: animated task list with spinners -->
 					{#if subLog.length > 0}
-						<div class="mt-4 bg-bg-primary/50 rounded-lg p-3 max-h-72 overflow-y-auto" id="sublog">
+						<div class="mt-4 bg-bg-primary/50 rounded-lg p-3 max-h-[500px] overflow-y-auto" id="sublog">
 							<div class="space-y-1.5">
 								{#each subLog as line, i}
 									<div class="flex items-start gap-2">
