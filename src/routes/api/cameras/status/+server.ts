@@ -109,17 +109,23 @@ export const GET: RequestHandler = async () => {
 						// ffprobe timeout or not available — skip live FPS
 					}
 
-					// Get firmware version from Mobotix HTTP API via curl (supports digest auth)
+					// Get model + firmware from Mobotix /admin/version page (has all info in <td> cells)
 					try {
 						const { execSync } = await import('node:child_process');
-						const fwHtml = execSync(
-							`curl -s --anyauth -u "${cam.username}:${decryptedPass}" "http://${cam.ip}/control/userimage.html" --max-time 3`,
+						const versionHtml = execSync(
+							`curl -s --basic -u "${cam.username}:${decryptedPass}" "http://${cam.ip}/admin/version" --max-time 3`,
 							{ timeout: 5000, encoding: 'utf-8' }
 						);
-						const fwMatch = fwHtml.match(/filesystem__version="([^"]+)"/);
-						if (fwMatch) firmwareVersion = fwMatch[1];
-						const titleMatch = fwHtml.match(/<title>([^<]+)<\/title>/);
-						if (titleMatch) cameraModel = titleMatch[1].replace(' Live', '').trim();
+						// Extract all <td> text content
+						const tdMatches = versionHtml.match(/<td[^>]*>(.*?)<\/td>/gs) || [];
+						const tdTexts = tdMatches.map((td: string) => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+						// First td is typically the model: "MOBOTIX S15D-Sec"
+						if (tdTexts.length > 0 && tdTexts[0].includes('MOBOTIX')) {
+							cameraModel = tdTexts[0];
+						}
+						// Firmware is in the format MX-V4.x.x.x
+						const fwEntry = tdTexts.find((t: string) => t.startsWith('MX-V'));
+						if (fwEntry) firmwareVersion = fwEntry;
 					} catch {
 						// Camera HTTP not reachable
 					}
