@@ -1,5 +1,6 @@
 <script lang="ts">
 	import InlineAlert from '$lib/components/ui/InlineAlert.svelte';
+	import { Loader2 } from 'lucide-svelte';
 	import type { ProxmoxSettings } from '$lib/types';
 
 	let { initialValues = {} }: { initialValues: Partial<ProxmoxSettings> } = $props();
@@ -9,8 +10,36 @@
 	let proxmox_token_secret = $state(initialValues.proxmox_token_secret ?? '');
 	let proxmox_storage = $state(initialValues.proxmox_storage ?? 'local-lvm');
 	let proxmox_bridge = $state(initialValues.proxmox_bridge ?? 'vmbr0');
+
 	let saving = $state(false);
-	let feedback: { type: 'success' | 'error'; message: string } | null = $state(null);
+	let feedback = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+
+	// Dropdown options from Proxmox
+	let bridges = $state<{ name: string; comment: string }[]>([]);
+	let storages = $state<{ name: string; type: string; totalGB: number; availGB: number }[]>([]);
+	let optionsLoading = $state(false);
+	let optionsLoaded = $state(false);
+
+	async function loadOptions() {
+		optionsLoading = true;
+		try {
+			const res = await fetch('/api/proxmox/options');
+			if (res.ok) {
+				const data = await res.json();
+				bridges = data.bridges || [];
+				storages = data.storages || [];
+				optionsLoaded = true;
+			}
+		} catch { /* ignore */ }
+		finally { optionsLoading = false; }
+	}
+
+	// Auto-load options when credentials are present
+	$effect(() => {
+		if (proxmox_host && proxmox_token_id && proxmox_token_secret && !optionsLoaded) {
+			loadOptions();
+		}
+	});
 
 	async function handleSave() {
 		saving = true;
@@ -36,6 +65,8 @@
 					type: 'success',
 					message: `Verbindung erfolgreich. Node: ${data.validation.nodeName}`
 				};
+				// Reload options after successful save
+				loadOptions();
 			} else if (data.validation?.error) {
 				feedback = { type: 'error', message: data.validation.error };
 			} else if (data.saved) {
@@ -51,9 +82,7 @@
 
 <form onsubmit={handleSave} class="space-y-4 max-w-lg">
 	<div>
-		<label for="proxmox_host" class="block text-sm font-medium text-text-secondary mb-1"
-			>Proxmox Host</label
-		>
+		<label for="proxmox_host" class="block text-sm font-medium text-text-secondary mb-1">Proxmox Host</label>
 		<input
 			id="proxmox_host"
 			type="text"
@@ -64,9 +93,7 @@
 	</div>
 
 	<div>
-		<label for="proxmox_token_id" class="block text-sm font-medium text-text-secondary mb-1"
-			>API Token ID</label
-		>
+		<label for="proxmox_token_id" class="block text-sm font-medium text-text-secondary mb-1">API Token ID</label>
 		<input
 			id="proxmox_token_id"
 			type="text"
@@ -78,9 +105,7 @@
 	</div>
 
 	<div>
-		<label for="proxmox_token_secret" class="block text-sm font-medium text-text-secondary mb-1"
-			>API Token Secret</label
-		>
+		<label for="proxmox_token_secret" class="block text-sm font-medium text-text-secondary mb-1">API Token Secret</label>
 		<input
 			id="proxmox_token_secret"
 			type="password"
@@ -91,29 +116,59 @@
 	</div>
 
 	<div>
-		<label for="proxmox_storage" class="block text-sm font-medium text-text-secondary mb-1"
-			>Storage Target</label
-		>
-		<input
-			id="proxmox_storage"
-			type="text"
-			bind:value={proxmox_storage}
-			placeholder="local-lvm"
-			class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-		/>
+		<label for="proxmox_storage" class="block text-sm font-medium text-text-secondary mb-1">
+			Storage Target
+			{#if optionsLoading}
+				<Loader2 class="w-3 h-3 animate-spin inline ml-1" />
+			{/if}
+		</label>
+		{#if storages.length > 0}
+			<select
+				id="proxmox_storage"
+				bind:value={proxmox_storage}
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			>
+				{#each storages as s}
+					<option value={s.name}>{s.name} ({s.type}) — {s.availGB} GB frei von {s.totalGB} GB</option>
+				{/each}
+			</select>
+		{:else}
+			<input
+				id="proxmox_storage"
+				type="text"
+				bind:value={proxmox_storage}
+				placeholder="local-lvm"
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			/>
+		{/if}
 	</div>
 
 	<div>
-		<label for="proxmox_bridge" class="block text-sm font-medium text-text-secondary mb-1"
-			>Network Bridge</label
-		>
-		<input
-			id="proxmox_bridge"
-			type="text"
-			bind:value={proxmox_bridge}
-			placeholder="vmbr0"
-			class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-		/>
+		<label for="proxmox_bridge" class="block text-sm font-medium text-text-secondary mb-1">
+			Network Bridge
+			{#if optionsLoading}
+				<Loader2 class="w-3 h-3 animate-spin inline ml-1" />
+			{/if}
+		</label>
+		{#if bridges.length > 0}
+			<select
+				id="proxmox_bridge"
+				bind:value={proxmox_bridge}
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			>
+				{#each bridges as b}
+					<option value={b.name}>{b.name}{b.comment ? ` — ${b.comment}` : ''}</option>
+				{/each}
+			</select>
+		{:else}
+			<input
+				id="proxmox_bridge"
+				type="text"
+				bind:value={proxmox_bridge}
+				placeholder="vmbr0"
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			/>
+		{/if}
 	</div>
 
 	{#if feedback}

@@ -122,8 +122,8 @@ export async function createContainer(params: {
 		vmid: params.vmid,
 		hostname: params.hostname,
 		ostemplate: params.ostemplate,
-		rootfs: `${storage}:8`,
-		memory: params.memory || 256,
+		rootfs: `${storage}:4`,
+		memory: params.memory || 192,
 		cores: params.cores || 1,
 		net0: `name=eth0,bridge=${bridge},ip=dhcp`,
 		start: false
