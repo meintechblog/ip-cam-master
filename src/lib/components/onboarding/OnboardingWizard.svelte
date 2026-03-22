@@ -31,6 +31,7 @@
 	let ip = $state(prefillIp);
 	let username = $state(prefillUsername);
 	let password = $state(prefillPassword);
+	let credentialsMatched = $derived(!!(prefillUsername && prefillPassword));
 	let name = $state(prefillName);
 
 	// Transcode params
@@ -219,6 +220,7 @@
 				bind:fps
 				bind:bitrate
 				onSubmit={handleCredentialsSubmit}
+				{credentialsMatched}
 			/>
 		{:else if currentStep === 1}
 			<StepTestConnection

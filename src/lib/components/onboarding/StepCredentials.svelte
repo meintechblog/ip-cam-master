@@ -8,7 +8,8 @@
 		height = $bindable(720),
 		fps = $bindable(20),
 		bitrate = $bindable(5000),
-		onSubmit
+		onSubmit,
+		credentialsMatched = false
 	}: {
 		ip: string;
 		username: string;
@@ -19,6 +20,7 @@
 		fps: number;
 		bitrate: number;
 		onSubmit: () => void;
+		credentialsMatched?: boolean;
 	} = $props();
 
 
@@ -50,28 +52,35 @@
 		</div>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-		<div>
-			<label for="cam-user" class="block text-sm font-medium text-text-secondary mb-1">Benutzername</label>
-			<input
-				id="cam-user"
-				type="text"
-				bind:value={username}
-				autocomplete="off"
-				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-			/>
+	{#if credentialsMatched}
+		<div class="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3">
+			<span class="w-2 h-2 rounded-full bg-green-400"></span>
+			<span class="text-sm text-green-400">Zugangsdaten aus Einstellungen erkannt</span>
 		</div>
-		<div>
-			<label for="cam-pass" class="block text-sm font-medium text-text-secondary mb-1">Passwort</label>
-			<input
-				id="cam-pass"
-				type="password"
-				bind:value={password}
-				autocomplete="off"
-				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-			/>
+	{:else}
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div>
+				<label for="cam-user" class="block text-sm font-medium text-text-secondary mb-1">Benutzername</label>
+				<input
+					id="cam-user"
+					type="text"
+					bind:value={username}
+					autocomplete="off"
+					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+				/>
+			</div>
+			<div>
+				<label for="cam-pass" class="block text-sm font-medium text-text-secondary mb-1">Passwort</label>
+				<input
+					id="cam-pass"
+					type="password"
+					bind:value={password}
+					autocomplete="off"
+					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
+				/>
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<div>
 		<h3 class="text-sm font-medium text-text-secondary mb-3">Transcode-Parameter (optional)</h3>
