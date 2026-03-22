@@ -53,11 +53,10 @@
 	let snapshotSrc = $state('');
 
 	function refreshSnapshot() {
-		if (!camera.cameraWebUrl || !isRunning) return;
+		if (!camera.snapshotUrl || !isRunning) return;
 		const img = new Image();
 		img.onload = () => { snapshotSrc = img.src; };
-		// Load directly from camera — no proxy needed, much faster
-		img.src = `${camera.cameraWebUrl}/record/current.jpg?t=${Date.now()}`;
+		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
 	}
 
 	$effect(() => {
