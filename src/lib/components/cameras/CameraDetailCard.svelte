@@ -30,7 +30,7 @@
 
 <div class="bg-bg-card border border-border rounded-lg overflow-hidden w-full">
 	<!-- Top: Snapshot full width with aspect ratio -->
-	<div class="relative bg-black" style="aspect-ratio: {camera.width}/{camera.height}; max-height: 360px;">
+	<div class="relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
 		{#if snapshotSrc}
 			<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
 		{:else}
