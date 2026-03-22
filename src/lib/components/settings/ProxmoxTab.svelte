@@ -9,8 +9,6 @@
 	let proxmox_token_secret = $state(initialValues.proxmox_token_secret ?? '');
 	let proxmox_storage = $state(initialValues.proxmox_storage ?? 'local-lvm');
 	let proxmox_bridge = $state(initialValues.proxmox_bridge ?? 'vmbr0');
-	let proxmox_vmid_start = $state(initialValues.proxmox_vmid_start ?? '200');
-
 	let saving = $state(false);
 	let feedback: { type: 'success' | 'error'; message: string } | null = $state(null);
 
@@ -27,8 +25,7 @@
 					proxmox_token_id,
 					proxmox_token_secret,
 					proxmox_storage,
-					proxmox_bridge,
-					proxmox_vmid_start
+					proxmox_bridge
 				})
 			});
 
@@ -115,19 +112,6 @@
 			type="text"
 			bind:value={proxmox_bridge}
 			placeholder="vmbr0"
-			class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-		/>
-	</div>
-
-	<div>
-		<label for="proxmox_vmid_start" class="block text-sm font-medium text-text-secondary mb-1"
-			>VMID Range Start</label
-		>
-		<input
-			id="proxmox_vmid_start"
-			type="number"
-			bind:value={proxmox_vmid_start}
-			placeholder="200"
 			class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
 		/>
 	</div>
