@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md -- Scaffold SvelteKit project, database, crypto, settings backend + API routes
 - [x] 01-02-PLAN.md -- LXC container management: Proxmox service + container REST API
-- [ ] 01-03-PLAN.md -- Web UI: layout, settings page, container card grid, visual checkpoint
+- [x] 01-03-PLAN.md -- Web UI: layout, settings page, container card grid, visual checkpoint
 
 ### Phase 2: Mobotix Camera Pipeline
 **Goal**: User can onboard a Mobotix camera end-to-end, from credential entry through verified H.264 RTSP stream output
