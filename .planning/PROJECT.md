@@ -12,7 +12,9 @@ One-click camera onboarding: discover a camera in the network, and the app handl
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Proxmox host configuration in the app (connection details for LXC management) — *Phase 1*
+- [x] Camera credentials managed securely (never in repo, local config only) — *Phase 1*
+- [x] Web dashboard showing all managed cameras with status (online/offline/error) — *Phase 1 (foundation)*
 
 ### Active
 
