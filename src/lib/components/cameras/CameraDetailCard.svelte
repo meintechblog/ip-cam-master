@@ -148,6 +148,12 @@
 					<span>Hostname</span>
 					<span class="text-text-primary">cam-{camera.vmid}</span>
 				</div>
+				{#if camera.lxcMac}
+					<div class="flex justify-between text-text-secondary">
+						<span>MAC</span>
+						<span class="font-mono text-text-primary text-[10px]">{camera.lxcMac}</span>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Container Actions -->

@@ -114,4 +114,5 @@ export interface CameraCardData {
 	liveFps: number | null;
 	lxcCpu: number | null;
 	lxcMemory: { used: number; total: number } | null;
+	lxcMac: string | null;
 }

@@ -31,6 +31,21 @@ export const GET: RequestHandler = async () => {
 				const containerIp = cam.containerIp;
 				const lxcCpu = containerData?.cpu ?? null;
 				const lxcMemory = containerData?.memory ?? null;
+				let lxcMac: string | null = null;
+
+				// Get MAC from Proxmox container config
+				if (containerData) {
+					try {
+						const { execSync } = await import('node:child_process');
+						const configJson = execSync(
+							`curl -sk -H "Authorization: PVEAPIToken=${(await getSettings('proxmox_')).proxmox_token_id}=${(await getSettings('proxmox_')).proxmox_token_secret}" "https://${(await getSettings('proxmox_')).proxmox_host.replace(/:.*$/, '')}:8006/api2/json/nodes/prox3/lxc/${cam.vmid}/config" --max-time 2`,
+							{ timeout: 3000, encoding: 'utf-8' }
+						);
+						const net0 = JSON.parse(configJson)?.data?.net0 || '';
+						const macMatch = net0.match(/hwaddr=([A-Fa-f0-9:]+)/);
+						if (macMatch) lxcMac = macMatch[1].toLowerCase();
+					} catch { /* skip */ }
+				}
 
 				let go2rtcRunning = false;
 				let onvifRunning = false;
@@ -121,7 +136,8 @@ export const GET: RequestHandler = async () => {
 						? `http://${containerIp}:1984`
 						: null,
 					lxcCpu: lxcCpu,
-					lxcMemory: lxcMemory
+					lxcMemory: lxcMemory,
+					lxcMac: lxcMac
 				} satisfies CameraCardData;
 			})
 		);
