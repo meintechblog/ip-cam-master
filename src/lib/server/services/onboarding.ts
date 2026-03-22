@@ -1,5 +1,5 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands } from './go2rtc';
 import { createContainer, startContainer } from './proxmox';
 import { getSettings } from './settings';
 import { encrypt, decrypt } from './crypto';
@@ -202,17 +202,43 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		}
 
 		const decryptedPassword = decrypt(camera.password);
-		const yamlContent = generateGo2rtcConfig({
-			streamName: camera.streamName,
-			cameraIp: camera.ip,
-			username: camera.username,
-			password: decryptedPassword,
-			width: camera.width,
-			height: camera.height,
-			fps: camera.fps,
-			bitrate: camera.bitrate,
-			streamPath: camera.streamPath
-		});
+		let yamlContent: string;
+
+		if (camera.cameraType === 'loxone') {
+			// Loxone Intercom: install nginx for auth-proxy, go2rtc reads from nginx
+			const nginxCmds = getNginxInstallCommands();
+			for (const cmd of nginxCmds) {
+				await executeOnContainer(ssh, camera.vmid, cmd);
+			}
+
+			// Generate and push nginx config (auth-stripping reverse proxy)
+			const nginxConfig = generateNginxConfig(camera.ip, camera.username, decryptedPassword);
+			await pushFileToContainer(ssh, camera.vmid, nginxConfig, '/etc/nginx/nginx.conf');
+			await executeOnContainer(ssh, camera.vmid, 'systemctl restart nginx');
+
+			// go2rtc reads from local nginx (no auth needed)
+			yamlContent = generateGo2rtcConfigLoxone({
+				streamName: camera.streamName,
+				width: camera.width,
+				height: camera.height,
+				fps: camera.fps,
+				bitrate: camera.bitrate
+			});
+		} else {
+			// Mobotix: go2rtc reads directly from camera RTSP
+			yamlContent = generateGo2rtcConfig({
+				streamName: camera.streamName,
+				cameraIp: camera.ip,
+				username: camera.username,
+				password: decryptedPassword,
+				width: camera.width,
+				height: camera.height,
+				fps: camera.fps,
+				bitrate: camera.bitrate,
+				streamPath: camera.streamPath
+			});
+		}
+
 		await pushFileToContainer(ssh, camera.vmid, yamlContent, '/etc/go2rtc/go2rtc.yaml');
 
 		const unitContent = generateSystemdUnit();

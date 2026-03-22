@@ -6,7 +6,7 @@ import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { name, ip, username, password, width, height, fps, bitrate, vmid } = await request.json();
+	const { name, ip, username, password, width, height, fps, bitrate, vmid, cameraType } = await request.json();
 
 	if (!name || !ip || !username || !password || !vmid) {
 		return json(
@@ -27,6 +27,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			ip,
 			username,
 			password,
+			cameraType: cameraType || 'mobotix',
+			streamPath: cameraType === 'loxone' ? '/mjpg/video.mjpg' : '/stream0/mobotix.mjpeg',
 			width: width || 1280,
 			height: height || 720,
 			fps: fps || 20,

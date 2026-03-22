@@ -32,9 +32,11 @@
 	$effect(() => { runDiscovery(); });
 
 	let prefillName = $state('');
+	let selectedCameraType = $state('mobotix');
 
-	async function selectCamera(ip: string, name?: string | null) {
+	async function selectCamera(ip: string, name?: string | null, type?: string) {
 		prefillName = name || '';
+		selectedCameraType = type || 'mobotix';
 		// Try saved credentials first
 		try {
 			const res = await fetch('/api/credentials/test', {
@@ -128,7 +130,7 @@
 			Login "{prefillCredName}" automatisch erkannt und vorausgefuellt.
 		</div>
 	{/if}
-	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} />
+	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} />
 {:else}
 	<!-- Manual entry -->
 	<div class="mb-6">
@@ -181,7 +183,7 @@
 								</button>
 							{:else}
 								<button
-									onclick={() => selectCamera(cam.ip, cam.name)}
+									onclick={() => selectCamera(cam.ip, cam.name, cam.type)}
 									class="bg-accent text-white rounded-lg px-4 py-2 hover:bg-accent/90 transition-colors text-sm cursor-pointer"
 								>
 									Einrichten

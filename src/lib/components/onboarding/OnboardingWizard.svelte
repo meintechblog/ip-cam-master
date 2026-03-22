@@ -10,13 +10,15 @@
 		prefillIp = '',
 		prefillUsername = '',
 		prefillPassword = '',
-		prefillName = ''
+		prefillName = '',
+		cameraType = 'mobotix'
 	}: {
 		nextVmid: number;
 		prefillIp?: string;
 		prefillUsername?: string;
 		prefillPassword?: string;
 		prefillName?: string;
+		cameraType?: string;
 	} = $props();
 
 	// Wizard state
@@ -139,7 +141,7 @@
 			const res = await fetch('/api/onboarding/save-camera', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, ip, username, password, width, height, fps, bitrate, vmid: nextVmid })
+				body: JSON.stringify({ name, ip, username, password, width, height, fps, bitrate, vmid: nextVmid, cameraType })
 			});
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'Kamera konnte nicht gespeichert werden');
@@ -168,7 +170,7 @@
 			const res = await fetch('/api/onboarding/test-connection', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip, username, password })
+				body: JSON.stringify({ ip, username, password, cameraType })
 			});
 			const data = await res.json();
 			if (!data.success && !data.resolution) throw new Error(data.error || 'Verbindungstest fehlgeschlagen');
@@ -190,7 +192,8 @@
 			connectionInfo = `${width}x${height} @ ${fps}fps, ${bitrate} kbit/s`;
 			addLog(1, 'Verbindung testen', `Kamera erreichbar — ${connectionInfo}`, 'done');
 
-			addSubLog(`Lade Vorschaubild von http://${ip}/record/current.jpg ...`);
+			const snapshotPath = cameraType === 'loxone' ? '/mjpg/video.mjpg' : '/record/current.jpg';
+		addSubLog(`Lade Vorschaubild von http://${ip}${snapshotPath} ...`);
 			loadSnapshot();
 			await new Promise(r => setTimeout(r, 3000));
 
@@ -244,9 +247,23 @@
 		addSubLog(`pct exec ${containerVmid} -- apt-get update && apt-get install -y ffmpeg wget`);
 		addSubLog(`go2rtc Binary von github.com/AlexxIT/go2rtc herunterladen...`);
 		addSubLog(`/usr/local/bin/go2rtc installiert`);
-		addSubLog(`go2rtc.yaml generieren:`);
-		addSubLog(`  Stream: ${streamName}`);
-		addSubLog(`  Source: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
+		if (cameraType === 'loxone') {
+			addSubLog(`nginx installieren (Reverse Proxy fuer Auth-Stripping)...`);
+			addSubLog(`nginx.conf generieren:`);
+			addSubLog(`  listen 127.0.0.1:8081`);
+			addSubLog(`  proxy_pass http://${ip}/mjpg/`);
+			addSubLog(`  Authorization: Basic (${username}:***) eingebettet`);
+			addSubLog(`  proxy_buffering off`);
+			addSubLog(`Config schreiben: /etc/nginx/nginx.conf`);
+			addSubLog(`nginx neu starten...`);
+			addSubLog(`go2rtc.yaml generieren:`);
+			addSubLog(`  Stream: ${streamName}`);
+			addSubLog(`  Source: http://localhost:8081/mjpg/video.mjpg (via nginx)`);
+		} else {
+			addSubLog(`go2rtc.yaml generieren:`);
+			addSubLog(`  Stream: ${streamName}`);
+			addSubLog(`  Source: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
+		}
 		addSubLog(`  Transcode: MJPEG → H.264, ${width}x${height}@${fps}fps, ${bitrate}k`);
 		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
 		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);

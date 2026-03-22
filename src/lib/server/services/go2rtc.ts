@@ -66,6 +66,62 @@ export function getInstallCommands(): string[] {
 }
 
 /**
+ * Generates go2rtc YAML config for a Loxone Intercom (reads from local nginx proxy).
+ */
+export function generateGo2rtcConfigLoxone(params: {
+	streamName: string;
+	width: number;
+	height: number;
+	fps: number;
+	bitrate: number;
+}): string {
+	const { streamName, width, height, fps, bitrate } = params;
+	const bufsize = bitrate * 2;
+
+	return `streams:
+  ${streamName}: ffmpeg:http://localhost:8081/mjpg/video.mjpg#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi
+`;
+}
+
+/**
+ * Generates nginx config for Loxone Intercom auth-proxy.
+ */
+export function generateNginxConfig(intercomIp: string, username: string, password: string): string {
+	const authBase64 = Buffer.from(`${username}:${password}`).toString('base64');
+
+	return `worker_processes 1;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    server {
+        listen 127.0.0.1:8081;
+
+        location /mjpg/ {
+            proxy_pass http://${intercomIp}/mjpg/;
+            proxy_set_header Authorization "Basic ${authBase64}";
+            proxy_set_header Host $host;
+            proxy_set_header Connection "";
+            proxy_http_version 1.1;
+            proxy_buffering off;
+        }
+    }
+}
+`;
+}
+
+/**
+ * Returns shell commands to install nginx in an LXC container.
+ */
+export function getNginxInstallCommands(): string[] {
+	return [
+		'apt-get install -y -qq nginx'
+	];
+}
+
+/**
  * Returns shell commands to install the ONVIF server in an LXC container.
  */
 export function getOnvifInstallCommands(): string[] {
