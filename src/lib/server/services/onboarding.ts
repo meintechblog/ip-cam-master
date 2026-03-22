@@ -139,7 +139,7 @@ export async function createCameraContainer(
 	await createContainer({
 		vmid: camera.vmid,
 		hostname: `cam-${camera.vmid}`,
-		ostemplate: 'local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst',
+		ostemplate: 'local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst',
 		cameraName: camera.name,
 		cameraIp: camera.ip,
 		cameraType: camera.cameraType

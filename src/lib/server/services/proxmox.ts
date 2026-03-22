@@ -73,6 +73,7 @@ export async function createContainer(params: {
 	const node = await getNodeName(proxmox);
 	const settings = await getSettings('proxmox_');
 	const bridge = settings.proxmox_bridge || 'vmbr0';
+	const storage = settings.proxmox_storage || 'local-lvm';
 
 	// Idempotency check: see if container with this VMID already exists
 	const existing = await proxmox.nodes.$(node).lxc.$get();
@@ -117,6 +118,7 @@ export async function createContainer(params: {
 		vmid: params.vmid,
 		hostname: params.hostname,
 		ostemplate: params.ostemplate,
+		rootfs: `${storage}:8`,
 		memory: params.memory || 512,
 		cores: params.cores || 1,
 		net0: `name=eth0,bridge=${bridge},ip=dhcp`,
