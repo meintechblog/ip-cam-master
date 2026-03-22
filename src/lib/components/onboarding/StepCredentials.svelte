@@ -1,8 +1,8 @@
 <script lang="ts">
 	let {
 		ip = $bindable(''),
-		username = $bindable('admin'),
-		password = $bindable('meinsm'),
+		username = $bindable(''),
+		password = $bindable(''),
 		name = $bindable(''),
 		width = $bindable(1280),
 		height = $bindable(720),
@@ -21,13 +21,10 @@
 		onSubmit: () => void;
 	} = $props();
 
-	function handleSubmit(e: Event) {
-		e.preventDefault();
-		onSubmit();
-	}
+
 </script>
 
-<form onsubmit={handleSubmit} class="space-y-6">
+<div class="space-y-6">
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 		<div>
 			<label for="cam-name" class="block text-sm font-medium text-text-secondary mb-1">Kamera-Name</label>
@@ -35,7 +32,7 @@
 				id="cam-name"
 				type="text"
 				bind:value={name}
-				required
+				autocomplete="off"
 				placeholder="z.B. Einfahrt Mobotix"
 				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
 			/>
@@ -46,7 +43,7 @@
 				id="cam-ip"
 				type="text"
 				bind:value={ip}
-				required
+				autocomplete="off"
 				placeholder="192.168.3.22"
 				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
 			/>
@@ -60,7 +57,7 @@
 				id="cam-user"
 				type="text"
 				bind:value={username}
-				required
+				autocomplete="off"
 				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
 			/>
 		</div>
@@ -70,7 +67,7 @@
 				id="cam-pass"
 				type="password"
 				bind:value={password}
-				required
+				autocomplete="off"
 				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
 			/>
 		</div>
@@ -120,10 +117,11 @@
 
 	<div class="flex justify-end">
 		<button
-			type="submit"
-			class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium"
+			type="button"
+			onclick={() => onSubmit()}
+			class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium cursor-pointer"
 		>
 			Weiter
 		</button>
 	</div>
-</form>
+</div>

@@ -17,8 +17,8 @@
 
 	// Form data
 	let ip = $state('');
-	let username = $state('admin');
-	let password = $state('meinsm');
+	let username = $state('');
+	let password = $state('');
 	let name = $state('');
 
 	// Transcode params
@@ -185,6 +185,17 @@
 	<StepIndicator {currentStep} />
 
 	<div class="bg-bg-card border border-border rounded-lg p-6">
+		{#if error}
+			<div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 text-red-400 text-sm">
+				{error}
+			</div>
+		{/if}
+		{#if loading}
+			<div class="flex items-center gap-2 mb-4 text-text-secondary text-sm">
+				<svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+				Wird verarbeitet...
+			</div>
+		{/if}
 		{#if currentStep === 0}
 			<StepCredentials
 				bind:ip

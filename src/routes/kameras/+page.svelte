@@ -7,10 +7,23 @@
 
 <div class="flex items-center justify-between mb-4">
 	<h1 class="text-2xl font-bold text-text-primary">Kameras</h1>
-	<a href="/kameras/onboarding" class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
-		+ Kamera hinzufuegen
-	</a>
+	{#if data.proxmoxConfigured}
+		<a href="/kameras/onboarding" class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
+			+ Kamera hinzufuegen
+		</a>
+	{:else}
+		<span class="inline-flex items-center gap-2 px-4 py-2 bg-bg-input text-text-secondary rounded-lg cursor-not-allowed" title="Proxmox muss zuerst in den Einstellungen konfiguriert werden">
+			+ Kamera hinzufuegen
+		</span>
+	{/if}
 </div>
+
+{#if !data.proxmoxConfigured}
+	<div class="bg-accent/10 border border-accent/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+		<span class="text-text-primary text-sm">Proxmox muss konfiguriert sein, bevor Kameras eingerichtet werden koennen.</span>
+		<a href="/settings" class="text-accent hover:text-accent/80 text-sm font-medium underline underline-offset-2">Zu den Einstellungen</a>
+	</div>
+{/if}
 
 {#if data.error}
 	<div class="mb-4">

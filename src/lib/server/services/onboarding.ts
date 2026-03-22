@@ -105,7 +105,7 @@ export async function saveCameraRecord(params: {
 	const encryptedPassword = encrypt(params.password);
 	const streamName = params.streamName || `cam-${params.vmid}`;
 
-	const result = db.insert(cameras)
+	db.insert(cameras)
 		.values({
 			vmid: params.vmid,
 			name: params.name,
@@ -121,9 +121,11 @@ export async function saveCameraRecord(params: {
 			streamName,
 			status: 'pending'
 		})
-		.returning();
+		.run();
 
-	return result[0].id;
+	// Get the inserted camera by vmid
+	const inserted = db.select({ id: cameras.id }).from(cameras).where(eq(cameras.vmid, params.vmid)).get();
+	return inserted?.id ?? 0;
 }
 
 /**
