@@ -339,13 +339,20 @@ export async function getNextVmid(): Promise<number> {
 		if (allVmids.length === 0) return 2000;
 
 		const maxVmid = Math.max(...allVmids);
-		// Round up to next 1000 for our range
-		const rangeStart = Math.ceil((maxVmid + 1) / 1000) * 1000;
-
-		// Find next free in our range
-		const usedInRange = new Set(allVmids.filter((v) => v >= rangeStart));
-		let next = rangeStart;
-		while (usedInRange.has(next)) next++;
+		// Our managed VMIDs start at 2000+. If none of ours exist yet,
+		// round up to next 1000 boundary. Otherwise just increment.
+		const ourVmids = allVmids.filter((v) => v >= 2000);
+		let next: number;
+		if (ourVmids.length === 0) {
+			// First managed container: round up to next 1000
+			next = Math.ceil((maxVmid + 1) / 1000) * 1000;
+		} else {
+			// Subsequent: just max + 1
+			next = Math.max(...ourVmids) + 1;
+		}
+		// Skip any that are already in use
+		const usedSet = new Set(allVmids);
+		while (usedSet.has(next)) next++;
 		return next;
 	} catch {
 		// Fallback if Proxmox unreachable
