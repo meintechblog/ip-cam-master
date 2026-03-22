@@ -222,6 +222,12 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		const uuidResult = await executeOnContainer(ssh, camera.vmid, 'cat /proc/sys/kernel/random/uuid');
 		const uuid = uuidResult.stdout.trim();
 
+		// Patch onvif-server source: replace hardcoded "Cardinal" with camera name
+		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
+		await executeOnContainer(ssh, camera.vmid,
+			`sed -i "s/Cardinal/${safeName}/g" /root/onvif-server/src/onvif-server.js`
+		);
+
 		// Generate and push ONVIF config
 		const onvifConfig = generateOnvifConfig({
 			streamName: camera.streamName,
