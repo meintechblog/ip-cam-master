@@ -83,47 +83,7 @@
 		</div>
 	{/if}
 
-	<div>
-		<h3 class="text-sm font-medium text-text-secondary mb-3">Transcode-Parameter (optional)</h3>
-		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-			<div>
-				<label for="cam-width" class="block text-xs text-text-secondary mb-1">Breite</label>
-				<input
-					id="cam-width"
-					type="number"
-					bind:value={width}
-					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-				/>
-			</div>
-			<div>
-				<label for="cam-height" class="block text-xs text-text-secondary mb-1">Hoehe</label>
-				<input
-					id="cam-height"
-					type="number"
-					bind:value={height}
-					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-				/>
-			</div>
-			<div>
-				<label for="cam-fps" class="block text-xs text-text-secondary mb-1">FPS</label>
-				<input
-					id="cam-fps"
-					type="number"
-					bind:value={fps}
-					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-				/>
-			</div>
-			<div>
-				<label for="cam-bitrate" class="block text-xs text-text-secondary mb-1">Bitrate kbit/s</label>
-				<input
-					id="cam-bitrate"
-					type="number"
-					bind:value={bitrate}
-					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:border-accent"
-				/>
-			</div>
-		</div>
-	</div>
+	<!-- Transcode params are auto-detected from camera config in step 2 -->
 
 	<div class="flex justify-end">
 		<button
