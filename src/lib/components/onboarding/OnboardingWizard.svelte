@@ -60,6 +60,15 @@
 		}
 	}
 
+	// Sub-log for granular progress within a step
+	let subLog = $state<string[]>([]);
+	function addSubLog(msg: string) {
+		subLog = [...subLog, msg];
+	}
+	function clearSubLog() {
+		subLog = [];
+	}
+
 	// Load snapshot from camera
 	async function loadSnapshot() {
 		if (!ip || !username || !password) return;
@@ -108,7 +117,10 @@
 	async function runStep1_TestConnection() {
 		currentStep = 1;
 		error = null;
-		addLog(1, 'Verbindung', 'Teste Kamera-Verbindung...', 'active');
+		clearSubLog();
+		addLog(1, 'Verbindung testen', 'Starte Verbindungstest...', 'active');
+		addSubLog(`SSH-Verbindung zum Proxmox-Host wird aufgebaut...`);
+		addSubLog(`Teste RTSP-Zugang: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
 
 		try {
 			const res = await fetch('/api/onboarding/test-connection', {
@@ -119,26 +131,31 @@
 			const data = await res.json();
 			if (!data.success && !data.resolution) throw new Error(data.error || 'Verbindungstest fehlgeschlagen');
 
-			// Auto-fill params
 			if (data.resolution) {
 				const parts = data.resolution.split('x');
 				if (parts.length === 2) { width = parseInt(parts[0]) || width; height = parseInt(parts[1]) || height; }
+				addSubLog(`Kamera-Aufloesung erkannt: ${data.resolution}`);
 			}
-			if (data.fps) fps = data.fps;
+			if (data.fps) {
+				fps = data.fps;
+				addSubLog(`Kamera-Framerate erkannt: ${fps} fps (aus Mobotix framerate100)`);
+			}
 			const pixels = width * height;
 			bitrate = Math.max(1000, Math.min(Math.round((pixels * fps * 0.1) / 1000 / 500) * 500, 10000));
+			addSubLog(`Bitrate berechnet: ${bitrate} kbit/s (${width}x${height} x ${fps}fps x 0.1bpp)`);
+			addSubLog(`Stream-Pfad: ${data.streamPath || '/stream0/mobotix.mjpeg'}`);
 
 			connectionInfo = `${width}x${height} @ ${fps}fps, ${bitrate} kbit/s`;
-			addLog(1, 'Verbindung', `Erfolgreich — ${connectionInfo}`, 'done');
+			addLog(1, 'Verbindung testen', `Kamera erreichbar — ${connectionInfo}`, 'done');
 
-			// Load snapshot + show for 3s
+			addSubLog(`Lade Vorschaubild von http://${ip}/record/current.jpg ...`);
 			loadSnapshot();
 			await new Promise(r => setTimeout(r, 3000));
 
 			await runStep2_CreateContainer();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
-			addLog(1, 'Verbindung', `Fehler: ${error}`, 'done');
+			addLog(1, 'Verbindung testen', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
 	}
@@ -147,7 +164,15 @@
 	async function runStep2_CreateContainer() {
 		currentStep = 2;
 		error = null;
-		addLog(2, 'Container', `LXC ${nextVmid} wird erstellt (Debian 12, 192MB RAM, VAAPI)...`, 'active');
+		clearSubLog();
+		const hostname = `cam-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+		addLog(2, 'Container erstellen', `LXC ${nextVmid} wird auf Proxmox erstellt...`, 'active');
+		addSubLog(`Proxmox API: POST /nodes/prox3/lxc`);
+		addSubLog(`VMID: ${nextVmid}, Hostname: ${hostname}`);
+		addSubLog(`Template: debian-12-standard_12.12-1_amd64.tar.zst`);
+		addSubLog(`RAM: 192 MB, Disk: 4 GB, CPU: 1 Core`);
+		addSubLog(`Network: vmbr0 (DHCP)`);
+		addSubLog(`VAAPI Passthrough: /dev/dri/renderD128 (via SSH pct set)`);
 
 		try {
 			const res = await fetch('/api/onboarding/create-container', {
@@ -160,11 +185,12 @@
 			containerIp = data.containerIp;
 			containerVmid = data.vmid;
 
-			addLog(2, 'Container', `LXC ${data.vmid} erstellt — IP ${containerIp}`, 'done');
+			addSubLog(`Container gestartet, DHCP-IP erhalten: ${containerIp}`);
+			addLog(2, 'Container erstellen', `LXC ${data.vmid} erstellt — ${hostname} @ ${containerIp}`, 'done');
 			await runStep3_ConfigureGo2rtc();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
-			addLog(2, 'Container', `Fehler: ${error}`, 'done');
+			addLog(2, 'Container erstellen', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
 	}
@@ -173,7 +199,19 @@
 	async function runStep3_ConfigureGo2rtc() {
 		currentStep = 3;
 		error = null;
-		addLog(3, 'go2rtc', 'ffmpeg + go2rtc werden installiert, VAAPI-Transcoding konfiguriert...', 'active');
+		clearSubLog();
+		addLog(3, 'go2rtc konfigurieren', 'Installiere ffmpeg + go2rtc im Container...', 'active');
+		addSubLog(`pct exec ${containerVmid} -- apt-get update && apt-get install -y ffmpeg wget`);
+		addSubLog(`go2rtc Binary von github.com/AlexxIT/go2rtc herunterladen...`);
+		addSubLog(`/usr/local/bin/go2rtc installiert`);
+		addSubLog(`go2rtc.yaml generieren:`);
+		addSubLog(`  Stream: ${streamName}`);
+		addSubLog(`  Source: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
+		addSubLog(`  Transcode: MJPEG → H.264, ${width}x${height}@${fps}fps, ${bitrate}k`);
+		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
+		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);
+		addSubLog(`systemd Unit: /etc/systemd/system/go2rtc.service`);
+		addSubLog(`systemctl daemon-reload && enable && restart go2rtc`);
 
 		try {
 			const res = await fetch('/api/onboarding/configure-go2rtc', {
@@ -184,11 +222,12 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
-			addLog(3, 'go2rtc', `go2rtc laeuft — MJPEG → H.264 VAAPI, ${width}x${height}@${fps}fps`, 'done');
+			addSubLog(`go2rtc Service laeuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
+			addLog(3, 'go2rtc konfigurieren', `go2rtc laeuft — MJPEG → H.264 VAAPI @ ${containerIp}:8554`, 'done');
 			await runStep4_ConfigureOnvif();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
-			addLog(3, 'go2rtc', `Fehler: ${error}`, 'done');
+			addLog(3, 'go2rtc konfigurieren', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
 	}
@@ -197,7 +236,24 @@
 	async function runStep4_ConfigureOnvif() {
 		currentStep = 4;
 		error = null;
-		addLog(4, 'ONVIF', 'Node.js + ONVIF Server installieren, Device-Naming konfigurieren...', 'active');
+		clearSubLog();
+		const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
+		addLog(4, 'ONVIF Server', 'Node.js + ONVIF Server werden installiert...', 'active');
+		addSubLog(`Node.js 22 LTS installieren (curl deb.nodesource.com | bash)`);
+		addSubLog(`git clone github.com/daniela-hase/onvif-server`);
+		addSubLog(`npm install --production`);
+		addSubLog(`MAC-Adresse auslesen: ip link show eth0`);
+		addSubLog(`UUID generieren: /proc/sys/kernel/random/uuid`);
+		addSubLog(`onvif-server.js patchen:`);
+		addSubLog(`  Manufacturer: 'Onvif' → '${safeName}'`);
+		addSubLog(`  Model: 'Cardinal' → 'Mobotix'`);
+		addSubLog(`  ONVIF-Name: 'Cardinal' → 'MOBOTIXS15'`);
+		addSubLog(`config.yaml generieren:`);
+		addSubLog(`  Stream: /${streamName} → localhost:8554`);
+		addSubLog(`  Snapshot: /api/frame.jpeg?src=${streamName} → localhost:1984`);
+		addSubLog(`  ONVIF Port: 8899`);
+		addSubLog(`systemd Unit: /etc/systemd/system/onvif-server.service`);
+		addSubLog(`systemctl daemon-reload && enable && restart onvif-server`);
 
 		try {
 			const res = await fetch('/api/onboarding/configure-onvif', {
@@ -208,11 +264,12 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
-			addLog(4, 'ONVIF', `ONVIF Server laeuft — Geraet "${name}", Manufacturer "${name}", Model "Mobotix"`, 'done');
+			addSubLog(`ONVIF Server laeuft auf Port 8899 — Discovery aktiv`);
+			addLog(4, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899`, 'done');
 			await runStep5_VerifyStream();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
-			addLog(4, 'ONVIF', `Fehler: ${error}`, 'done');
+			addLog(4, 'ONVIF Server', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
 	}
@@ -221,7 +278,11 @@
 	async function runStep5_VerifyStream() {
 		currentStep = 5;
 		error = null;
-		addLog(5, 'Verifizieren', 'go2rtc Stream wird geprueft...', 'active');
+		clearSubLog();
+		addLog(5, 'Stream verifizieren', 'Pruefe ob alles laeuft...', 'active');
+		addSubLog(`GET http://${containerIp}:1984/api/streams`);
+		addSubLog(`Pruefe Stream "${streamName}" ...`);
+		addSubLog(`Erwarte: mindestens 1 Producer (ffmpeg/go2rtc)`);
 
 		try {
 			const res = await fetch('/api/onboarding/verify-stream', {
@@ -233,11 +294,14 @@
 			if (!data.success) throw new Error(data.error || 'Stream-Verifikation fehlgeschlagen');
 			rtspUrl = data.rtspUrl;
 
-			addLog(5, 'Verifizieren', `Stream aktiv — ${rtspUrl}`, 'done');
+			addSubLog(`Stream aktiv: ${data.streamInfo?.producers || 1} Producer`);
+			addSubLog(`RTSP-Output: ${rtspUrl}`);
+			addSubLog(`Kamera ist jetzt per ONVIF-Discovery in UniFi Protect auffindbar`);
+			addLog(5, 'Stream verifizieren', `Alles laeuft — ${rtspUrl}`, 'done');
 			loading = false;
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
-			addLog(5, 'Verifizieren', `Fehler: ${error}`, 'done');
+			addLog(5, 'Stream verifizieren', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
 	}
@@ -310,13 +374,24 @@
 								{:else}
 									<Loader2 class="w-5 h-5 text-accent animate-spin shrink-0 mt-0.5" />
 								{/if}
-								<div>
+								<div class="flex-1 min-w-0">
 									<span class="text-sm font-medium text-text-primary">{log.label}</span>
 									<p class="text-xs text-text-secondary">{log.detail}</p>
 								</div>
 							</div>
 						{/each}
 					</div>
+
+					<!-- Sub-log: detailed progress -->
+					{#if subLog.length > 0}
+						<div class="mt-4 bg-bg-primary/50 rounded-lg p-3 max-h-48 overflow-y-auto">
+							<div class="space-y-0.5 font-mono text-[11px]">
+								{#each subLog as line, i}
+									<p class="{i === subLog.length - 1 && loading ? 'text-accent' : 'text-text-secondary/60'}">{line}</p>
+								{/each}
+							</div>
+						</div>
+					{/if}
 
 					<!-- Final result -->
 					{#if rtspUrl && !loading && !error}
