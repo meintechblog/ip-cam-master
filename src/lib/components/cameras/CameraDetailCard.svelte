@@ -4,7 +4,6 @@
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
-	let snapshotSrc = $state('');
 
 	function copyRtsp() {
 		if (camera.rtspUrl) {
@@ -14,18 +13,12 @@
 		}
 	}
 
-	function refreshSnapshot() {
-		if (!camera.snapshotUrl) return;
-		const img = new Image();
-		img.onload = () => { snapshotSrc = img.src; };
-		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
-	}
-
-	$effect(() => {
-		refreshSnapshot();
-		const timer = setInterval(refreshSnapshot, 10000);
-		return () => clearInterval(timer);
-	});
+	// go2rtc stream URL for live video via WebRTC/MSE
+	let streamUrl = $derived(
+		camera.containerIp && camera.go2rtcRunning
+			? `http://${camera.containerIp}:1984/stream.html?src=${camera.streamName}&mode=webrtc`
+			: null
+	);
 
 	function formatBytes(bytes: number): string {
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -38,12 +31,17 @@
 	<div class="flex flex-col lg:flex-row">
 		<!-- Snapshot -->
 		<div class="flex-1 relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
-			{#if snapshotSrc}
-				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
+			{#if streamUrl}
+				<iframe
+					src={streamUrl}
+					title="{camera.name} Live"
+					class="w-full h-full border-0"
+					allow="autoplay"
+				></iframe>
 			{:else}
-				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">Kein Vorschaubild</div>
+				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">Kein Stream verfuegbar</div>
 			{/if}
-			<div class="absolute top-3 left-3 flex items-center gap-2">
+			<div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
 				<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
 			</div>
 		</div>
