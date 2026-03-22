@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **LXC-01**: App creates a Proxmox LXC container for a camera via Proxmox API
 - [x] **LXC-02**: App configures VAAPI device passthrough (/dev/dri) in LXC container
-- [ ] **LXC-03**: App installs and configures go2rtc inside the LXC container
+- [x] **LXC-03**: App installs and configures go2rtc inside the LXC container
 - [ ] **LXC-04**: App installs and configures nginx inside LXC container (for Loxone Intercom cameras)
 - [x] **LXC-05**: User can start, stop, and restart a camera's LXC container from the dashboard
 - [x] **LXC-06**: User can delete a camera's LXC container with confirmation dialog
@@ -36,12 +36,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### go2rtc Configuration
 
-- [ ] **G2R-01**: App generates correct go2rtc YAML config for Mobotix cameras (MJPEG->H.264, VAAPI)
+- [x] **G2R-01**: App generates correct go2rtc YAML config for Mobotix cameras (MJPEG->H.264, VAAPI)
 - [ ] **G2R-02**: App generates correct go2rtc YAML config for Loxone Intercom (via nginx proxy stream)
 - [ ] **G2R-03**: App generates nginx config for Loxone Intercom auth-proxy (Basic Auth header injection, buffering disabled)
-- [ ] **G2R-04**: App deploys generated configs to the LXC container and restarts services
-- [ ] **G2R-05**: User can customize transcode parameters (resolution, fps, bitrate) per camera
-- [ ] **G2R-06**: App validates stream is accessible after config deployment
+- [x] **G2R-04**: App deploys generated configs to the LXC container and restarts services
+- [x] **G2R-05**: User can customize transcode parameters (resolution, fps, bitrate) per camera
+- [x] **G2R-06**: App validates stream is accessible after config deployment
 
 ### Camera Dashboard
 
@@ -121,17 +121,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISC-06 | Phase 3 | Pending |
 | LXC-01 | Phase 1 | Complete |
 | LXC-02 | Phase 1 | Complete |
-| LXC-03 | Phase 2 | Pending |
+| LXC-03 | Phase 2 | Complete |
 | LXC-04 | Phase 3 | Pending |
 | LXC-05 | Phase 1 | Complete |
 | LXC-06 | Phase 1 | Complete |
 | LXC-07 | Phase 1 | Complete |
-| G2R-01 | Phase 2 | Pending |
+| G2R-01 | Phase 2 | Complete |
 | G2R-02 | Phase 3 | Pending |
 | G2R-03 | Phase 3 | Pending |
-| G2R-04 | Phase 2 | Pending |
-| G2R-05 | Phase 2 | Pending |
-| G2R-06 | Phase 2 | Pending |
+| G2R-04 | Phase 2 | Complete |
+| G2R-05 | Phase 2 | Complete |
+| G2R-06 | Phase 2 | Complete |
 | DASH-01 | Phase 4 | Pending |
 | DASH-02 | Phase 4 | Pending |
 | DASH-03 | Phase 4 | Pending |

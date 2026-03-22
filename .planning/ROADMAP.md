@@ -49,7 +49,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Backend services: SSH, go2rtc config generation, onboarding orchestration, DB schema + API routes
+- [x] 02-01-PLAN.md -- Backend services: SSH, go2rtc config generation, onboarding orchestration, DB schema + API routes
 - [ ] 02-02-PLAN.md -- 5-step onboarding wizard UI with progress indicator, step components, WebRTC preview
 - [ ] 02-03-PLAN.md -- Visual checkpoint: verify wizard UI and flow
 

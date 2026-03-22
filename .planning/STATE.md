@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-03-PLAN.md (checkpoint pending)
-last_updated: "2026-03-22T15:09:28.266Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-22T18:03:18.772Z"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 01 — foundation-and-proxmox-integration
+**Current focus:** Phase 02 — mobotix-camera-pipeline
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (mobotix-camera-pipeline) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: Not started
 | Phase 01 P01 | 6min | 3 tasks | 24 files |
 | Phase 01 P02 | 3min | 2 tasks | 7 files |
 | Phase 01 P03 | 4min | 3 tasks | 20 files |
+| Phase 02 P01 | 5min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Cached Proxmox node name in module-level variable to avoid repeated API calls per operation
 - [Phase 01]: Used simple custom tab implementation instead of bits-ui Tabs for lower complexity
 - [Phase 01]: Stored camera credentials as settings with credential_ prefix for Phase 1 simplicity
+- [Phase 02]: SSH bridge via pct exec for container commands instead of direct container SSH
+- [Phase 02]: go2rtc config uses hash-param syntax for ffmpeg options per go2rtc conventions
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T13:19:10.253Z
-Stopped at: Completed 01-03-PLAN.md (checkpoint pending)
+Last session: 2026-03-22T18:03:18.770Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
