@@ -46,8 +46,9 @@
 				type="text"
 				bind:value={ip}
 				autocomplete="off"
+				disabled={!!ip && credentialsMatched}
 				placeholder="192.168.3.22"
-				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
 			/>
 		</div>
 	</div>
