@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
-	import { ExternalLink, Copy, Check } from 'lucide-svelte';
+	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2 } from 'lucide-svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
@@ -20,6 +20,27 @@
 			copied = true;
 			setTimeout(() => { copied = false; }, 2000);
 		}
+	}
+
+	let actionLoading = $state(false);
+	let showDeleteConfirm = $state(false);
+
+	async function containerAction(action: 'start' | 'stop' | 'restart') {
+		actionLoading = true;
+		try {
+			await fetch(`/api/proxmox/containers/${camera.vmid}/${action}`, { method: 'POST' });
+		} catch { /* ignore */ }
+		finally { actionLoading = false; }
+	}
+
+	async function deleteContainer() {
+		actionLoading = true;
+		try {
+			await fetch(`/api/proxmox/containers/${camera.vmid}`, { method: 'DELETE' });
+			showDeleteConfirm = false;
+			window.location.reload();
+		} catch { /* ignore */ }
+		finally { actionLoading = false; }
 	}
 
 	let streamUrl = $derived(
@@ -115,6 +136,37 @@
 					<span class="text-text-primary">cam-{camera.vmid}</span>
 				</div>
 			</div>
+
+			<!-- Container Actions -->
+			<div class="flex items-center gap-1.5 mt-3 pt-3 border-t border-border">
+				<button onclick={() => containerAction('start')} disabled={actionLoading || camera.containerStatus === 'running'}
+					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer" title="Start">
+					<Play class="w-3 h-3" /> Start
+				</button>
+				<button onclick={() => containerAction('stop')} disabled={actionLoading || camera.containerStatus === 'stopped'}
+					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer" title="Stop">
+					<Square class="w-3 h-3" /> Stop
+				</button>
+				<button onclick={() => containerAction('restart')} disabled={actionLoading}
+					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer" title="Restart">
+					<RotateCw class="w-3 h-3" /> Restart
+				</button>
+				<button onclick={() => showDeleteConfirm = true} disabled={actionLoading}
+					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ml-auto" title="Loeschen">
+					<Trash2 class="w-3 h-3" />
+				</button>
+			</div>
+
+			<!-- Delete Confirm -->
+			{#if showDeleteConfirm}
+				<div class="mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+					<p class="text-xs text-red-400 mb-2">Container {camera.vmid} wirklich loeschen?</p>
+					<div class="flex gap-2">
+						<button onclick={deleteContainer} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Loeschen</button>
+						<button onclick={() => showDeleteConfirm = false} class="px-3 py-1 text-xs bg-bg-input text-text-secondary rounded hover:bg-bg-card cursor-pointer">Abbrechen</button>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 
