@@ -62,9 +62,21 @@
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
+					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{camera.cameraModel || camera.cameraType}</span></div>
 					<div class="flex justify-between"><span>Aufloesung</span><span class="text-text-primary">{camera.width}x{camera.height}</span></div>
-					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{camera.fps}</span></div>
-					<div class="flex justify-between"><span>Typ</span><span class="text-text-primary uppercase">{camera.cameraType}</span></div>
+					<div class="flex justify-between">
+						<span>FPS</span>
+						<span class="text-text-primary">
+							{#if camera.liveFps}
+								<span class="{camera.liveFps < camera.fps ? 'text-yellow-400' : 'text-green-400'}">{camera.liveFps}</span>/{camera.fps}
+							{:else}
+								{camera.fps}
+							{/if}
+						</span>
+					</div>
+					{#if camera.firmwareVersion}
+						<div class="flex justify-between"><span>Firmware</span><span class="text-text-primary">{camera.firmwareVersion}</span></div>
+					{/if}
 				</div>
 			</div>
 

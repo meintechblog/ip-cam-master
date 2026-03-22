@@ -84,9 +84,45 @@ export const GET: RequestHandler = async () => {
 				}
 
 				let cameraWebUrl: string | null = null;
+				let liveFps: number | null = null;
+				let cameraModel: string | null = null;
+				let firmwareVersion: string | null = null;
+
 				try {
 					const decryptedPass = decrypt(cam.password);
 					cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
+
+					// Probe camera for live FPS via ffprobe (non-blocking, 3s timeout)
+					try {
+						const { execSync } = await import('node:child_process');
+						const probeJson = execSync(
+							`ffprobe -v quiet -print_format json -show_streams -timeout 3000000 "rtsp://${cam.username}:${decryptedPass}@${cam.ip}:554${cam.streamPath || '/stream0/mobotix.mjpeg'}"`,
+							{ timeout: 5000, encoding: 'utf-8' }
+						);
+						const probeData = JSON.parse(probeJson);
+						const videoStream = probeData.streams?.find((s: any) => s.codec_type === 'video');
+						if (videoStream?.r_frame_rate) {
+							const [num, den] = videoStream.r_frame_rate.split('/').map(Number);
+							if (den > 0) liveFps = Math.round(num / den);
+						}
+					} catch {
+						// ffprobe timeout or not available — skip live FPS
+					}
+
+					// Get firmware version from Mobotix HTTP API via curl (supports digest auth)
+					try {
+						const { execSync } = await import('node:child_process');
+						const fwHtml = execSync(
+							`curl -s --anyauth -u "${cam.username}:${decryptedPass}" "http://${cam.ip}/control/userimage.html" --max-time 3`,
+							{ timeout: 5000, encoding: 'utf-8' }
+						);
+						const fwMatch = fwHtml.match(/filesystem__version="([^"]+)"/);
+						if (fwMatch) firmwareVersion = fwMatch[1];
+						const titleMatch = fwHtml.match(/<title>([^<]+)<\/title>/);
+						if (titleMatch) cameraModel = titleMatch[1].replace(' Live', '').trim();
+					} catch {
+						// Camera HTTP not reachable
+					}
 				} catch {
 					cameraWebUrl = `http://${cam.ip}`;
 				}
@@ -98,6 +134,9 @@ export const GET: RequestHandler = async () => {
 					cameraIp: cam.ip,
 					cameraType: cam.cameraType || 'mobotix',
 					cameraWebUrl,
+					cameraModel,
+					firmwareVersion,
+					liveFps,
 					containerIp,
 					streamName: cam.streamName,
 					rtspUrl: containerIp ? `rtsp://${containerIp}:8554/${cam.streamName}` : null,

@@ -109,4 +109,7 @@ export interface CameraCardData {
 	snapshotUrl: string | null;
 	go2rtcWebUrl: string | null;
 	cameraWebUrl: string | null;
+	cameraModel: string | null;
+	firmwareVersion: string | null;
+	liveFps: number | null;
 }
