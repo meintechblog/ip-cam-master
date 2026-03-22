@@ -49,11 +49,15 @@
 		finally { actionLoading = false; }
 	}
 
-	let isRunning = $derived(camera.containerStatus === 'running');
+	let isNativeOnvif = $derived(camera.status === 'native-onvif' || camera.cameraType === 'mobotix-onvif');
+	let isRunning = $derived(isNativeOnvif || camera.containerStatus === 'running');
 	let snapshotSrc = $state('');
 
 	function refreshSnapshot() {
-		if (!camera.snapshotUrl || !isRunning) return;
+		if (!isRunning) return;
+		// Native ONVIF: snapshot directly from camera via proxy
+		// Pipeline cameras: also via proxy
+		if (!camera.snapshotUrl && !isNativeOnvif) return;
 		const img = new Image();
 		img.onload = () => { snapshotSrc = img.src; };
 		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
@@ -88,7 +92,7 @@
 	<!-- Top: Stream + LXC info side by side -->
 	<div class="flex flex-col lg:flex-row">
 		<!-- Live Stream -->
-		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width}/{camera.height};">
+		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width || 16}/{camera.height || 9};">
 			{#if snapshotSrc && isRunning}
 				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
 			{:else}
@@ -101,7 +105,8 @@
 			</div>
 		</div>
 
-		<!-- LXC Container Info -->
+		<!-- LXC Container Info (only for pipeline cameras) -->
+		{#if !isNativeOnvif}
 		<div class="lg:w-64 xl:w-72 shrink-0 p-4 bg-bg-primary/30 border-l border-border">
 			<div class="flex items-center gap-2 mb-3">
 				<span class="w-2.5 h-2.5 rounded-full {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
@@ -187,8 +192,46 @@
 				</div>
 			{/if}
 		</div>
+		{:else}
+		<!-- Native ONVIF info panel -->
+		<div class="lg:w-64 xl:w-72 shrink-0 p-4 bg-bg-primary/30 border-l border-border">
+			<div class="flex items-center gap-2 mb-3">
+				<span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+				<span class="text-sm font-bold text-text-primary">Nativ ONVIF</span>
+			</div>
+			<div class="space-y-0.5 text-xs text-text-secondary">
+				<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
+				{#if probeData?.cameraModel}
+					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{probeData.cameraModel}</span></div>
+				{/if}
+				{#if probeData?.firmwareVersion}
+					<div class="flex justify-between"><span>Firmware</span><span class="text-text-primary">{probeData.firmwareVersion}</span></div>
+				{/if}
+				{#if probeData?.liveFps}
+					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
+				{/if}
+			</div>
+			<div class="mt-3 pt-3 border-t border-border">
+				<span class="text-xs text-green-400">Direkt in UniFi Protect nutzbar — kein Container noetig</span>
+			</div>
+			{#if camera.cameraWebUrl}
+				<a href={camera.cameraWebUrl} target="_blank" class="flex items-center gap-1 mt-2 text-xs text-accent hover:text-accent/80">
+					<ExternalLink class="w-3 h-3" /> Kamera oeffnen
+				</a>
+			{/if}
+		</div>
+		{/if}
 	</div>
 
+	{#if isNativeOnvif}
+	<!-- Simple info bar for native ONVIF -->
+	<div class="p-4 border-t border-border">
+		<div class="bg-bg-primary/50 rounded-lg px-4 py-3 flex items-center gap-3">
+			<span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+			<span class="text-sm text-text-primary">Diese Kamera unterstuetzt ONVIF nativ und kann direkt in UniFi Protect adopted werden.</span>
+		</div>
+	</div>
+	{:else}
 	<!-- Pipeline: horizontal flow with arrows -->
 	<div class="p-4 border-t border-border {!isRunning ? 'opacity-40 pointer-events-none' : ''}">
 		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
@@ -306,4 +349,5 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 </div>

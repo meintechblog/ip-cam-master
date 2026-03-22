@@ -1,15 +1,21 @@
 <script lang="ts">
 	import OnboardingWizard from '$lib/components/onboarding/OnboardingWizard.svelte';
-	import { Loader2, Wifi } from 'lucide-svelte';
+	import { Loader2, Wifi, Check } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
 
-	// Selected camera for wizard (null = manual entry)
 	let selectedIp = $state<string | null>(null);
-
-	// Discovery state
 	let discovered = $state<{ ip: string; type: string; alreadyOnboarded: boolean }[]>([]);
 	let scanning = $state(true);
+
+	// For ONVIF registration
+	let registeringIp = $state<string | null>(null);
+	let registerName = $state('');
+	let registerUser = $state('');
+	let registerPass = $state('');
+	let registerError = $state<string | null>(null);
+	let registerLoading = $state(false);
 
 	async function runDiscovery() {
 		scanning = true;
@@ -23,19 +29,53 @@
 		finally { scanning = false; }
 	}
 
-	$effect(() => {
-		runDiscovery();
-	});
+	$effect(() => { runDiscovery(); });
 
 	function selectCamera(ip: string) {
 		selectedIp = ip;
+	}
+
+	function startRegister(ip: string) {
+		registeringIp = ip;
+		registerName = '';
+		registerUser = '';
+		registerPass = '';
+		registerError = null;
+	}
+
+	async function submitRegister() {
+		if (!registerName || !registerUser || !registerPass || !registeringIp) {
+			registerError = 'Bitte alle Felder ausfuellen';
+			return;
+		}
+		registerLoading = true;
+		registerError = null;
+		try {
+			const res = await fetch('/api/cameras/register', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: registerName,
+					ip: registeringIp,
+					username: registerUser,
+					password: registerPass,
+					cameraType: 'mobotix-onvif'
+				})
+			});
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error);
+			goto('/kameras');
+		} catch (err: any) {
+			registerError = err.message || 'Registrierung fehlgeschlagen';
+		} finally {
+			registerLoading = false;
+		}
 	}
 </script>
 
 <h1 class="text-2xl font-bold text-text-primary mb-6">Kamera einrichten</h1>
 
 {#if selectedIp}
-	<!-- Wizard with pre-filled IP -->
 	<button onclick={() => selectedIp = null} class="text-accent hover:text-accent/80 text-sm mb-4 cursor-pointer">
 		&larr; Zurueck zur Auswahl
 	</button>
@@ -65,20 +105,88 @@
 		{:else}
 			<div class="space-y-3">
 				{#each discovered as cam (cam.ip)}
-					<div class="bg-bg-card border border-border rounded-lg p-4 flex items-center justify-between">
-						<div>
+					<div class="bg-bg-card border border-border rounded-lg p-4">
+						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-2">
 								<span class="w-2 h-2 rounded-full bg-green-400"></span>
 								<span class="text-text-primary font-mono font-medium">{cam.ip}</span>
-								<span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent uppercase">{cam.type}</span>
+								{#if cam.type === 'mobotix-onvif'}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">MOBOTIX ONVIF</span>
+									<span class="text-xs text-text-secondary">Nativ — kein Container noetig</span>
+								{:else if cam.type === 'mobotix'}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">MOBOTIX</span>
+									<span class="text-xs text-text-secondary">Braucht Pipeline (go2rtc + ONVIF)</span>
+								{:else}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 uppercase">{cam.type}</span>
+								{/if}
 							</div>
+							{#if cam.type === 'mobotix-onvif'}
+								<button
+									onclick={() => startRegister(cam.ip)}
+									class="bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors text-sm cursor-pointer"
+								>
+									Registrieren
+								</button>
+							{:else}
+								<button
+									onclick={() => selectCamera(cam.ip)}
+									class="bg-accent text-white rounded-lg px-4 py-2 hover:bg-accent/90 transition-colors text-sm cursor-pointer"
+								>
+									Einrichten
+								</button>
+							{/if}
 						</div>
-						<button
-							onclick={() => selectCamera(cam.ip)}
-							class="bg-accent text-white rounded-lg px-4 py-2 hover:bg-accent/90 transition-colors text-sm cursor-pointer"
-						>
-							Einrichten
-						</button>
+
+						<!-- Inline register form for native ONVIF -->
+						{#if registeringIp === cam.ip}
+							<div class="mt-3 pt-3 border-t border-border space-y-3">
+								{#if registerError}
+									<div class="text-red-400 text-xs">{registerError}</div>
+								{/if}
+								<div class="grid grid-cols-3 gap-3">
+									<input
+										type="text"
+										bind:value={registerName}
+										placeholder="Kamera-Name"
+										autocomplete="off"
+										class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+									/>
+									<input
+										type="text"
+										bind:value={registerUser}
+										placeholder="Benutzername"
+										autocomplete="off"
+										class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+									/>
+									<input
+										type="password"
+										bind:value={registerPass}
+										placeholder="Passwort"
+										autocomplete="off"
+										class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+									/>
+								</div>
+								<div class="flex gap-2">
+									<button
+										onclick={submitRegister}
+										disabled={registerLoading}
+										class="bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors text-sm cursor-pointer disabled:opacity-50"
+									>
+										{#if registerLoading}
+											<Loader2 class="w-4 h-4 animate-spin inline" />
+										{:else}
+											Speichern
+										{/if}
+									</button>
+									<button
+										onclick={() => registeringIp = null}
+										class="bg-bg-input text-text-secondary rounded-lg px-4 py-2 hover:bg-bg-card text-sm cursor-pointer"
+									>
+										Abbrechen
+									</button>
+								</div>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>

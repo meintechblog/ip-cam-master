@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
 
 export interface DiscoveredCamera {
 	ip: string;
-	type: 'mobotix' | 'loxone' | 'unknown';
+	type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'unknown';
 	alreadyOnboarded: boolean;
 }
 
@@ -40,7 +40,13 @@ for ip in $(seq ${rangeStart} ${rangeEnd}); do
       # Mobotix: follow redirect, check for 'mobotix' in page
       RESP_L=$(curl -s --max-time 1 -L "http://$FULL/" 2>/dev/null | head -c 2000)
       if echo "$RESP_L" | grep -qi "mobotix"; then
-        echo "mobotix:$FULL"
+        # Check native ONVIF support (405 = endpoint exists, needs POST)
+        ONVIF_CODE=$(curl -s --max-time 1 -o /dev/null -w "%{http_code}" "http://$FULL/onvif/device_service" 2>/dev/null)
+        if [ "$ONVIF_CODE" = "405" ] || [ "$ONVIF_CODE" = "200" ]; then
+          echo "mobotix-onvif:$FULL"
+        else
+          echo "mobotix:$FULL"
+        fi
       fi
     fi
   ) &
@@ -61,7 +67,9 @@ wait
 			.split('\n')
 			.filter(Boolean)
 			.map((line) => {
-				const [type, ip] = line.split(':') as ['mobotix' | 'loxone', string];
+				const colonIdx = line.indexOf(':');
+				const type = line.substring(0, colonIdx) as DiscoveredCamera['type'];
+				const ip = line.substring(colonIdx + 1);
 				return {
 					ip,
 					type,

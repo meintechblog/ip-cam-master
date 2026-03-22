@@ -133,9 +133,7 @@ export const GET: RequestHandler = async () => {
 					onvifRunning,
 					streamInfo,
 					connectedClients,
-					snapshotUrl: containerIp && go2rtcRunning
-						? `/api/cameras/${cam.id}/snapshot`
-						: null,
+					snapshotUrl: `/api/cameras/${cam.id}/snapshot`,
 					go2rtcWebUrl: containerIp
 						? `http://${containerIp}:1984`
 						: null,
