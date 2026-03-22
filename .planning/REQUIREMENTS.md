@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure Setup
 
-- [ ] **INFRA-01**: User can configure Proxmox host connection (IP, API token, storage target, network bridge)
-- [ ] **INFRA-02**: App validates Proxmox connection on save and shows success/error
-- [ ] **INFRA-03**: User can configure UniFi Dream Machine connection (IP, SSH credentials)
-- [ ] **INFRA-04**: User can configure credential store for camera access (local-only, never in repo)
-- [ ] **INFRA-05**: App stores all secrets in local SQLite database outside of git-tracked files
+- [x] **INFRA-01**: User can configure Proxmox host connection (IP, API token, storage target, network bridge)
+- [x] **INFRA-02**: App validates Proxmox connection on save and shows success/error
+- [x] **INFRA-03**: User can configure UniFi Dream Machine connection (IP, SSH credentials)
+- [x] **INFRA-04**: User can configure credential store for camera access (local-only, never in repo)
+- [x] **INFRA-05**: App stores all secrets in local SQLite database outside of git-tracked files
 
 ### Network Discovery
 
@@ -108,11 +108,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
-| INFRA-04 | Phase 1 | Pending |
-| INFRA-05 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
+| INFRA-04 | Phase 1 | Complete |
+| INFRA-05 | Phase 1 | Complete |
 | DISC-01 | Phase 3 | Pending |
 | DISC-02 | Phase 3 | Pending |
 | DISC-03 | Phase 3 | Pending |
