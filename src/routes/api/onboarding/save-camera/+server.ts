@@ -1,6 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { saveCameraRecord } from '$lib/server/services/onboarding';
+import { db } from '$lib/server/db/client';
+import { cameras } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const { name, ip, username, password, width, height, fps, bitrate, vmid } = await request.json();
@@ -10,6 +13,12 @@ export const POST: RequestHandler = async ({ request }) => {
 			{ success: false, error: 'Name, IP, Username, Passwort und VMID erforderlich' },
 			{ status: 400 }
 		);
+	}
+
+	// Check for existing camera with same IP
+	const existing = db.select().from(cameras).where(eq(cameras.ip, ip)).get() as any;
+	if (existing) {
+		return json({ success: true, cameraId: existing.id });
 	}
 
 	try {
