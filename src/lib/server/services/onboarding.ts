@@ -223,12 +223,14 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		const uuid = uuidResult.stdout.trim();
 
 		// Patch onvif-server source for UniFi Protect display
+		// Pattern from working containers (e.g., 1003/Balkon):
+		//   Manufacturer = camera name (shown as device name in Protect)
+		//   Model = 'Mobotix' (shown as model in Protect)
+		//   onvif name = 'MOBOTIXS15' (shown during discovery)
+		//   Config names = {Name}HqCameraConfiguration / {Name}LqCameraConfiguration
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
-		// Build model string from camera type (e.g., "MOBOTIXS15" for Mobotix S15D-Sec)
-		const modelName = camera.cameraType === 'mobotix'
-			? `MOBOTIX${camera.name}` : camera.name;
 		await executeOnContainer(ssh, camera.vmid,
-			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${camera.cameraType === 'mobotix' ? 'Mobotix' : safeName}'/g; s/Model: 'Cardinal'/Model: '${modelName}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${safeName}|g" /root/onvif-server/src/onvif-server.js`
+			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${safeName}'/g; s/Model: 'Cardinal'/Model: 'Mobotix'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/MOBOTIXS15|g" /root/onvif-server/src/onvif-server.js`
 		);
 
 		// Generate and push ONVIF config

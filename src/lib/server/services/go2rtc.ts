@@ -119,6 +119,15 @@ export function generateOnvifConfig(params: {
       height: ${height}
       framerate: ${fps}
       bitrate: ${bitrate}
+      quality: 4
+    lowQuality:
+      rtsp: /${streamName}
+      snapshot: /api/frame.jpeg?src=${streamName}
+      width: ${width}
+      height: ${height}
+      framerate: ${fps}
+      bitrate: ${bitrate}
+      quality: 1
     target:
       hostname: localhost
       ports:
