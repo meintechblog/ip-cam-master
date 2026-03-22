@@ -66,6 +66,90 @@ export function getInstallCommands(): string[] {
 }
 
 /**
+ * Returns shell commands to install the ONVIF server in an LXC container.
+ */
+export function getOnvifInstallCommands(): string[] {
+	return [
+		'apt-get install -y -qq git curl',
+		'curl -fsSL https://deb.nodesource.com/setup_22.x | bash -',
+		'apt-get install -y -qq nodejs',
+		'cd /root && git clone https://github.com/daniela-hase/onvif-server.git',
+		'cd /root/onvif-server && npm install --production'
+	];
+}
+
+/**
+ * Generates ONVIF server config.yaml for a camera stream.
+ */
+export function generateOnvifConfig(params: {
+	streamName: string;
+	cameraName: string;
+	mac: string;
+	uuid: string;
+	width: number;
+	height: number;
+	fps: number;
+	bitrate: number;
+	onvifPort?: number;
+}): string {
+	const {
+		streamName,
+		cameraName,
+		mac,
+		uuid,
+		width,
+		height,
+		fps,
+		bitrate,
+		onvifPort = 8899
+	} = params;
+
+	return `onvif:
+  - mac: ${mac}
+    ports:
+      server: ${onvifPort}
+      rtsp: 8556
+      snapshot: 8580
+    name: ${cameraName}
+    uuid: ${uuid}
+    highQuality:
+      rtsp: /${streamName}
+      snapshot: /api/frame.jpeg?src=${streamName}
+      width: ${width}
+      height: ${height}
+      framerate: ${fps}
+      bitrate: ${bitrate}
+    target:
+      hostname: localhost
+      ports:
+        rtsp: 8554
+        snapshot: 1984
+`;
+}
+
+/**
+ * Generates a systemd unit file for the ONVIF server.
+ */
+export function generateOnvifSystemdUnit(): string {
+	return `[Unit]
+Description=ONVIF Server
+After=go2rtc.service network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/onvif-server
+ExecStartPre=/bin/sleep 12
+ExecStart=/usr/bin/node /root/onvif-server/main.js /root/onvif-server/config.yaml
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+`;
+}
+
+/**
  * Checks stream health via go2rtc HTTP API.
  */
 export async function checkStreamHealth(

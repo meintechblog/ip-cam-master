@@ -275,7 +275,7 @@ export async function listContainers(): Promise<ContainerInfo[]> {
 	const dbRecords = db.select().from(containers).all();
 	const dbMap = new Map(dbRecords.map((r: any) => [r.vmid, r]));
 
-	return apiContainers.map((c: any) => {
+	const result = apiContainers.map((c: any) => {
 		const dbRecord = dbMap.get(c.vmid);
 		return {
 			vmid: c.vmid,
@@ -290,6 +290,9 @@ export async function listContainers(): Promise<ContainerInfo[]> {
 				: undefined
 		} satisfies ContainerInfo;
 	});
+
+	result.sort((a, b) => a.vmid - b.vmid);
+	return result;
 }
 
 /**

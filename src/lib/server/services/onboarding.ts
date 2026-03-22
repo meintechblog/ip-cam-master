@@ -1,5 +1,5 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateSystemdUnit, getInstallCommands, checkStreamHealth } from './go2rtc';
+import { generateGo2rtcConfig, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit } from './go2rtc';
 import { createContainer, startContainer } from './proxmox';
 import { getSettings } from './settings';
 import { encrypt, decrypt } from './crypto';
@@ -204,8 +204,43 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		const unitContent = generateSystemdUnit();
 		await pushFileToContainer(ssh, camera.vmid, unitContent, '/etc/systemd/system/go2rtc.service');
 
-		// Enable and start service
+		// Enable and start go2rtc service
 		await executeOnContainer(ssh, camera.vmid, 'systemctl daemon-reload && systemctl enable go2rtc && systemctl restart go2rtc');
+
+		// Wait for go2rtc to start
+		await new Promise((resolve) => setTimeout(resolve, 3000));
+
+		// Install ONVIF server (needed for UniFi Protect adoption)
+		const onvifCmds = getOnvifInstallCommands();
+		for (const cmd of onvifCmds) {
+			await executeOnContainer(ssh, camera.vmid, cmd);
+		}
+
+		// Get container MAC address and generate UUID
+		const macResult = await executeOnContainer(ssh, camera.vmid, "ip link show eth0 | grep ether | awk '{print $2}'");
+		const mac = macResult.stdout.trim() || 'bc:24:11:00:00:01';
+		const uuidResult = await executeOnContainer(ssh, camera.vmid, 'cat /proc/sys/kernel/random/uuid');
+		const uuid = uuidResult.stdout.trim();
+
+		// Generate and push ONVIF config
+		const onvifConfig = generateOnvifConfig({
+			streamName: camera.streamName,
+			cameraName: camera.name,
+			mac,
+			uuid,
+			width: camera.width,
+			height: camera.height,
+			fps: camera.fps,
+			bitrate: camera.bitrate
+		});
+		await pushFileToContainer(ssh, camera.vmid, onvifConfig, '/root/onvif-server/config.yaml');
+
+		// Generate and push ONVIF systemd unit
+		const onvifUnit = generateOnvifSystemdUnit();
+		await pushFileToContainer(ssh, camera.vmid, onvifUnit, '/etc/systemd/system/onvif-server.service');
+
+		// Enable and start ONVIF server
+		await executeOnContainer(ssh, camera.vmid, 'systemctl daemon-reload && systemctl enable onvif-server && systemctl restart onvif-server');
 
 		// Update status
 		db.update(cameras)
