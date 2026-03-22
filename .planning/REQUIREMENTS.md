@@ -1,7 +1,7 @@
 # Requirements: IP-Cam-Master
 
 **Defined:** 2026-03-22
-**Core Value:** One-click camera onboarding — discover a camera, and the app handles everything to get its stream into UniFi Protect.
+**Core Value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
 
 ## v1 Requirements
 
@@ -32,11 +32,11 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **LXC-04**: App installs and configures nginx inside LXC container (for Loxone Intercom cameras)
 - [ ] **LXC-05**: User can start, stop, and restart a camera's LXC container from the dashboard
 - [ ] **LXC-06**: User can delete a camera's LXC container with confirmation dialog
-- [ ] **LXC-07**: Container creation is idempotent — running again repairs, does not duplicate
+- [ ] **LXC-07**: Container creation is idempotent -- running again repairs, does not duplicate
 
 ### go2rtc Configuration
 
-- [ ] **G2R-01**: App generates correct go2rtc YAML config for Mobotix cameras (MJPEG→H.264, VAAPI)
+- [ ] **G2R-01**: App generates correct go2rtc YAML config for Mobotix cameras (MJPEG->H.264, VAAPI)
 - [ ] **G2R-02**: App generates correct go2rtc YAML config for Loxone Intercom (via nginx proxy stream)
 - [ ] **G2R-03**: App generates nginx config for Loxone Intercom auth-proxy (Basic Auth header injection, buffering disabled)
 - [ ] **G2R-04**: App deploys generated configs to the LXC container and restarts services
@@ -55,12 +55,12 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Camera Onboarding Pipeline
 
 - [ ] **ONBD-01**: User can start onboarding flow for a discovered non-ONVIF camera
-- [ ] **ONBD-02**: Onboarding flow: select camera → enter/confirm credentials → test connection → create container → deploy config → verify stream
+- [ ] **ONBD-02**: Onboarding flow: select camera -> enter/confirm credentials -> test connection -> create container -> deploy config -> verify stream
 - [ ] **ONBD-03**: Each onboarding step shows clear success/error with retry option
 - [ ] **ONBD-04**: After successful stream verification, app provides RTSP URL for UniFi Protect adoption
 - [ ] **ONBD-05**: App triggers or guides UniFi Protect adoption (semi-automatic with clear instructions)
-- [ ] **ONBD-06**: Mobotix-specific pipeline works end-to-end (MJPEG source → H.264 RTSP output)
-- [ ] **ONBD-07**: Loxone Intercom-specific pipeline works end-to-end (HTTP+auth → nginx → go2rtc → RTSP)
+- [ ] **ONBD-06**: Mobotix-specific pipeline works end-to-end (MJPEG source -> H.264 RTSP output)
+- [ ] **ONBD-07**: Loxone Intercom-specific pipeline works end-to-end (HTTP+auth -> nginx -> go2rtc -> RTSP)
 
 ### Installation & Distribution
 
@@ -93,12 +93,12 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| Built-in NVR/recording | UniFi Protect handles recording — duplicating NVR adds massive complexity |
+| Built-in NVR/recording | UniFi Protect handles recording -- duplicating NVR adds massive complexity |
 | AI/object detection | Separate domain (Frigate exists), would 10x complexity |
 | Multi-site/multi-Proxmox | V1 is single-site homelab tool |
-| Cloud/remote access | Security risk — local-only is a feature. Use Tailscale/WireGuard if needed |
+| Cloud/remote access | Security risk -- local-only is a feature. Use Tailscale/WireGuard if needed |
 | Mobile native app | Responsive web UI + PWA sufficient |
-| Generic camera brand support | ONVIF cameras can be adopted natively in Protect 5.0+ — tool exists for non-ONVIF cameras |
+| Generic camera brand support | ONVIF cameras can be adopted natively in Protect 5.0+ -- tool exists for non-ONVIF cameras |
 | Old Loxone Intercom model | Explicitly excluded per user requirement |
 | Real-time log streaming UI | Low value after initial setup. Show last N lines on demand instead |
 
@@ -108,54 +108,54 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| INFRA-04 | TBD | Pending |
-| INFRA-05 | TBD | Pending |
-| DISC-01 | TBD | Pending |
-| DISC-02 | TBD | Pending |
-| DISC-03 | TBD | Pending |
-| DISC-04 | TBD | Pending |
-| DISC-05 | TBD | Pending |
-| DISC-06 | TBD | Pending |
-| LXC-01 | TBD | Pending |
-| LXC-02 | TBD | Pending |
-| LXC-03 | TBD | Pending |
-| LXC-04 | TBD | Pending |
-| LXC-05 | TBD | Pending |
-| LXC-06 | TBD | Pending |
-| LXC-07 | TBD | Pending |
-| G2R-01 | TBD | Pending |
-| G2R-02 | TBD | Pending |
-| G2R-03 | TBD | Pending |
-| G2R-04 | TBD | Pending |
-| G2R-05 | TBD | Pending |
-| G2R-06 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| DASH-05 | TBD | Pending |
-| DASH-06 | TBD | Pending |
-| ONBD-01 | TBD | Pending |
-| ONBD-02 | TBD | Pending |
-| ONBD-03 | TBD | Pending |
-| ONBD-04 | TBD | Pending |
-| ONBD-05 | TBD | Pending |
-| ONBD-06 | TBD | Pending |
-| ONBD-07 | TBD | Pending |
-| INST-01 | TBD | Pending |
-| INST-02 | TBD | Pending |
-| INST-03 | TBD | Pending |
-| INST-04 | TBD | Pending |
-| INST-05 | TBD | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| INFRA-04 | Phase 1 | Pending |
+| INFRA-05 | Phase 1 | Pending |
+| DISC-01 | Phase 3 | Pending |
+| DISC-02 | Phase 3 | Pending |
+| DISC-03 | Phase 3 | Pending |
+| DISC-04 | Phase 3 | Pending |
+| DISC-05 | Phase 3 | Pending |
+| DISC-06 | Phase 3 | Pending |
+| LXC-01 | Phase 1 | Pending |
+| LXC-02 | Phase 1 | Pending |
+| LXC-03 | Phase 2 | Pending |
+| LXC-04 | Phase 3 | Pending |
+| LXC-05 | Phase 1 | Pending |
+| LXC-06 | Phase 1 | Pending |
+| LXC-07 | Phase 1 | Pending |
+| G2R-01 | Phase 2 | Pending |
+| G2R-02 | Phase 3 | Pending |
+| G2R-03 | Phase 3 | Pending |
+| G2R-04 | Phase 2 | Pending |
+| G2R-05 | Phase 2 | Pending |
+| G2R-06 | Phase 2 | Pending |
+| DASH-01 | Phase 4 | Pending |
+| DASH-02 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Pending |
+| DASH-04 | Phase 4 | Pending |
+| DASH-05 | Phase 4 | Pending |
+| DASH-06 | Phase 4 | Pending |
+| ONBD-01 | Phase 2 | Pending |
+| ONBD-02 | Phase 2 | Pending |
+| ONBD-03 | Phase 2 | Pending |
+| ONBD-04 | Phase 2 | Pending |
+| ONBD-05 | Phase 4 | Pending |
+| ONBD-06 | Phase 2 | Pending |
+| ONBD-07 | Phase 3 | Pending |
+| INST-01 | Phase 5 | Pending |
+| INST-02 | Phase 5 | Pending |
+| INST-03 | Phase 5 | Pending |
+| INST-04 | Phase 5 | Pending |
+| INST-05 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 37 total
-- Mapped to phases: 0
-- Unmapped: 37 ⚠️
+- v1 requirements: 42 total
+- Mapped to phases: 42
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after initial definition*
+*Last updated: 2026-03-22 after roadmap creation*
