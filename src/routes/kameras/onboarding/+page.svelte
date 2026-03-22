@@ -59,9 +59,9 @@
 	let prefillPass = $state('');
 	let prefillCredName = $state('');
 
-	async function startRegister(ip: string) {
+	async function startRegister(ip: string, name?: string | null) {
 		registeringIp = ip;
-		registerName = '';
+		registerName = name || '';
 		registerUser = '';
 		registerPass = '';
 		registerError = null;
@@ -77,6 +77,11 @@
 				if (data.success) {
 					registerUser = data.username;
 					registerPass = data.password;
+					// If we have name + credentials, register immediately
+					if (registerName) {
+						await submitRegister();
+						return;
+					}
 				}
 			}
 		} catch { /* ignore */ }
@@ -169,7 +174,7 @@
 							</div>
 							{#if cam.type === 'mobotix-onvif'}
 								<button
-									onclick={() => { if (cam.name) registerName = cam.name; startRegister(cam.ip); }}
+									onclick={() => startRegister(cam.ip, cam.name)}
 									class="bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors text-sm cursor-pointer"
 								>
 									Registrieren
