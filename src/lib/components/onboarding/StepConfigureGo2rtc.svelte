@@ -18,11 +18,16 @@
 	} = $props();
 
 	const subSteps = [
-		'ffmpeg + go2rtc werden installiert...',
-		'go2rtc Konfiguration wird bereitgestellt...',
-		'Node.js + ONVIF Server werden installiert...',
-		'ONVIF Konfiguration + Device-Naming...',
-		'Services werden gestartet...'
+		'apt-get update + ffmpeg installieren...',
+		'go2rtc Binary von GitHub herunterladen...',
+		'go2rtc.yaml mit VAAPI-Transcoding generieren...',
+		'go2rtc systemd Service anlegen + starten...',
+		'Node.js 22 LTS im Container installieren...',
+		'ONVIF Server von GitHub klonen + npm install...',
+		'config.yaml mit MAC, UUID, Stream-Mapping generieren...',
+		'Device-Naming in onvif-server.js patchen (Manufacturer, Model)...',
+		'ONVIF Server systemd Service anlegen + starten...',
+		'Warte auf Stream-Initialisierung...'
 	];
 
 	let currentSubStep = $state(0);
@@ -32,7 +37,7 @@
 		if (loading) {
 			intervalId = setInterval(() => {
 				currentSubStep = (prev => Math.min(prev + 1, subSteps.length - 1))(currentSubStep);
-			}, 3000);
+			}, 2000);
 		}
 		return () => { if (intervalId) clearInterval(intervalId); };
 	});
@@ -46,7 +51,7 @@
 			currentSubStep = 0;
 			intervalId = setInterval(() => {
 				currentSubStep = Math.min(currentSubStep + 1, subSteps.length - 1);
-			}, 3000);
+			}, 2000);
 		}
 	});
 </script>
