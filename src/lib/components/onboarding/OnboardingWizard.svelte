@@ -7,7 +7,7 @@
 	import StepConfigureGo2rtc from './StepConfigureGo2rtc.svelte';
 	import StepVerifyStream from './StepVerifyStream.svelte';
 
-	let { nextVmid }: { nextVmid: number } = $props();
+	let { nextVmid, prefillIp = '' }: { nextVmid: number; prefillIp?: string } = $props();
 
 	// Wizard state
 	let currentStep = $state(0);
@@ -16,7 +16,7 @@
 	let cameraId = $state<number | null>(null);
 
 	// Form data
-	let ip = $state('');
+	let ip = $state(prefillIp);
 	let username = $state('');
 	let password = $state('');
 	let name = $state('');
