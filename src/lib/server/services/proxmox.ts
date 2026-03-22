@@ -164,29 +164,27 @@ export async function createContainer(params: {
  * Falls back to direct API call if proxmox-api types don't support dev0.
  */
 export async function configureVaapi(node: string, vmid: number): Promise<void> {
-	const proxmox = await getProxmoxClient();
+	// Device passthrough requires root@pam — API tokens can't do it.
+	// Use SSH to the Proxmox host and modify the LXC config directly.
+	const { connectToProxmox: connectSSH } = await import('./ssh');
+	const ssh = await connectSSH();
 
 	try {
-		// dev0 parameter for device passthrough (PVE 8.1+)
-		// Type assertion needed because proxmox-api types may not include dev0
-		await proxmox.nodes.$(node).lxc.$(vmid).config.$put({
-			dev0: '/dev/dri/renderD128,mode=0666'
-		} as any);
-	} catch (err) {
-		// Fallback to direct API call if proxmox-api doesn't support dev0
-		console.warn(`VAAPI config via proxmox-api failed for VMID ${vmid}, trying direct API:`, err);
-		const settings = await getSettings('proxmox_');
-		await fetch(
-			`https://${settings.proxmox_host}:8006/api2/json/nodes/${node}/lxc/${vmid}/config`,
-			{
-				method: 'PUT',
-				headers: {
-					Authorization: `PVEAPIToken=${settings.proxmox_token_id}=${settings.proxmox_token_secret}`,
-					'Content-Type': 'application/x-www-form-urlencoded'
-				},
-				body: new URLSearchParams({ dev0: '/dev/dri/renderD128,mode=0666' })
-			}
+		// Check if dev0 already configured
+		const { stdout } = await ssh.execCommand(`pct config ${vmid} | grep 'dev0'`);
+		if (stdout && stdout.includes('renderD128')) {
+			return; // Already configured
+		}
+
+		// Add device passthrough via pct set
+		const result = await ssh.execCommand(
+			`pct set ${vmid} -dev0 /dev/dri/renderD128,mode=0666`
 		);
+		if (result.code && result.code !== 0) {
+			throw new Error(result.stderr || 'Failed to configure VAAPI passthrough');
+		}
+	} finally {
+		ssh.dispose();
 	}
 }
 
