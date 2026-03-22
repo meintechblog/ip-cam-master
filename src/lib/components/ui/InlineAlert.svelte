@@ -15,13 +15,14 @@
 		error: AlertCircle,
 		info: Info
 	};
+
+	let Icon = $derived(icons[type]);
 </script>
 
 <div
 	transition:slide={{ duration: 200 }}
 	class="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm {styles[type]}"
 >
-	{@const Icon = icons[type]}
 	<Icon class="w-4 h-4 shrink-0" />
 	<span>{message}</span>
 </div>
