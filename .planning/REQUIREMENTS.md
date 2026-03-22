@@ -26,13 +26,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### LXC Container Management
 
-- [ ] **LXC-01**: App creates a Proxmox LXC container for a camera via Proxmox API
-- [ ] **LXC-02**: App configures VAAPI device passthrough (/dev/dri) in LXC container
+- [x] **LXC-01**: App creates a Proxmox LXC container for a camera via Proxmox API
+- [x] **LXC-02**: App configures VAAPI device passthrough (/dev/dri) in LXC container
 - [ ] **LXC-03**: App installs and configures go2rtc inside the LXC container
 - [ ] **LXC-04**: App installs and configures nginx inside LXC container (for Loxone Intercom cameras)
-- [ ] **LXC-05**: User can start, stop, and restart a camera's LXC container from the dashboard
-- [ ] **LXC-06**: User can delete a camera's LXC container with confirmation dialog
-- [ ] **LXC-07**: Container creation is idempotent -- running again repairs, does not duplicate
+- [x] **LXC-05**: User can start, stop, and restart a camera's LXC container from the dashboard
+- [x] **LXC-06**: User can delete a camera's LXC container with confirmation dialog
+- [x] **LXC-07**: Container creation is idempotent -- running again repairs, does not duplicate
 
 ### go2rtc Configuration
 
@@ -119,13 +119,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISC-04 | Phase 3 | Pending |
 | DISC-05 | Phase 3 | Pending |
 | DISC-06 | Phase 3 | Pending |
-| LXC-01 | Phase 1 | Pending |
-| LXC-02 | Phase 1 | Pending |
+| LXC-01 | Phase 1 | Complete |
+| LXC-02 | Phase 1 | Complete |
 | LXC-03 | Phase 2 | Pending |
 | LXC-04 | Phase 3 | Pending |
-| LXC-05 | Phase 1 | Pending |
-| LXC-06 | Phase 1 | Pending |
-| LXC-07 | Phase 1 | Pending |
+| LXC-05 | Phase 1 | Complete |
+| LXC-06 | Phase 1 | Complete |
+| LXC-07 | Phase 1 | Complete |
 | G2R-01 | Phase 2 | Pending |
 | G2R-02 | Phase 3 | Pending |
 | G2R-03 | Phase 3 | Pending |
