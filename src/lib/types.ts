@@ -108,4 +108,5 @@ export interface CameraCardData {
 	connectedClients: number;
 	snapshotUrl: string | null;
 	go2rtcWebUrl: string | null;
+	cameraWebUrl: string | null;
 }

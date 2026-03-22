@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { listContainers } from '$lib/server/services/proxmox';
 import { checkStreamHealth } from '$lib/server/services/go2rtc';
+import { decrypt } from '$lib/server/services/crypto';
 import type { CameraCardData, ContainerStatus } from '$lib/types';
 
 export const GET: RequestHandler = async () => {
@@ -82,12 +83,21 @@ export const GET: RequestHandler = async () => {
 					}
 				}
 
+				let cameraWebUrl: string | null = null;
+				try {
+					const decryptedPass = decrypt(cam.password);
+					cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
+				} catch {
+					cameraWebUrl = `http://${cam.ip}`;
+				}
+
 				return {
 					id: cam.id,
 					vmid: cam.vmid,
 					name: cam.name,
 					cameraIp: cam.ip,
 					cameraType: cam.cameraType || 'mobotix',
+					cameraWebUrl,
 					containerIp,
 					streamName: cam.streamName,
 					rtspUrl: containerIp ? `rtsp://${containerIp}:8554/${cam.streamName}` : null,

@@ -56,7 +56,7 @@
 				<div class="flex items-center gap-2 mb-1.5">
 					<span class="w-2 h-2 rounded-full shrink-0 {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
 					<span class="text-sm font-medium text-text-primary">Kamera</span>
-					<a href="http://{camera.cameraIp}" target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
+					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
 				</div>
