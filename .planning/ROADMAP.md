@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can configure camera credentials that are stored in local SQLite, never in git-tracked files
   4. User can create an LXC container on Proxmox with VAAPI device passthrough from the web UI
   5. User can start, stop, restart, and delete LXC containers from the web UI
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Scaffold SvelteKit project, database, crypto, settings backend + API routes
+- [ ] 01-02-PLAN.md -- LXC container management: Proxmox service + container REST API
+- [ ] 01-03-PLAN.md -- Web UI: layout, settings page, container card grid, visual checkpoint
 
 ### Phase 2: Mobotix Camera Pipeline
 **Goal**: User can onboard a Mobotix camera end-to-end, from credential entry through verified H.264 RTSP stream output
@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Proxmox Integration | 0/3 | Not started | - |
+| 1. Foundation and Proxmox Integration | 0/3 | Planning complete | - |
 | 2. Mobotix Camera Pipeline | 0/3 | Not started | - |
 | 3. Loxone Pipeline and Network Discovery | 0/3 | Not started | - |
 | 4. Dashboard and UniFi Protect | 0/2 | Not started | - |
