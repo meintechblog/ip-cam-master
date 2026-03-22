@@ -71,10 +71,10 @@ export const GET: RequestHandler = async () => {
 								const consumerList = Array.isArray(stream.consumers) ? stream.consumers : [];
 								const consumers = consumerList.length;
 								const unifiConnected = consumerList.some(
-									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server')
+									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server') || c.user_agent?.includes('GStreamer')
 								);
 								const unifiStreams = consumerList.filter(
-									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server')
+									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server') || c.user_agent?.includes('GStreamer')
 								).length;
 								streamInfo = {
 									active: producers > 0,
