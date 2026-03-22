@@ -3,7 +3,7 @@ import { settings } from '$lib/server/db/schema';
 import { encrypt, decrypt } from './crypto';
 import { eq, like } from 'drizzle-orm';
 
-const SENSITIVE_KEYS = ['proxmox_token_secret', 'unifi_password'];
+const SENSITIVE_KEYS = ['proxmox_token_secret', 'unifi_password', 'proxmox_ssh_password', 'credential_password'];
 
 function isSensitive(key: string): boolean {
 	return SENSITIVE_KEYS.includes(key);

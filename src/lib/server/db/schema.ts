@@ -26,6 +26,31 @@ export const containers = sqliteTable('containers', {
 		.$defaultFn(() => new Date().toISOString())
 });
 
+export const cameras = sqliteTable('cameras', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	vmid: integer('vmid').notNull(),
+	name: text('name').notNull(),
+	ip: text('ip').notNull(),
+	username: text('username').notNull(),
+	password: text('password').notNull(),
+	cameraType: text('camera_type').notNull().default('mobotix'),
+	streamPath: text('stream_path').notNull().default('/stream0/mobotix.mjpeg'),
+	width: integer('width').notNull().default(1280),
+	height: integer('height').notNull().default(720),
+	fps: integer('fps').notNull().default(20),
+	bitrate: integer('bitrate').notNull().default(5000),
+	streamName: text('stream_name').notNull(),
+	rtspUrl: text('rtsp_url'),
+	containerIp: text('container_ip'),
+	status: text('status').notNull().default('pending'),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	updatedAt: text('updated_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
 export const credentials = sqliteTable('credentials', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	name: text('name').notNull(),

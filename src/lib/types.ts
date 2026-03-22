@@ -38,3 +38,47 @@ export interface SettingRecord {
 	value: string;
 	encrypted: boolean;
 }
+
+export type CameraStatus = 'pending' | 'container_created' | 'configured' | 'verified';
+
+export interface TranscodeParams {
+	width: number;
+	height: number;
+	fps: number;
+	bitrate: number;
+}
+
+export interface Camera {
+	id: number;
+	vmid: number;
+	name: string;
+	ip: string;
+	username: string;
+	password: string;
+	cameraType: CameraType;
+	streamPath: string;
+	width: number;
+	height: number;
+	fps: number;
+	bitrate: number;
+	streamName: string;
+	rtspUrl: string | null;
+	containerIp: string | null;
+	status: CameraStatus;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface OnboardingState {
+	currentStep: number;
+	cameraId: number | null;
+	status: CameraStatus;
+	error: string | null;
+}
+
+export interface StreamInfo {
+	active: boolean;
+	codec: string | null;
+	producers: number;
+	resolution: string | null;
+}
