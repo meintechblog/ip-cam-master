@@ -24,8 +24,12 @@ export async function getProxmoxClient() {
 		throw new Error('Proxmox not configured. Fill in all fields.');
 	}
 
+	// Strip port from host — proxmox-api adds :8006 automatically
+	const host = settings.proxmox_host.replace(/:.*$/, '');
+
 	return proxmoxApi({
-		host: settings.proxmox_host,
+		host,
+		port: 8006,
 		tokenID: settings.proxmox_token_id,
 		tokenSecret: settings.proxmox_token_secret
 	});
