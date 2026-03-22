@@ -109,6 +109,11 @@
 			if (data.fps) {
 				fps = data.fps;
 			}
+			// Auto-calculate bitrate from resolution + fps
+			// Rule: ~0.1 bits per pixel per frame, rounded to nearest 500
+			const pixels = width * height;
+			const calculatedBitrate = Math.round((pixels * fps * 0.1) / 1000 / 500) * 500;
+			bitrate = Math.max(1000, Math.min(calculatedBitrate, 10000));
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {

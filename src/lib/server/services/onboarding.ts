@@ -45,15 +45,30 @@ export async function testMobotixConnection(
 			}
 		}
 
-		// Fallback: TCP connect test to port 554
+		// Fallback: TCP connect test to port 554 + read config from Mobotix HTTP API
 		const tcpCmd = `timeout 3 bash -c 'echo > /dev/tcp/${ip}/554' 2>/dev/null && echo REACHABLE || echo UNREACHABLE`;
 		const tcpResult = await ssh.execCommand(tcpCmd);
 
 		if (tcpResult.stdout?.includes('REACHABLE')) {
+			// Read resolution + FPS from Mobotix config API
+			let resolution: string | undefined;
+			let fps: number | undefined;
+			try {
+				const configResult = await ssh.execCommand(
+					`curl -s --basic -u "${username}:${password}" "http://${ip}/control/control?read&section=general&framerate100&customsize" --max-time 3`
+				);
+				const configText = configResult.stdout || '';
+				const sizeMatch = configText.match(/customsize=(\d+x\d+)/);
+				if (sizeMatch) resolution = sizeMatch[1];
+				const fpsMatch = configText.match(/framerate100=(\d+)/);
+				if (fpsMatch) fps = parseInt(fpsMatch[1]) / 100;
+			} catch { /* ignore */ }
+
 			return {
 				success: true,
-				streamPath: primaryPath,
-				error: 'Camera reachable but stream probe failed. Using default settings.'
+				resolution,
+				fps,
+				streamPath: primaryPath
 			};
 		}
 
