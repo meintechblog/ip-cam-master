@@ -144,7 +144,7 @@ export const GET: RequestHandler = async () => {
 			})
 		);
 
-		results.sort((a, b) => a.vmid - b.vmid);
+		results.sort((a, b) => a.name.localeCompare(b.name));
 		return json(results);
 	} catch (err) {
 		return json([], { status: 500 });
