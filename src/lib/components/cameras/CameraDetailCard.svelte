@@ -53,10 +53,11 @@
 	let snapshotSrc = $state('');
 
 	function refreshSnapshot() {
-		if (!camera.snapshotUrl || !isRunning) return;
+		if (!camera.cameraWebUrl || !isRunning) return;
 		const img = new Image();
 		img.onload = () => { snapshotSrc = img.src; };
-		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
+		// Load directly from camera — no proxy needed, much faster
+		img.src = `${camera.cameraWebUrl}/record/current.jpg?t=${Date.now()}`;
 	}
 
 	$effect(() => {
@@ -74,7 +75,7 @@
 
 	$effect(() => {
 		fetchProbe();
-		const timer = setInterval(fetchProbe, 5000);
+		const timer = setInterval(fetchProbe, 30000);
 		return () => clearInterval(timer);
 	});
 

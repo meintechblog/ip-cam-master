@@ -3,26 +3,10 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { decrypt } from '$lib/server/services/crypto';
-import http from 'node:http';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
-function fetchImage(url: string, headers: Record<string, string>, timeoutMs: number): Promise<Buffer> {
-	return new Promise((resolve, reject) => {
-		const parsed = new URL(url);
-		const timer = setTimeout(() => { req.destroy(); reject(new Error('timeout')); }, timeoutMs);
-		const req = http.get({
-			hostname: parsed.hostname,
-			port: parsed.port || 80,
-			path: parsed.pathname + parsed.search,
-			headers
-		}, (res) => {
-			const chunks: Buffer[] = [];
-			res.on('data', (chunk: Buffer) => chunks.push(chunk));
-			res.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
-			res.on('error', (err) => { clearTimeout(timer); reject(err); });
-		});
-		req.on('error', (err) => { clearTimeout(timer); reject(err); });
-	});
-}
+const execAsync = promisify(exec);
 
 export const GET: RequestHandler = async ({ params }) => {
 	const cameraId = parseInt(params.id);
@@ -34,15 +18,16 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	try {
 		const password = decrypt(camera.password);
-		const auth = Buffer.from(`${camera.username}:${password}`).toString('base64');
-		const url = `http://${camera.ip}/record/current.jpg`;
-		const imageBuffer = await fetchImage(url, { Authorization: `Basic ${auth}` }, 5000);
+		const { stdout } = await execAsync(
+			`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/record/current.jpg" --max-time 3`,
+			{ timeout: 4000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
+		);
 
-		if (imageBuffer.length < 1000) {
+		if (stdout.length < 1000) {
 			return new Response('Snapshot unavailable', { status: 502 });
 		}
 
-		return new Response(imageBuffer, {
+		return new Response(stdout, {
 			headers: {
 				'Content-Type': 'image/jpeg',
 				'Cache-Control': 'no-cache, no-store'
