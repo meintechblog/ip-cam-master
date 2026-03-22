@@ -1,78 +1,70 @@
 # IP-Cam-Master
 
-One-click camera onboarding for UniFi Protect. Discover a camera, and the app handles everything — container creation, stream transcoding, ONVIF wrapping, and Protect adoption.
+One-click camera onboarding for UniFi Protect. Discover cameras in the network, and the app handles everything — container creation, stream transcoding, ONVIF wrapping, and Protect adoption.
 
 Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone Intercom) into UniFi Protect without manual setup.
 
+## Features
+
+- **Auto-Discovery** — Scans the network for Mobotix cameras and Loxone Intercoms, shows them with name and type
+- **Credential Presets** — Store standard logins once, cameras are auto-matched during onboarding
+- **5-Step Onboarding Wizard** — From credential entry to verified stream in UniFi Protect
+- **Native ONVIF Support** — Cameras with built-in ONVIF are registered without containers
+- **Live Dashboard** — Snapshot preview, service pipeline status, LXC resources, UniFi Protect connection
+- **Camera Probing** — Live FPS, model (e.g., MOBOTIX S15D-Sec), firmware version, codec directly from camera
+- **Container Management** — Start, stop, restart, delete LXC containers from the UI
+- **Dynamic Proxmox Config** — Storage and bridge dropdowns loaded from Proxmox API with disk space info
+
 ## How It Works
 
-### The Problem
-
-Cameras like Mobotix (MJPEG only, no ONVIF) or Loxone Intercoms can't be adopted into UniFi Protect directly. The manual process involves creating LXC containers, installing go2rtc, configuring ffmpeg transcoding, setting up an ONVIF server, and finally adopting — for each camera individually.
-
-### The Solution
-
-IP-Cam-Master automates the entire pipeline through a 5-step wizard:
+### Architecture
 
 ```
-┌─────────────┐     ┌───────────────────────────────────────────────────────────┐     ┌──────────────┐
-│  Mobotix     │     │  LXC Container (Proxmox)                                 │     │  UniFi       │
-│  Camera      │     │                                                           │     │  Protect     │
-│              │     │  ┌─────────┐    ┌──────────────┐    ┌──────────────────┐  │     │              │
-│  MJPEG :554 ─┼────►│  │  go2rtc │───►│  RTSP :8554  │───►│  ONVIF Server   │──┼────►│  Adoption    │
-│              │     │  │  VAAPI  │    │  H.264       │    │  :8899           │  │     │  via ONVIF   │
-│              │     │  └─────────┘    └──────────────┘    └──────────────────┘  │     │  Discovery   │
-└─────────────┘     └───────────────────────────────────────────────────────────┘     └──────────────┘
+┌─────────────┐     ┌──────────────────────────────────────────────┐     ┌──────────────┐
+│  Mobotix     │     │  LXC Container (Proxmox, 4GB/192MB)         │     │  UniFi       │
+│  Camera      │     │                                              │     │  Protect     │
+│              │     │  ┌─────────┐  ┌──────────┐  ┌────────────┐  │     │              │
+│  MJPEG :554 ─┼────►│  │ go2rtc  │─►│ RTSP     │─►│ ONVIF      │──┼────►│  ONVIF       │
+│              │     │  │ VAAPI   │  │ H.264    │  │ Server     │  │     │  Discovery   │
+│              │     │  └─────────┘  └──────────┘  └────────────┘  │     │  + Adoption  │
+└─────────────┘     └──────────────────────────────────────────────┘     └──────────────┘
 ```
 
-### Onboarding Flow (5 Steps)
+### Two Camera Types
 
-1. **Zugangsdaten** — Enter camera IP, credentials, and optional transcode parameters (auto-detected defaults).
-2. **Verbindung testen** — App probes the camera's RTSP stream. Shows a live snapshot on success.
-3. **Container erstellen** — Creates a Debian 12 LXC container on Proxmox with VAAPI device passthrough (`/dev/dri/renderD128`).
-4. **go2rtc + ONVIF konfigurieren** — Installs ffmpeg, go2rtc, Node.js, and the [ONVIF server](https://github.com/daniela-hase/onvif-server). Generates configs, patches device naming, starts systemd services.
-5. **Stream verifizieren** — Checks go2rtc API for active stream. Shows RTSP URL and WebRTC live preview. Camera is now discoverable by UniFi Protect via ONVIF.
+| Type | Example | Onboarding | Container |
+|------|---------|-----------|-----------|
+| **Pipeline** (no ONVIF) | Mobotix S15D | Full 5-step wizard | Yes — go2rtc + ONVIF Server |
+| **Native ONVIF** | Mobotix S16B | Simple registration | No — direct Protect adoption |
 
-### What Gets Created Per Camera
+### Onboarding Flow
 
-Each onboarded camera gets its own isolated LXC container with:
+1. **Auto-Discovery** scans the network, identifies cameras by type (Mobotix/Loxone/ONVIF)
+2. **Credential matching** — saved presets are tried automatically. If matched: IP, name, user, password are pre-filled
+3. **Connection test** — probes camera RTSP stream, shows live snapshot
+4. **Container creation** — Debian 12 LXC on Proxmox with VAAPI passthrough, named `cam-<name>`
+5. **Service setup** — installs go2rtc (MJPEG→H.264 VAAPI), ONVIF server (with correct device naming), both as systemd services
+6. **Stream verification** — go2rtc API health check, RTSP URL displayed
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| go2rtc | 8554 (RTSP), 1984 (HTTP/WebRTC) | MJPEG → H.264 transcoding via VAAPI |
-| ONVIF Server | 8899 | Makes the stream discoverable by UniFi Protect |
+### Camera Dashboard
 
-**go2rtc** transcodes the camera's MJPEG stream to H.264 using Intel VAAPI hardware acceleration:
+Each camera gets a full-width card with:
 
-```yaml
-streams:
-  cam-1010: ffmpeg:rtsp://user:pass@192.168.3.22:554/stream0/mobotix.mjpeg#video=h264#width=1280#height=720#raw=-r 20#raw=-maxrate 5000k#raw=-bufsize 10000k#raw=-g 20#hardware=vaapi
-```
-
-**ONVIF Server** wraps the transcoded RTSP stream into an ONVIF-compliant device that UniFi Protect can discover and adopt — including proper device naming (no more "Cardinal").
+- **Live snapshot** (refreshes every 10s, directly from camera)
+- **LXC panel** — CPU/RAM bars, IP, MAC address, hostname, start/stop/restart/delete buttons
+- **Service pipeline** — Kamera ► go2rtc ► ONVIF ► UniFi Protect with green/red status indicators
+- **Camera details** — Model (MOBOTIX S15D-Sec), firmware (MX-V4.4.2.73), live FPS, codec
+- **go2rtc details** — Transcode info, VAAPI, bitrate, connected clients
+- **UniFi Protect** — Connection status (detected via GStreamer user agent), active streams
+- **Editable name** — Click pencil icon, updates DB + LXC hostname
 
 ## Tech Stack
 
 - **Frontend:** SvelteKit 2 (Svelte 5 Runes), Tailwind CSS 4, Lucide icons
 - **Backend:** SvelteKit server routes, SQLite (better-sqlite3), Drizzle ORM
-- **Infrastructure:** Proxmox VE API, SSH via node-ssh, go2rtc, daniela-hase/onvif-server
+- **Infrastructure:** Proxmox VE API, SSH via node-ssh (key-based), go2rtc, daniela-hase/onvif-server
 - **Security:** AES-256-GCM encryption for all stored credentials
 - **Runtime:** Node.js 22 LTS
-
-## Infrastructure
-
-| Component | IP | Role |
-|-----------|-----|------|
-| Proxmox Host (prox3) | 192.168.3.16 | Runs LXC containers for each camera |
-| App VM (ip-cam-master) | 192.168.3.233 | Hosts the IP-Cam-Master web app |
-| UniFi Dream Machine | 192.168.3.1 | Runs UniFi Protect |
-
-## Prerequisites
-
-- Proxmox VE with API token (`root@pam`, privilege separation disabled)
-- SSH key-based access from the app VM to the Proxmox host (`ssh-copy-id root@<proxmox-host>`)
-- Intel GPU on Proxmox host for VAAPI hardware transcoding (`/dev/dri/renderD128`)
-- Debian 12 LXC template: `pveam download local debian-12-standard_12.12-1_amd64.tar.zst`
 
 ## Quick Start
 
@@ -86,34 +78,71 @@ npx drizzle-kit push   # Create SQLite tables
 npm run dev -- --host 0.0.0.0
 ```
 
+### First-Time Setup
+
 1. Open `http://<vm-ip>:5173`
-2. Go to **Settings** → Configure Proxmox connection (host, API token)
-3. Go to **Kameras** → **+ Kamera hinzufuegen**
-4. Follow the 5-step wizard
-5. Camera appears in UniFi Protect via ONVIF discovery
+2. **Settings → Proxmox** — Enter host IP + API token → Save → Storage/Bridge dropdowns appear automatically
+3. **Settings → Credentials** — Add standard camera logins (tried automatically during onboarding)
+4. **Kameras → + Kamera hinzufuegen** — Discovered cameras appear with pre-filled credentials
+5. Click **Einrichten** → Follow wizard → Camera appears in UniFi Protect
+
+### Prerequisites
+
+- Proxmox VE with API token (`root@pam`, privilege separation disabled)
+- SSH key-based access from app VM to Proxmox host: `ssh-copy-id root@<proxmox-host>`
+- Intel GPU on Proxmox host for VAAPI hardware transcoding (`/dev/dri/renderD128`)
+- Debian 12 LXC template: `pveam download local debian-12-standard_12.12-1_amd64.tar.zst`
+
+### Container Specs
+
+Each camera LXC container uses minimal resources:
+
+| Resource | Value |
+|----------|-------|
+| RAM | 192 MB |
+| Disk | 4 GB |
+| CPU | 1 core |
+| Services | go2rtc + ONVIF server (systemd) |
+| Hostname | `cam-<camera-name>` |
+| VMID | Auto-assigned (next 1000 boundary) |
+
+## Settings
+
+### Proxmox
+
+| Field | Description |
+|-------|-------------|
+| Host | Proxmox IP (port 8006 added automatically) |
+| API Token ID | Format: `user@realm!tokenname` |
+| API Token Secret | UUID token |
+| Storage Target | Dropdown from Proxmox (shows free space) |
+| Network Bridge | Dropdown from Proxmox |
+
+### Credentials
+
+Standard logins tried in priority order when onboarding cameras. Stored AES-256-GCM encrypted.
 
 ## Background & References
 
 This project automates the manual processes described in these blog posts on [meintechblog.de](https://meintechblog.de):
 
-- **[Hardcore-Tech-Howto: Quasi jeden Uralt-Kamerastream in UniFi Protect nutzbar machen (NERDALARM!)](https://meintechblog.de/2025/07/18/hardcore-tech-howto-quasi-jeden-uralt-kamerastream-in-unifi-protect-nutzbar-machen-nerdalarm/)** — Original Mobotix → go2rtc → Frigate → ONVIF → UniFi Protect pipeline. Describes the per-camera LXC setup, VAAPI transcoding, and ONVIF server configuration that IP-Cam-Master now automates.
+- **[Hardcore-Tech-Howto: Quasi jeden Uralt-Kamerastream in UniFi Protect nutzbar machen](https://meintechblog.de/2025/07/18/hardcore-tech-howto-quasi-jeden-uralt-kamerastream-in-unifi-protect-nutzbar-machen-nerdalarm/)** — Original Mobotix → go2rtc → ONVIF → UniFi Protect pipeline
+- **[Howto: Loxone Intercom Videofeed in UniFi Protect einbinden](https://meintechblog.de/2025/10/07/howto-loxone-intercom-videofeed-in-unifi-protect-einbinden/)** — Loxone Intercom integration with nginx auth-proxy and ONVIF server setup
+- **[Florian Rhomberg: Third-party camera integration](https://www.florian-rhomberg.net/2025/01/how-to-integrate-a-third-party-camera-into-unifi-protect/)** — General integration walkthrough
 
-- **[Howto: Loxone Intercom Videofeed in UniFi Protect einbinden](https://meintechblog.de/2025/10/07/howto-loxone-intercom-videofeed-in-unifi-protect-einbinden/)** — Loxone Intercom integration with nginx auth-proxy, go2rtc transcoding, and the ONVIF server setup including the "Cardinal" → camera name patching and full systemd service configuration.
-
-Additional reference:
-- **[Florian Rhomberg: How to integrate a third-party camera into UniFi Protect](https://www.florian-rhomberg.net/2025/01/how-to-integrate-a-third-party-camera-into-unifi-protect/)** — General third-party camera integration walkthrough
-
-### Key Differences from Blog Posts
+### What IP-Cam-Master Automates
 
 | Manual (Blog) | IP-Cam-Master |
 |---------------|---------------|
-| SSH into Proxmox, manually create LXC | One click — app calls Proxmox API + SSH |
-| Manually install go2rtc, ffmpeg, Node.js | Automated in onboarding step 4 |
-| Hand-write go2rtc YAML config | Generated from wizard form inputs |
-| Clone onvif-server, edit config.yaml manually | Auto-generated with correct MAC, UUID, stream mapping |
-| Manually edit onvif-server.js to fix "Cardinal" name | Auto-patched with `sed` during onboarding |
-| Check stream with separate tools | Built-in WebRTC preview + go2rtc API health check |
-| One container at a time | Wizard handles any number of cameras |
+| Scan network manually for cameras | Auto-discovery with type detection |
+| Remember and type credentials | Credential presets, auto-matched |
+| SSH into Proxmox, create LXC | One click via Proxmox API + SSH |
+| Install go2rtc, ffmpeg, Node.js | Automated in onboarding |
+| Write go2rtc YAML config by hand | Generated from wizard inputs |
+| Clone onvif-server, edit config | Auto-generated with MAC, UUID, stream mapping |
+| Edit onvif-server.js for naming | Auto-patched (Manufacturer, Model, ONVIF name) |
+| Check stream with separate tools | Live snapshot + service status dashboard |
+| No overview of camera health | Dashboard with FPS, codec, model, UniFi connection |
 
 ## License
 
