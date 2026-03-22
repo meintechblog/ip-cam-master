@@ -27,6 +27,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Scan subnet: curl each IP with 1s timeout, check for Mobotix/Loxone
 		// Run in parallel batches for speed
 		// Parallel scan: background all curls, wait for all
+		// Loxone: only detect Intercoms (have /mjpg/video.mjpg endpoint), not other Loxone devices
 		const scanScript = `
 			for ip in $(seq ${rangeStart} ${rangeEnd}); do
 				(
@@ -35,7 +36,11 @@ export const GET: RequestHandler = async ({ url }) => {
 					if echo "$RESP" | grep -qi 'mobotix'; then
 						echo "mobotix:$FULL"
 					elif echo "$RESP" | grep -qi 'loxone'; then
-						echo "loxone:$FULL"
+						# Only Loxone Intercoms have a video endpoint
+						VIDEO=$(curl -s --max-time 1 -o /dev/null -w '%{http_code}' "http://$FULL/mjpg/video.mjpg" 2>/dev/null)
+						if [ "$VIDEO" = "401" ] || [ "$VIDEO" = "200" ]; then
+							echo "loxone:$FULL"
+						fi
 					fi
 				) &
 			done
