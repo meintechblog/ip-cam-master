@@ -34,30 +34,12 @@ export const GET: RequestHandler = async ({ params }) => {
 	try {
 		const password = decrypt(camera.password);
 
-		// Run ffprobe + camera info in parallel (both async, non-blocking)
-		const [fpsResult, versionResult] = await Promise.allSettled([
-			// Live FPS: count frames over 2 seconds
-			execAsync(
-				`timeout 4 ffprobe -v quiet -print_format json -show_entries stream=nb_read_frames -count_frames -read_intervals "%+2" -select_streams v -rtsp_transport tcp "rtsp://${camera.username}:${password}@${camera.ip}:554${camera.streamPath || '/stream0/mobotix.mjpeg'}"`,
-				{ timeout: 6000, encoding: 'utf-8' }
-			),
-			// Model + firmware from /admin/version
-			execAsync(
-				`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/admin/version" --max-time 2`,
-				{ timeout: 4000, encoding: 'utf-8' }
-			)
-		]);
-
-		if (fpsResult.status === 'fulfilled') {
-			try {
-				const probeData = JSON.parse(fpsResult.value.stdout);
-				const frames = parseInt(probeData.streams?.[0]?.nb_read_frames || '0');
-				if (frames > 0) liveFps = Math.round(frames / 2);
-			} catch { /* parse error */ }
-		}
-
-		if (versionResult.status === 'fulfilled') {
-			const html = versionResult.value.stdout;
+		// Step 1: Get model + firmware FIRST (before ffprobe hogs the connection)
+		try {
+			const { stdout: html } = await execAsync(
+				`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/admin/version" --max-time 3`,
+				{ timeout: 5000, encoding: 'utf-8' }
+			);
 			const tdMatches = html.match(/<td[^>]*>(.*?)<\/td>/gs) || [];
 			const tdTexts = tdMatches.map((td: string) => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
 			if (tdTexts.length > 0 && tdTexts[0].includes('MOBOTIX')) {
@@ -65,11 +47,27 @@ export const GET: RequestHandler = async ({ params }) => {
 			}
 			const fwEntry = tdTexts.find((t: string) => t.startsWith('MX-V'));
 			if (fwEntry) firmwareVersion = fwEntry;
-		}
+		} catch { /* camera HTTP not reachable */ }
+
+		// Step 2: Live FPS via ffprobe (holds RTSP connection, blocks camera HTTP)
+		try {
+			const { stdout: probeJson } = await execAsync(
+				`timeout 4 ffprobe -v quiet -print_format json -show_entries stream=nb_read_frames -count_frames -read_intervals "%+2" -select_streams v -rtsp_transport tcp "rtsp://${camera.username}:${password}@${camera.ip}:554${camera.streamPath || '/stream0/mobotix.mjpeg'}"`,
+				{ timeout: 6000, encoding: 'utf-8' }
+			);
+			const probeData = JSON.parse(probeJson);
+			const frames = parseInt(probeData.streams?.[0]?.nb_read_frames || '0');
+			if (frames > 0) liveFps = Math.round(frames / 2);
+		} catch { /* ffprobe not available or timeout */ }
 
 		// Configured FPS
 		maxFps = camera.fps;
-		codec = 'MxPEG';
+		// ONVIF-capable cameras support H.264, others use MxPEG (MJPEG)
+		if (camera.cameraType === 'mobotix-onvif') {
+			codec = 'H.264 (ONVIF)';
+		} else {
+			codec = 'MxPEG (MJPEG)';
+		}
 	} catch {
 		// Decryption failed
 	}

@@ -280,9 +280,9 @@
 						<span>FPS</span>
 						<span class="text-text-primary">
 							{#if probeData?.liveFps != null}
-								<span class="{probeData.liveFps < camera.fps ? 'text-yellow-400' : 'text-green-400'}">{probeData.liveFps}</span>/{camera.fps}
+								{probeData.liveFps}
 							{:else}
-								{camera.fps}
+								—
 							{/if}
 						</span>
 					</div>
