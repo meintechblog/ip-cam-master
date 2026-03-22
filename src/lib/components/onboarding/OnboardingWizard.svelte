@@ -49,6 +49,16 @@
 	// Step log
 	let stepLog = $state<{ step: number; label: string; detail: string; status: 'done' | 'active' | 'pending' }[]>([]);
 
+	// Long-running fetch with 5 min timeout
+	function longFetch(url: string, body: any): Promise<Response> {
+		return fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+			signal: AbortSignal.timeout(300000)
+		});
+	}
+
 	function addLog(step: number, label: string, detail: string, status: 'done' | 'active' | 'pending' = 'active') {
 		const existing = stepLog.find(l => l.step === step);
 		if (existing) {
@@ -62,11 +72,32 @@
 
 	// Sub-log for granular progress within a step
 	let subLog = $state<string[]>([]);
+	let subLogQueue: string[] = [];
+	let subLogTimer: ReturnType<typeof setInterval> | null = null;
+
 	function addSubLog(msg: string) {
-		subLog = [...subLog, msg];
+		subLogQueue.push(msg);
+	}
+	function flushSubLog() {
+		// Show all queued messages immediately
+		if (subLogQueue.length > 0) {
+			subLog = [...subLog, ...subLogQueue];
+			subLogQueue = [];
+		}
+	}
+	function startSubLogDrip() {
+		// Drip-feed queued messages one by one with delay
+		if (subLogTimer) clearInterval(subLogTimer);
+		subLogTimer = setInterval(() => {
+			if (subLogQueue.length > 0) {
+				subLog = [...subLog, subLogQueue.shift()!];
+			}
+		}, 400);
 	}
 	function clearSubLog() {
 		subLog = [];
+		subLogQueue = [];
+		if (subLogTimer) { clearInterval(subLogTimer); subLogTimer = null; }
 	}
 
 	// Load snapshot from camera
@@ -121,6 +152,7 @@
 		addLog(1, 'Verbindung testen', 'Starte Verbindungstest...', 'active');
 		addSubLog(`SSH-Verbindung zum Proxmox-Host wird aufgebaut...`);
 		addSubLog(`Teste RTSP-Zugang: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
+		startSubLogDrip();
 
 		try {
 			const res = await fetch('/api/onboarding/test-connection', {
@@ -167,6 +199,7 @@
 		clearSubLog();
 		const hostname = `cam-${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
 		addLog(2, 'Container erstellen', `LXC ${nextVmid} wird auf Proxmox erstellt...`, 'active');
+		startSubLogDrip();
 		addSubLog(`Proxmox API: POST /nodes/prox3/lxc`);
 		addSubLog(`VMID: ${nextVmid}, Hostname: ${hostname}`);
 		addSubLog(`Template: debian-12-standard_12.12-1_amd64.tar.zst`);
@@ -175,11 +208,7 @@
 		addSubLog(`VAAPI Passthrough: /dev/dri/renderD128 (via SSH pct set)`);
 
 		try {
-			const res = await fetch('/api/onboarding/create-container', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cameraId })
-			});
+			const res = await longFetch('/api/onboarding/create-container', { cameraId });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'Container konnte nicht erstellt werden');
 			containerIp = data.containerIp;
@@ -201,6 +230,7 @@
 		error = null;
 		clearSubLog();
 		addLog(3, 'go2rtc konfigurieren', 'Installiere ffmpeg + go2rtc im Container...', 'active');
+		startSubLogDrip();
 		addSubLog(`pct exec ${containerVmid} -- apt-get update && apt-get install -y ffmpeg wget`);
 		addSubLog(`go2rtc Binary von github.com/AlexxIT/go2rtc herunterladen...`);
 		addSubLog(`/usr/local/bin/go2rtc installiert`);
@@ -214,11 +244,7 @@
 		addSubLog(`systemctl daemon-reload && enable && restart go2rtc`);
 
 		try {
-			const res = await fetch('/api/onboarding/configure-go2rtc', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cameraId })
-			});
+			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
@@ -239,6 +265,7 @@
 		clearSubLog();
 		const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
 		addLog(4, 'ONVIF Server', 'Node.js + ONVIF Server werden installiert...', 'active');
+		startSubLogDrip();
 		addSubLog(`Node.js 22 LTS installieren (curl deb.nodesource.com | bash)`);
 		addSubLog(`git clone github.com/daniela-hase/onvif-server`);
 		addSubLog(`npm install --production`);
@@ -256,11 +283,7 @@
 		addSubLog(`systemctl daemon-reload && enable && restart onvif-server`);
 
 		try {
-			const res = await fetch('/api/onboarding/configure-onvif', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cameraId })
-			});
+			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
@@ -280,6 +303,7 @@
 		error = null;
 		clearSubLog();
 		addLog(5, 'Stream verifizieren', 'Pruefe ob alles laeuft...', 'active');
+		startSubLogDrip();
 		addSubLog(`GET http://${containerIp}:1984/api/streams`);
 		addSubLog(`Pruefe Stream "${streamName}" ...`);
 		addSubLog(`Erwarte: mindestens 1 Producer (ffmpeg/go2rtc)`);
@@ -382,12 +406,29 @@
 						{/each}
 					</div>
 
-					<!-- Sub-log: detailed progress -->
+					<!-- Sub-log: animated task list with spinners -->
 					{#if subLog.length > 0}
-						<div class="mt-4 bg-bg-primary/50 rounded-lg p-3 max-h-48 overflow-y-auto">
-							<div class="space-y-0.5 font-mono text-[11px]">
+						<div class="mt-4 bg-bg-primary/50 rounded-lg p-3 max-h-72 overflow-y-auto" id="sublog">
+							<div class="space-y-1.5">
 								{#each subLog as line, i}
-									<p class="{i === subLog.length - 1 && loading ? 'text-accent' : 'text-text-secondary/60'}">{line}</p>
+									<div class="flex items-start gap-2">
+										{#if i < subLog.length - 1 || !loading}
+											<span class="text-green-400 text-xs mt-0.5 shrink-0">&#10003;</span>
+										{:else}
+											<Loader2 class="w-3.5 h-3.5 text-accent animate-spin shrink-0 mt-px" />
+										{/if}
+										<p class="font-mono text-[11px] leading-relaxed {i === subLog.length - 1 && loading ? 'text-text-primary font-medium' : 'text-text-secondary/70'}">
+											{line}
+										</p>
+									</div>
+									<!-- Show progress bar for download lines -->
+									{#if (line.includes('herunterladen') || line.includes('installieren') || line.includes('clone')) && i === subLog.length - 1 && loading}
+										<div class="ml-5 mt-1">
+											<div class="w-full h-1 bg-bg-input rounded-full overflow-hidden">
+												<div class="h-full bg-accent rounded-full animate-pulse" style="width: 65%; animation: progress 2s ease-in-out infinite;"></div>
+											</div>
+										</div>
+									{/if}
 								{/each}
 							</div>
 						</div>
