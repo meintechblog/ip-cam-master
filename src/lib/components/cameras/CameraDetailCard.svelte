@@ -28,9 +28,15 @@
 	async function containerAction(action: 'start' | 'stop' | 'restart') {
 		actionLoading = true;
 		try {
-			await fetch(`/api/proxmox/containers/${camera.vmid}/${action}`, { method: 'POST' });
-		} catch { /* ignore */ }
-		finally { actionLoading = false; }
+			const res = await fetch(`/api/proxmox/containers/${camera.vmid}/${action}`, { method: 'POST' });
+			if (!res.ok) {
+				// Silently handle — status will update on next poll
+			}
+		} catch { /* network error during restart is expected */ }
+		finally {
+			// Wait a moment for Proxmox to process, then release
+			setTimeout(() => { actionLoading = false; }, 3000);
+		}
 	}
 
 	async function deleteContainer() {
@@ -43,8 +49,10 @@
 		finally { actionLoading = false; }
 	}
 
+	let isRunning = $derived(camera.containerStatus === 'running');
+
 	let streamUrl = $derived(
-		camera.containerIp && camera.go2rtcRunning
+		camera.containerIp && camera.go2rtcRunning && isRunning
 			? `http://${camera.containerIp}:1984/stream.html?src=${camera.streamName}&mode=webrtc`
 			: null
 	);
@@ -72,7 +80,7 @@
 	<!-- Top: Stream + LXC info side by side -->
 	<div class="flex flex-col lg:flex-row">
 		<!-- Live Stream -->
-		<div class="flex-1 relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
+		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width}/{camera.height};">
 			{#if streamUrl}
 				<iframe
 					src={streamUrl}
@@ -81,7 +89,9 @@
 					allow="autoplay"
 				></iframe>
 			{:else}
-				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">Kein Stream verfuegbar</div>
+				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">
+					{isRunning ? 'Stream wird geladen...' : 'Container gestoppt'}
+				</div>
 			{/if}
 			<div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
 				<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
@@ -171,7 +181,7 @@
 	</div>
 
 	<!-- Pipeline: horizontal flow with arrows -->
-	<div class="p-4 border-t border-border">
+	<div class="p-4 border-t border-border {!isRunning ? 'opacity-40 pointer-events-none' : ''}">
 		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
 
 			<!-- Kamera -->
