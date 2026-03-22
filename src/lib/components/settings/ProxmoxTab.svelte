@@ -115,14 +115,14 @@
 		/>
 	</div>
 
-	<div>
-		<label for="proxmox_storage" class="block text-sm font-medium text-text-secondary mb-1">
-			Storage Target
-			{#if optionsLoading}
-				<Loader2 class="w-3 h-3 animate-spin inline ml-1" />
-			{/if}
-		</label>
-		{#if storages.length > 0}
+	{#if optionsLoading}
+		<div class="flex items-center gap-2 text-text-secondary text-sm py-2">
+			<Loader2 class="w-4 h-4 animate-spin" />
+			<span>Lade Storage und Netzwerk-Optionen von Proxmox...</span>
+		</div>
+	{:else if storages.length > 0 || bridges.length > 0}
+		<div>
+			<label for="proxmox_storage" class="block text-sm font-medium text-text-secondary mb-1">Storage Target</label>
 			<select
 				id="proxmox_storage"
 				bind:value={proxmox_storage}
@@ -132,25 +132,10 @@
 					<option value={s.name}>{s.name} ({s.type}) — {s.availGB} GB frei von {s.totalGB} GB</option>
 				{/each}
 			</select>
-		{:else}
-			<input
-				id="proxmox_storage"
-				type="text"
-				bind:value={proxmox_storage}
-				placeholder="local-lvm"
-				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-			/>
-		{/if}
-	</div>
+		</div>
 
-	<div>
-		<label for="proxmox_bridge" class="block text-sm font-medium text-text-secondary mb-1">
-			Network Bridge
-			{#if optionsLoading}
-				<Loader2 class="w-3 h-3 animate-spin inline ml-1" />
-			{/if}
-		</label>
-		{#if bridges.length > 0}
+		<div>
+			<label for="proxmox_bridge" class="block text-sm font-medium text-text-secondary mb-1">Network Bridge</label>
 			<select
 				id="proxmox_bridge"
 				bind:value={proxmox_bridge}
@@ -160,16 +145,10 @@
 					<option value={b.name}>{b.name}{b.comment ? ` — ${b.comment}` : ''}</option>
 				{/each}
 			</select>
-		{:else}
-			<input
-				id="proxmox_bridge"
-				type="text"
-				bind:value={proxmox_bridge}
-				placeholder="vmbr0"
-				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-			/>
-		{/if}
-	</div>
+		</div>
+	{:else if !proxmox_host || !proxmox_token_id || !proxmox_token_secret}
+		<p class="text-xs text-text-secondary py-2">Storage und Bridge werden nach dem ersten Speichern automatisch geladen.</p>
+	{/if}
 
 	{#if feedback}
 		<InlineAlert type={feedback.type} message={feedback.message} />
