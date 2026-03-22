@@ -26,48 +26,99 @@
 		const timer = setInterval(refreshSnapshot, 10000);
 		return () => clearInterval(timer);
 	});
+
+	function formatBytes(bytes: number): string {
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+		return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
+	}
 </script>
 
 <div class="bg-bg-card border border-border rounded-lg overflow-hidden w-full">
-	<!-- Top: Snapshot full width with aspect ratio -->
-	<div class="relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
-		{#if snapshotSrc}
-			<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
-		{:else}
-			<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">Kein Vorschaubild</div>
-		{/if}
-		<!-- Overlay: camera name + status -->
-		<div class="absolute top-3 left-3 flex items-center gap-2">
-			<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
-			<span class="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-black/70 backdrop-blur-sm
-				{camera.containerStatus === 'running' ? 'text-green-400' : 'text-red-400'}">
-				<span class="w-2 h-2 rounded-full {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
-				LXC {camera.vmid}
-			</span>
+	<!-- Top: Snapshot + LXC info side by side -->
+	<div class="flex flex-col lg:flex-row">
+		<!-- Snapshot -->
+		<div class="flex-1 relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
+			{#if snapshotSrc}
+				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
+			{:else}
+				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">Kein Vorschaubild</div>
+			{/if}
+			<div class="absolute top-3 left-3 flex items-center gap-2">
+				<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
+			</div>
+		</div>
+
+		<!-- LXC Container Info -->
+		<div class="lg:w-64 xl:w-72 shrink-0 p-4 bg-bg-primary/30 border-l border-border">
+			<div class="flex items-center gap-2 mb-3">
+				<span class="w-2.5 h-2.5 rounded-full {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
+				<span class="text-sm font-bold text-text-primary">LXC {camera.vmid}</span>
+				<span class="text-xs text-text-secondary ml-auto">{camera.containerStatus}</span>
+			</div>
+			<div class="space-y-2 text-xs">
+				<div>
+					<div class="flex justify-between text-text-secondary mb-0.5">
+						<span>CPU</span>
+						<span class="text-text-primary">{camera.lxcCpu != null ? `${(camera.lxcCpu * 100).toFixed(1)}%` : '—'}</span>
+					</div>
+					{#if camera.lxcCpu != null}
+						<div class="w-full h-1.5 bg-bg-input rounded-full overflow-hidden">
+							<div class="h-full rounded-full {camera.lxcCpu > 0.8 ? 'bg-red-400' : camera.lxcCpu > 0.5 ? 'bg-yellow-400' : 'bg-green-400'}"
+								style="width: {Math.min(camera.lxcCpu * 100, 100)}%"></div>
+						</div>
+					{/if}
+				</div>
+				<div>
+					<div class="flex justify-between text-text-secondary mb-0.5">
+						<span>RAM</span>
+						<span class="text-text-primary">
+							{#if camera.lxcMemory}
+								{formatBytes(camera.lxcMemory.used)} / {formatBytes(camera.lxcMemory.total)}
+							{:else}
+								—
+							{/if}
+						</span>
+					</div>
+					{#if camera.lxcMemory}
+						{@const memPercent = camera.lxcMemory.used / camera.lxcMemory.total}
+						<div class="w-full h-1.5 bg-bg-input rounded-full overflow-hidden">
+							<div class="h-full rounded-full {memPercent > 0.8 ? 'bg-red-400' : memPercent > 0.5 ? 'bg-yellow-400' : 'bg-green-400'}"
+								style="width: {Math.min(memPercent * 100, 100)}%"></div>
+						</div>
+					{/if}
+				</div>
+				<div class="flex justify-between text-text-secondary">
+					<span>IP</span>
+					<span class="font-mono text-text-primary">{camera.containerIp || '—'}</span>
+				</div>
+				<div class="flex justify-between text-text-secondary">
+					<span>Hostname</span>
+					<span class="text-text-primary">cam-{camera.vmid}</span>
+				</div>
+			</div>
 		</div>
 	</div>
 
-	<!-- Bottom: Pipeline + Info -->
-	<div class="p-4">
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+	<!-- Pipeline: horizontal flow with triangles -->
+	<div class="p-4 border-t border-border">
+		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
 
-			<!-- Layer 1: Kamera -->
+			<!-- Kamera -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
 					<span class="w-2 h-2 rounded-full shrink-0 {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
 					<span class="text-sm font-medium text-text-primary">Kamera</span>
-					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
+					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="text-accent hover:text-accent/80 ml-auto">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
-					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
 					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{camera.cameraModel || camera.cameraType}</span></div>
-					<div class="flex justify-between"><span>Aufloesung</span><span class="text-text-primary">{camera.width}x{camera.height}</span></div>
+					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
 					<div class="flex justify-between">
 						<span>FPS</span>
 						<span class="text-text-primary">
-							{#if camera.liveFps}
+							{#if camera.liveFps != null}
 								<span class="{camera.liveFps < camera.fps ? 'text-yellow-400' : 'text-green-400'}">{camera.liveFps}</span>/{camera.fps}
 							{:else}
 								{camera.fps}
@@ -75,45 +126,53 @@
 						</span>
 					</div>
 					{#if camera.firmwareVersion}
-						<div class="flex justify-between"><span>Firmware</span><span class="text-text-primary">{camera.firmwareVersion}</span></div>
+						<div class="flex justify-between"><span>FW</span><span class="text-text-primary">{camera.firmwareVersion}</span></div>
 					{/if}
 				</div>
 			</div>
 
-			<!-- Layer 2: go2rtc -->
+			<!-- Arrow -->
+			<div class="hidden md:flex items-center justify-center px-1 text-text-secondary/30 text-lg">&#9654;</div>
+
+			<!-- go2rtc -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
 					<span class="w-2 h-2 rounded-full shrink-0 {camera.go2rtcRunning ? 'bg-green-400' : 'bg-red-400'}"></span>
 					<span class="text-sm font-medium text-text-primary">go2rtc</span>
 					{#if camera.go2rtcRunning && camera.go2rtcWebUrl}
-						<a href={camera.go2rtcWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="go2rtc Web-UI">
+						<a href={camera.go2rtcWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto">
 							<ExternalLink class="w-3.5 h-3.5" />
 						</a>
 					{/if}
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
-					<div class="flex justify-between"><span>Transcode</span><span class="text-text-primary">MJPEG &rarr; H.264</span></div>
-					<div class="flex justify-between"><span>HW-Accel</span><span class="text-text-primary">VAAPI</span></div>
+					<div class="flex justify-between"><span>Transcode</span><span class="text-text-primary">MJPEG → H.264</span></div>
+					<div class="flex justify-between"><span>Accel</span><span class="text-text-primary">VAAPI</span></div>
 					<div class="flex justify-between"><span>Bitrate</span><span class="text-text-primary">{camera.bitrate} kbit/s</span></div>
 					<div class="flex justify-between"><span>Clients</span><span class="text-text-primary">{camera.connectedClients}</span></div>
 				</div>
 			</div>
 
-			<!-- Layer 3: ONVIF Server -->
+			<!-- Arrow -->
+			<div class="hidden md:flex items-center justify-center px-1 text-text-secondary/30 text-lg">&#9654;</div>
+
+			<!-- ONVIF Server -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
 					<span class="w-2 h-2 rounded-full shrink-0 {camera.onvifRunning ? 'bg-green-400' : 'bg-red-400'}"></span>
-					<span class="text-sm font-medium text-text-primary">ONVIF Server</span>
+					<span class="text-sm font-medium text-text-primary">ONVIF</span>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>Port</span><span class="font-mono text-text-primary">8899</span></div>
 					<div class="flex justify-between"><span>Geraet</span><span class="text-text-primary">{camera.name}</span></div>
-					<div class="flex justify-between"><span>Discovery</span><span class="text-text-primary">{camera.onvifRunning ? 'aktiv' : 'inaktiv'}</span></div>
-					<div class="flex justify-between"><span>Container</span><span class="font-mono text-text-primary">{camera.containerIp || '—'}</span></div>
+					<div class="flex justify-between"><span>Discovery</span><span class="{camera.onvifRunning ? 'text-green-400' : 'text-red-400'}">{camera.onvifRunning ? 'aktiv' : 'aus'}</span></div>
 				</div>
 			</div>
 
-			<!-- Layer 4: UniFi Protect -->
+			<!-- Arrow -->
+			<div class="hidden md:flex items-center justify-center px-1 text-text-secondary/30 text-lg">&#9654;</div>
+
+			<!-- UniFi Protect -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
 					{#if camera.streamInfo?.unifiConnected}
@@ -129,17 +188,15 @@
 						{#if camera.streamInfo?.unifiConnected}
 							<span class="text-green-400 font-medium">verbunden</span>
 						{:else}
-							<span class="text-yellow-400">nicht verbunden</span>
+							<span class="text-yellow-400">wartend</span>
 						{/if}
 					</div>
 					{#if camera.streamInfo?.unifiConnected}
 						<div class="flex justify-between"><span>Streams</span><span class="text-text-primary">{camera.streamInfo.unifiStreams}</span></div>
 					{/if}
-					<div class="flex justify-between"><span>Stream</span><span class="text-text-primary">{camera.streamInfo?.active ? 'aktiv' : 'inaktiv'}</span></div>
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{camera.streamInfo?.codec || 'H.264'}</span></div>
 				</div>
 			</div>
-
 		</div>
 
 		<!-- RTSP URL bar -->

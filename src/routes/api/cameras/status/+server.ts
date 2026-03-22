@@ -15,19 +15,22 @@ export const GET: RequestHandler = async () => {
 		}
 
 		// Get container statuses from Proxmox
-		let containerStatuses: Map<number, ContainerStatus> = new Map();
+		let containerMap: Map<number, any> = new Map();
 		try {
 			const containers = await listContainers();
-			containerStatuses = new Map(containers.map((c) => [c.vmid, c.status]));
+			containerMap = new Map(containers.map((c) => [c.vmid, c]));
 		} catch {
-			// Proxmox unreachable — all containers unknown
+			// Proxmox unreachable
 		}
 
 		// Collect live data for each camera in parallel
 		const results: CameraCardData[] = await Promise.all(
 			allCameras.map(async (cam: any) => {
-				const containerStatus = containerStatuses.get(cam.vmid) || 'unknown';
+				const containerData = containerMap.get(cam.vmid);
+				const containerStatus = containerData?.status || 'unknown';
 				const containerIp = cam.containerIp;
+				const lxcCpu = containerData?.cpu ?? null;
+				const lxcMemory = containerData?.memory ?? null;
 
 				let go2rtcRunning = false;
 				let onvifRunning = false;
@@ -92,19 +95,16 @@ export const GET: RequestHandler = async () => {
 					const decryptedPass = decrypt(cam.password);
 					cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
 
-					// Probe camera for live FPS via ffprobe (non-blocking, 3s timeout)
+					// Probe camera for live FPS: count frames over 3 seconds
 					try {
 						const { execSync } = await import('node:child_process');
 						const probeJson = execSync(
-							`ffprobe -v quiet -print_format json -show_streams -timeout 3000000 "rtsp://${cam.username}:${decryptedPass}@${cam.ip}:554${cam.streamPath || '/stream0/mobotix.mjpeg'}"`,
-							{ timeout: 5000, encoding: 'utf-8' }
+							`ffprobe -v quiet -print_format json -show_entries stream=nb_read_frames -count_frames -read_intervals "%+3" -select_streams v -rtsp_transport tcp "rtsp://${cam.username}:${decryptedPass}@${cam.ip}:554${cam.streamPath || '/stream0/mobotix.mjpeg'}"`,
+							{ timeout: 8000, encoding: 'utf-8' }
 						);
 						const probeData = JSON.parse(probeJson);
-						const videoStream = probeData.streams?.find((s: any) => s.codec_type === 'video');
-						if (videoStream?.r_frame_rate) {
-							const [num, den] = videoStream.r_frame_rate.split('/').map(Number);
-							if (den > 0) liveFps = Math.round(num / den);
-						}
+						const frames = parseInt(probeData.streams?.[0]?.nb_read_frames || '0');
+						if (frames > 0) liveFps = Math.round(frames / 3);
 					} catch {
 						// ffprobe timeout or not available — skip live FPS
 					}
@@ -161,7 +161,9 @@ export const GET: RequestHandler = async () => {
 						: null,
 					go2rtcWebUrl: containerIp
 						? `http://${containerIp}:1984`
-						: null
+						: null,
+					lxcCpu: lxcCpu,
+					lxcMemory: lxcMemory
 				} satisfies CameraCardData;
 			})
 		);

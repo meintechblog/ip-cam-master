@@ -112,4 +112,6 @@ export interface CameraCardData {
 	cameraModel: string | null;
 	firmwareVersion: string | null;
 	liveFps: number | null;
+	lxcCpu: number | null;
+	lxcMemory: { used: number; total: number } | null;
 }
