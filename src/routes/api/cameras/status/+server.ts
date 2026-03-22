@@ -45,7 +45,14 @@ export const GET: RequestHandler = async () => {
 							const stream = data[cam.streamName];
 							if (stream) {
 								const producers = Array.isArray(stream.producers) ? stream.producers.length : 0;
-								const consumers = Array.isArray(stream.consumers) ? stream.consumers.length : 0;
+								const consumerList = Array.isArray(stream.consumers) ? stream.consumers : [];
+								const consumers = consumerList.length;
+								const unifiConnected = consumerList.some(
+									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server')
+								);
+								const unifiStreams = consumerList.filter(
+									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server')
+								).length;
 								streamInfo = {
 									active: producers > 0,
 									codec: stream.producers?.[0]?.codec || null,
@@ -53,6 +60,8 @@ export const GET: RequestHandler = async () => {
 									resolution: stream.producers?.[0]?.resolution || null
 								};
 								connectedClients = consumers;
+								(streamInfo as any).unifiConnected = unifiConnected;
+								(streamInfo as any).unifiStreams = unifiStreams;
 							}
 						}
 					} catch {

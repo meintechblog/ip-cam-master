@@ -81,6 +81,8 @@ export interface StreamInfo {
 	codec: string | null;
 	producers: number;
 	resolution: string | null;
+	unifiConnected?: boolean;
+	unifiStreams?: number;
 }
 
 export interface CameraCardData {

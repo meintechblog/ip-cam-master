@@ -75,6 +75,17 @@
 					<span class="w-2 h-2 rounded-full {camera.streamInfo?.active ? 'bg-green-400' : 'bg-yellow-400'}"></span>
 					<span class="text-text-secondary">Stream {camera.streamInfo?.active ? 'aktiv' : 'inaktiv'}</span>
 				</div>
+				<div class="flex items-center gap-1.5 text-xs">
+					{#if camera.streamInfo?.unifiConnected}
+						<span class="w-2 h-2 rounded-full bg-green-400"></span>
+						<span class="text-text-secondary">UniFi Protect</span>
+						<span class="text-green-400 font-medium">verbunden ({camera.streamInfo.unifiStreams} Streams)</span>
+					{:else}
+						<span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+						<span class="text-text-secondary">UniFi Protect</span>
+						<span class="text-yellow-400">nicht verbunden</span>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Details Grid -->
