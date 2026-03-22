@@ -196,13 +196,11 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 	const ssh = await connectToProxmox();
 
 	try {
-		// Run install commands
 		const installCmds = getInstallCommands();
 		for (const cmd of installCmds) {
 			await executeOnContainer(ssh, camera.vmid, cmd);
 		}
 
-		// Generate and push go2rtc config
 		const decryptedPassword = decrypt(camera.password);
 		const yamlContent = generateGo2rtcConfig({
 			streamName: camera.streamName,
@@ -217,17 +215,29 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		});
 		await pushFileToContainer(ssh, camera.vmid, yamlContent, '/etc/go2rtc/go2rtc.yaml');
 
-		// Generate and push systemd unit
 		const unitContent = generateSystemdUnit();
 		await pushFileToContainer(ssh, camera.vmid, unitContent, '/etc/systemd/system/go2rtc.service');
 
-		// Enable and start go2rtc service
 		await executeOnContainer(ssh, camera.vmid, 'systemctl daemon-reload && systemctl enable go2rtc && systemctl restart go2rtc');
 
-		// Wait for go2rtc to start
-		await new Promise((resolve) => setTimeout(resolve, 3000));
+		db.update(cameras)
+			.set({ status: 'go2rtc_configured', updatedAt: new Date().toISOString() })
+			.where(eq(cameras.id, cameraId))
+			.run();
+	} finally {
+		ssh.dispose();
+	}
+}
 
-		// Install ONVIF server (needed for UniFi Protect adoption)
+/**
+ * Installs ONVIF server in the container, generates config, patches device naming, starts service.
+ */
+export async function configureOnvif(cameraId: number): Promise<void> {
+	const camera = getCameraById(cameraId);
+	const ssh = await connectToProxmox();
+
+	try {
+		// Install Node.js + ONVIF server
 		const onvifCmds = getOnvifInstallCommands();
 		for (const cmd of onvifCmds) {
 			await executeOnContainer(ssh, camera.vmid, cmd);
@@ -239,12 +249,7 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		const uuidResult = await executeOnContainer(ssh, camera.vmid, 'cat /proc/sys/kernel/random/uuid');
 		const uuid = uuidResult.stdout.trim();
 
-		// Patch onvif-server source for UniFi Protect display
-		// Pattern from working containers (e.g., 1003/Balkon):
-		//   Manufacturer = camera name (shown as device name in Protect)
-		//   Model = 'Mobotix' (shown as model in Protect)
-		//   onvif name = 'MOBOTIXS15' (shown during discovery)
-		//   Config names = {Name}HqCameraConfiguration / {Name}LqCameraConfiguration
+		// Patch onvif-server.js for UniFi Protect (Manufacturer, Model, ONVIF name)
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
 		await executeOnContainer(ssh, camera.vmid,
 			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${safeName}'/g; s/Model: 'Cardinal'/Model: 'Mobotix'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/MOBOTIXS15|g" /root/onvif-server/src/onvif-server.js`
@@ -272,10 +277,7 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 
 		// Update status
 		db.update(cameras)
-			.set({
-				status: 'configured',
-				updatedAt: new Date().toISOString()
-			})
+			.set({ status: 'configured', updatedAt: new Date().toISOString() })
 			.where(eq(cameras.id, cameraId))
 			.run();
 	} finally {

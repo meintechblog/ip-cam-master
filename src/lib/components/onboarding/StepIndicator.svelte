@@ -3,10 +3,11 @@
 
 	const steps = [
 		'Zugangsdaten',
-		'Verbindung testen',
-		'Container erstellen',
-		'go2rtc + ONVIF',
-		'Stream verifizieren'
+		'Verbindung',
+		'Container',
+		'go2rtc',
+		'ONVIF',
+		'Verifizieren'
 	];
 </script>
 
