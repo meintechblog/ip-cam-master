@@ -5,6 +5,15 @@
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
 
+	// Camera probe data (loaded separately, every 5s)
+	let probeData = $state<{
+		liveFps: number | null;
+		maxFps: number | null;
+		cameraModel: string | null;
+		firmwareVersion: string | null;
+		codec: string | null;
+	} | null>(null);
+
 	function copyRtsp() {
 		if (camera.rtspUrl) {
 			navigator.clipboard.writeText(camera.rtspUrl);
@@ -13,12 +22,24 @@
 		}
 	}
 
-	// go2rtc stream URL for live video via WebRTC/MSE
 	let streamUrl = $derived(
 		camera.containerIp && camera.go2rtcRunning
 			? `http://${camera.containerIp}:1984/stream.html?src=${camera.streamName}&mode=webrtc`
 			: null
 	);
+
+	async function fetchProbe() {
+		try {
+			const res = await fetch(`/api/cameras/${camera.id}/probe`);
+			if (res.ok) probeData = await res.json();
+		} catch { /* ignore */ }
+	}
+
+	$effect(() => {
+		fetchProbe();
+		const timer = setInterval(fetchProbe, 5000);
+		return () => clearInterval(timer);
+	});
 
 	function formatBytes(bytes: number): string {
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -27,9 +48,9 @@
 </script>
 
 <div class="bg-bg-card border border-border rounded-lg overflow-hidden w-full">
-	<!-- Top: Snapshot + LXC info side by side -->
+	<!-- Top: Stream + LXC info side by side -->
 	<div class="flex flex-col lg:flex-row">
-		<!-- Snapshot -->
+		<!-- Live Stream -->
 		<div class="flex-1 relative bg-black" style="aspect-ratio: {camera.width}/{camera.height};">
 			{#if streamUrl}
 				<iframe
@@ -97,7 +118,7 @@
 		</div>
 	</div>
 
-	<!-- Pipeline: horizontal flow with triangles -->
+	<!-- Pipeline: horizontal flow with arrows -->
 	<div class="p-4 border-t border-border">
 		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
 
@@ -111,20 +132,11 @@
 					</a>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
-					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{camera.cameraModel || camera.cameraType}</span></div>
+					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{probeData?.cameraModel || camera.cameraType}</span></div>
 					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
-					<div class="flex justify-between">
-						<span>FPS</span>
-						<span class="text-text-primary">
-							{#if camera.liveFps != null}
-								<span class="{camera.liveFps < camera.fps ? 'text-yellow-400' : 'text-green-400'}">{camera.liveFps}</span>/{camera.fps}
-							{:else}
-								{camera.fps}
-							{/if}
-						</span>
-					</div>
-					{#if camera.firmwareVersion}
-						<div class="flex justify-between"><span>FW</span><span class="text-text-primary">{camera.firmwareVersion}</span></div>
+					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{probeData?.codec || 'MJPEG'}</span></div>
+					{#if probeData?.firmwareVersion}
+						<div class="flex justify-between"><span>FW</span><span class="text-text-primary">{probeData.firmwareVersion}</span></div>
 					{/if}
 				</div>
 			</div>
@@ -146,6 +158,16 @@
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>Transcode</span><span class="text-text-primary">MJPEG → H.264</span></div>
 					<div class="flex justify-between"><span>Accel</span><span class="text-text-primary">VAAPI</span></div>
+					<div class="flex justify-between">
+						<span>FPS</span>
+						<span class="text-text-primary">
+							{#if probeData?.liveFps != null}
+								<span class="{probeData.liveFps < camera.fps ? 'text-yellow-400' : 'text-green-400'}">{probeData.liveFps}</span>/{camera.fps}
+							{:else}
+								{camera.fps}
+							{/if}
+						</span>
+					</div>
 					<div class="flex justify-between"><span>Bitrate</span><span class="text-text-primary">{camera.bitrate} kbit/s</span></div>
 					<div class="flex justify-between"><span>Clients</span><span class="text-text-primary">{camera.connectedClients}</span></div>
 				</div>

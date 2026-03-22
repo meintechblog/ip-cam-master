@@ -87,48 +87,9 @@ export const GET: RequestHandler = async () => {
 				}
 
 				let cameraWebUrl: string | null = null;
-				let liveFps: number | null = null;
-				let cameraModel: string | null = null;
-				let firmwareVersion: string | null = null;
-
 				try {
 					const decryptedPass = decrypt(cam.password);
 					cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
-
-					// Probe camera for live FPS: count frames over 3 seconds
-					try {
-						const { execSync } = await import('node:child_process');
-						const probeJson = execSync(
-							`ffprobe -v quiet -print_format json -show_entries stream=nb_read_frames -count_frames -read_intervals "%+3" -select_streams v -rtsp_transport tcp "rtsp://${cam.username}:${decryptedPass}@${cam.ip}:554${cam.streamPath || '/stream0/mobotix.mjpeg'}"`,
-							{ timeout: 8000, encoding: 'utf-8' }
-						);
-						const probeData = JSON.parse(probeJson);
-						const frames = parseInt(probeData.streams?.[0]?.nb_read_frames || '0');
-						if (frames > 0) liveFps = Math.round(frames / 3);
-					} catch {
-						// ffprobe timeout or not available — skip live FPS
-					}
-
-					// Get model + firmware from Mobotix /admin/version page (has all info in <td> cells)
-					try {
-						const { execSync } = await import('node:child_process');
-						const versionHtml = execSync(
-							`curl -s --basic -u "${cam.username}:${decryptedPass}" "http://${cam.ip}/admin/version" --max-time 3`,
-							{ timeout: 5000, encoding: 'utf-8' }
-						);
-						// Extract all <td> text content
-						const tdMatches = versionHtml.match(/<td[^>]*>(.*?)<\/td>/gs) || [];
-						const tdTexts = tdMatches.map((td: string) => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
-						// First td is typically the model: "MOBOTIX S15D-Sec"
-						if (tdTexts.length > 0 && tdTexts[0].includes('MOBOTIX')) {
-							cameraModel = tdTexts[0];
-						}
-						// Firmware is in the format MX-V4.x.x.x
-						const fwEntry = tdTexts.find((t: string) => t.startsWith('MX-V'));
-						if (fwEntry) firmwareVersion = fwEntry;
-					} catch {
-						// Camera HTTP not reachable
-					}
 				} catch {
 					cameraWebUrl = `http://${cam.ip}`;
 				}
@@ -140,9 +101,6 @@ export const GET: RequestHandler = async () => {
 					cameraIp: cam.ip,
 					cameraType: cam.cameraType || 'mobotix',
 					cameraWebUrl,
-					cameraModel,
-					firmwareVersion,
-					liveFps,
 					containerIp,
 					streamName: cam.streamName,
 					rtspUrl: containerIp ? `rtsp://${containerIp}:8554/${cam.streamName}` : null,
