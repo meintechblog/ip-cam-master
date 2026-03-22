@@ -219,22 +219,11 @@
 					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
 				{/if}
 			</div>
-			<div class="mt-3 pt-3 border-t border-border">
-				<span class="text-xs text-green-400">Direkt in UniFi Protect nutzbar — kein Container noetig</span>
-			</div>
 		</div>
 		{/if}
 	</div>
 
-	{#if isNativeOnvif}
-	<!-- Simple info bar for native ONVIF -->
-	<div class="p-4 border-t border-border">
-		<div class="bg-bg-primary/50 rounded-lg px-4 py-3 flex items-center gap-3">
-			<span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
-			<span class="text-sm text-text-primary">Diese Kamera unterstuetzt ONVIF nativ und kann direkt in UniFi Protect adopted werden.</span>
-		</div>
-	</div>
-	{:else}
+	{#if !isNativeOnvif}
 	<!-- Pipeline: horizontal flow with arrows -->
 	<div class="p-4 border-t border-border {!isRunning ? 'opacity-40 pointer-events-none' : ''}">
 		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-0 items-stretch">
