@@ -307,15 +307,35 @@ export async function verifyStream(
  * Gets the next available VMID based on settings and existing cameras.
  */
 export async function getNextVmid(): Promise<number> {
-	const settings = await getSettings('proxmox_');
-	const vmidStart = parseInt(settings.proxmox_vmid_start || '200', 10);
+	// Auto-detect: find highest VMID on Proxmox, round up to next 1000, then increment
+	try {
+		const { listContainers } = await import('./proxmox');
+		const containers = await listContainers();
+		const allVmids = containers.map((c) => c.vmid);
 
-	const rows = db.select({ maxVmid: sql<number>`MAX(${cameras.vmid})` })
-		.from(cameras)
-		.all();
+		// Also include our DB entries
+		const dbRows = db.select({ vmid: cameras.vmid }).from(cameras).all() as any[];
+		for (const r of dbRows) {
+			if (r.vmid > 0) allVmids.push(r.vmid);
+		}
 
-	const maxVmid = rows[0]?.maxVmid || 0;
-	return Math.max(vmidStart, maxVmid + 1);
+		if (allVmids.length === 0) return 2000;
+
+		const maxVmid = Math.max(...allVmids);
+		// Round up to next 1000 for our range
+		const rangeStart = Math.ceil((maxVmid + 1) / 1000) * 1000;
+
+		// Find next free in our range
+		const usedInRange = new Set(allVmids.filter((v) => v >= rangeStart));
+		let next = rangeStart;
+		while (usedInRange.has(next)) next++;
+		return next;
+	} catch {
+		// Fallback if Proxmox unreachable
+		const rows = db.select({ maxVmid: sql<number>`MAX(${cameras.vmid})` }).from(cameras).all();
+		const maxVmid = rows[0]?.maxVmid || 0;
+		return maxVmid > 0 ? maxVmid + 1 : 2000;
+	}
 }
 
 /**
