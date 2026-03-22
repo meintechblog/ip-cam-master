@@ -50,7 +50,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- Backend services: SSH, go2rtc config generation, onboarding orchestration, DB schema + API routes
-- [ ] 02-02-PLAN.md -- 5-step onboarding wizard UI with progress indicator, step components, WebRTC preview
+- [x] 02-02-PLAN.md -- 5-step onboarding wizard UI with progress indicator, step components, WebRTC preview
 - [ ] 02-03-PLAN.md -- Visual checkpoint: verify wizard UI and flow
 
 ### Phase 3: Loxone Pipeline and Network Discovery

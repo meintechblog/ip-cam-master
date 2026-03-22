@@ -54,12 +54,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Camera Onboarding Pipeline
 
-- [ ] **ONBD-01**: User can start onboarding flow for a discovered non-ONVIF camera
-- [ ] **ONBD-02**: Onboarding flow: select camera -> enter/confirm credentials -> test connection -> create container -> deploy config -> verify stream
-- [ ] **ONBD-03**: Each onboarding step shows clear success/error with retry option
-- [ ] **ONBD-04**: After successful stream verification, app provides RTSP URL for UniFi Protect adoption
+- [x] **ONBD-01**: User can start onboarding flow for a discovered non-ONVIF camera
+- [x] **ONBD-02**: Onboarding flow: select camera -> enter/confirm credentials -> test connection -> create container -> deploy config -> verify stream
+- [x] **ONBD-03**: Each onboarding step shows clear success/error with retry option
+- [x] **ONBD-04**: After successful stream verification, app provides RTSP URL for UniFi Protect adoption
 - [ ] **ONBD-05**: App triggers or guides UniFi Protect adoption (semi-automatic with clear instructions)
-- [ ] **ONBD-06**: Mobotix-specific pipeline works end-to-end (MJPEG source -> H.264 RTSP output)
+- [x] **ONBD-06**: Mobotix-specific pipeline works end-to-end (MJPEG source -> H.264 RTSP output)
 - [ ] **ONBD-07**: Loxone Intercom-specific pipeline works end-to-end (HTTP+auth -> nginx -> go2rtc -> RTSP)
 
 ### Installation & Distribution
@@ -138,12 +138,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-04 | Phase 4 | Pending |
 | DASH-05 | Phase 4 | Pending |
 | DASH-06 | Phase 4 | Pending |
-| ONBD-01 | Phase 2 | Pending |
-| ONBD-02 | Phase 2 | Pending |
-| ONBD-03 | Phase 2 | Pending |
-| ONBD-04 | Phase 2 | Pending |
+| ONBD-01 | Phase 2 | Complete |
+| ONBD-02 | Phase 2 | Complete |
+| ONBD-03 | Phase 2 | Complete |
+| ONBD-04 | Phase 2 | Complete |
 | ONBD-05 | Phase 4 | Pending |
-| ONBD-06 | Phase 2 | Pending |
+| ONBD-06 | Phase 2 | Complete |
 | ONBD-07 | Phase 3 | Pending |
 | INST-01 | Phase 5 | Pending |
 | INST-02 | Phase 5 | Pending |
