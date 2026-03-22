@@ -56,7 +56,7 @@ export const credentials = sqliteTable('credentials', {
 	name: text('name').notNull(),
 	username: text('username').notNull(),
 	password: text('password').notNull(),
-	cameraIp: text('camera_ip'),
+	priority: integer('priority').notNull().default(0),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())

@@ -31,16 +31,52 @@
 
 	$effect(() => { runDiscovery(); });
 
-	function selectCamera(ip: string) {
+	async function selectCamera(ip: string) {
+		// Try saved credentials first
+		try {
+			const res = await fetch('/api/credentials/test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ip })
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data.success) {
+					// Pre-fill credentials from matched preset
+					prefillUser = data.username;
+					prefillPass = data.password;
+					prefillCredName = data.name;
+				}
+			}
+		} catch { /* ignore */ }
 		selectedIp = ip;
 	}
 
-	function startRegister(ip: string) {
+	let prefillUser = $state('');
+	let prefillPass = $state('');
+	let prefillCredName = $state('');
+
+	async function startRegister(ip: string) {
 		registeringIp = ip;
 		registerName = '';
 		registerUser = '';
 		registerPass = '';
 		registerError = null;
+		// Try saved credentials
+		try {
+			const res = await fetch('/api/credentials/test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ip })
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data.success) {
+					registerUser = data.username;
+					registerPass = data.password;
+				}
+			}
+		} catch { /* ignore */ }
 	}
 
 	async function submitRegister() {
@@ -76,10 +112,15 @@
 <h1 class="text-2xl font-bold text-text-primary mb-6">Kamera einrichten</h1>
 
 {#if selectedIp}
-	<button onclick={() => selectedIp = null} class="text-accent hover:text-accent/80 text-sm mb-4 cursor-pointer">
+	<button onclick={() => { selectedIp = null; prefillUser = ''; prefillPass = ''; prefillCredName = ''; }} class="text-accent hover:text-accent/80 text-sm mb-4 cursor-pointer">
 		&larr; Zurueck zur Auswahl
 	</button>
-	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} />
+	{#if prefillCredName}
+		<div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4 text-green-400 text-sm">
+			Login "{prefillCredName}" automatisch erkannt und vorausgefuellt.
+		</div>
+	{/if}
+	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} />
 {:else}
 	<!-- Manual entry -->
 	<div class="mb-6">

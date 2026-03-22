@@ -7,7 +7,17 @@
 	import StepConfigureGo2rtc from './StepConfigureGo2rtc.svelte';
 	import StepVerifyStream from './StepVerifyStream.svelte';
 
-	let { nextVmid, prefillIp = '' }: { nextVmid: number; prefillIp?: string } = $props();
+	let {
+		nextVmid,
+		prefillIp = '',
+		prefillUsername = '',
+		prefillPassword = ''
+	}: {
+		nextVmid: number;
+		prefillIp?: string;
+		prefillUsername?: string;
+		prefillPassword?: string;
+	} = $props();
 
 	// Wizard state
 	let currentStep = $state(0);
@@ -17,8 +27,8 @@
 
 	// Form data
 	let ip = $state(prefillIp);
-	let username = $state('');
-	let password = $state('');
+	let username = $state(prefillUsername);
+	let password = $state(prefillPassword);
 	let name = $state('');
 
 	// Transcode params
