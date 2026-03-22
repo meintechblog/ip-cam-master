@@ -5,7 +5,7 @@
 		'Zugangsdaten',
 		'Verbindung testen',
 		'Container erstellen',
-		'go2rtc konfigurieren',
+		'go2rtc + ONVIF',
 		'Stream verifizieren'
 	];
 </script>

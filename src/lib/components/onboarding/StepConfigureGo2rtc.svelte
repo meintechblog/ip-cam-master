@@ -18,10 +18,11 @@
 	} = $props();
 
 	const subSteps = [
-		'ffmpeg wird installiert...',
-		'go2rtc wird heruntergeladen...',
-		'Konfiguration wird bereitgestellt...',
-		'Service wird gestartet...'
+		'ffmpeg + go2rtc werden installiert...',
+		'go2rtc Konfiguration wird bereitgestellt...',
+		'Node.js + ONVIF Server werden installiert...',
+		'ONVIF Konfiguration + Device-Naming...',
+		'Services werden gestartet...'
 	];
 
 	let currentSubStep = $state(0);
@@ -54,7 +55,7 @@
 	{#if loading}
 		<div class="flex items-center gap-3 text-text-secondary">
 			<Loader2 class="w-5 h-5 animate-spin" />
-			<span>go2rtc wird konfiguriert...</span>
+			<span>go2rtc + ONVIF Server werden konfiguriert...</span>
 		</div>
 		<div class="bg-bg-card border border-border rounded-lg p-4">
 			{#each subSteps as step, i}
@@ -73,7 +74,7 @@
 	{:else if done && !error}
 		<div class="flex items-center gap-3 text-success">
 			<CheckCircle class="w-5 h-5" />
-			<span class="font-medium">go2rtc erfolgreich konfiguriert</span>
+			<span class="font-medium">go2rtc + ONVIF Server erfolgreich konfiguriert</span>
 		</div>
 	{/if}
 
