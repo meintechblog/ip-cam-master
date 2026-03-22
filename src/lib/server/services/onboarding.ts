@@ -136,9 +136,11 @@ export async function createCameraContainer(
 ): Promise<{ vmid: number; containerIp: string }> {
 	const camera = getCameraById(cameraId);
 
+	// Hostname from camera name: lowercase, no spaces/special chars
+	const hostname = `cam-${camera.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
 	await createContainer({
 		vmid: camera.vmid,
-		hostname: `cam-${camera.vmid}`,
+		hostname,
 		ostemplate: 'local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst',
 		cameraName: camera.name,
 		cameraIp: camera.ip,

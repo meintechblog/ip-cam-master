@@ -243,11 +243,19 @@ export async function deleteContainer(vmid: number): Promise<void> {
 	const proxmox = await getProxmoxClient();
 	const node = await getNodeName(proxmox);
 
-	// Check if container is running, stop first if so
+	// Check if container is running, stop first and wait
 	try {
 		const status = await proxmox.nodes.$(node).lxc.$(vmid).status.current.$get();
 		if (status && (status as any).status === 'running') {
 			await proxmox.nodes.$(node).lxc.$(vmid).status.stop.$post();
+			// Wait for container to actually stop
+			for (let i = 0; i < 15; i++) {
+				await new Promise((r) => setTimeout(r, 1000));
+				try {
+					const s = await proxmox.nodes.$(node).lxc.$(vmid).status.current.$get();
+					if ((s as any).status === 'stopped') break;
+				} catch { break; }
+			}
 		}
 	} catch {
 		// Container may already be stopped or not exist

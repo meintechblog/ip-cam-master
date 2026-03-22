@@ -1,9 +1,28 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
-	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2 } from 'lucide-svelte';
+	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil } from 'lucide-svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
+	let editing = $state(false);
+	let editName = $state(camera.name);
+	let renameLoading = $state(false);
+
+	async function saveName() {
+		if (!editName.trim() || editName === camera.name) { editing = false; return; }
+		renameLoading = true;
+		try {
+			const res = await fetch(`/api/cameras/${camera.id}/rename`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: editName.trim() })
+			});
+			if ((await res.json()).success) {
+				camera.name = editName.trim();
+			}
+		} catch { /* ignore */ }
+		finally { renameLoading = false; editing = false; }
+	}
 
 	// Camera probe data (loaded separately, every 5s)
 	let probeData = $state<{
@@ -39,14 +58,13 @@
 		}
 	}
 
-	async function deleteContainer() {
+	async function deleteCamera() {
 		actionLoading = true;
 		try {
-			await fetch(`/api/proxmox/containers/${camera.vmid}`, { method: 'DELETE' });
-			showDeleteConfirm = false;
-			window.location.reload();
+			await fetch(`/api/cameras/${camera.id}/delete`, { method: 'POST' });
 		} catch { /* ignore */ }
-		finally { actionLoading = false; }
+		showDeleteConfirm = false;
+		window.location.reload();
 	}
 
 	let isNativeOnvif = $derived(camera.status === 'native-onvif' || camera.cameraType === 'mobotix-onvif');
@@ -100,8 +118,23 @@
 					{isRunning ? 'Bild wird geladen...' : 'Container gestoppt'}
 				</div>
 			{/if}
-			<div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
-				<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
+			<div class="absolute top-3 left-3 flex items-center gap-2">
+				{#if editing}
+					<div class="flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-md px-2 py-1">
+						<input
+							type="text"
+							bind:value={editName}
+							class="bg-transparent text-text-primary text-sm font-bold outline-none w-32"
+							onkeydown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') editing = false; }}
+						/>
+						<button onclick={saveName} class="text-green-400 hover:text-green-300 cursor-pointer"><Check class="w-4 h-4" /></button>
+					</div>
+				{:else}
+					<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
+					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer">
+						<Pencil class="w-3.5 h-3.5" />
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -184,9 +217,9 @@
 			<!-- Delete Confirm -->
 			{#if showDeleteConfirm}
 				<div class="mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-					<p class="text-xs text-red-400 mb-2">Container {camera.vmid} wirklich loeschen?</p>
+					<p class="text-xs text-red-400 mb-2">"{camera.name}" (LXC {camera.vmid}) wirklich loeschen?</p>
 					<div class="flex gap-2">
-						<button onclick={deleteContainer} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Loeschen</button>
+						<button onclick={deleteCamera} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Loeschen</button>
 						<button onclick={() => showDeleteConfirm = false} class="px-3 py-1 text-xs bg-bg-input text-text-secondary rounded hover:bg-bg-card cursor-pointer">Abbrechen</button>
 					</div>
 				</div>
@@ -217,6 +250,23 @@
 				{/if}
 				{#if probeData?.liveFps}
 					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
+				{/if}
+			</div>
+			<!-- Delete button for native ONVIF -->
+			<div class="mt-3 pt-3 border-t border-border">
+				{#if !showDeleteConfirm}
+					<button onclick={() => showDeleteConfirm = true}
+						class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer">
+						<Trash2 class="w-3 h-3" /> Entfernen
+					</button>
+				{:else}
+					<div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+						<p class="text-xs text-red-400 mb-2">Kamera "{camera.name}" wirklich entfernen?</p>
+						<div class="flex gap-2">
+							<button onclick={deleteCamera} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Entfernen</button>
+							<button onclick={() => showDeleteConfirm = false} class="px-3 py-1 text-xs bg-bg-input text-text-secondary rounded hover:bg-bg-card cursor-pointer">Abbrechen</button>
+						</div>
+					</div>
 				{/if}
 			</div>
 		</div>
