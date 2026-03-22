@@ -46,12 +46,12 @@ Plans:
   2. Each onboarding step shows clear success or error with retry option
   3. After successful onboarding, an RTSP URL is provided that outputs H.264 video transcoded from Mobotix MJPEG via VAAPI
   4. User can customize transcode parameters (resolution, fps, bitrate) per camera
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md -- Backend services: SSH, go2rtc config generation, onboarding orchestration, DB schema + API routes
+- [ ] 02-02-PLAN.md -- 5-step onboarding wizard UI with progress indicator, step components, WebRTC preview
+- [ ] 02-03-PLAN.md -- Visual checkpoint: verify wizard UI and flow
 
 ### Phase 3: Loxone Pipeline and Network Discovery
 **Goal**: User can onboard Loxone Intercoms via nginx auth-proxy pipeline and discover cameras automatically on the network
@@ -105,8 +105,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Proxmox Integration | 0/3 | Planning complete | - |
-| 2. Mobotix Camera Pipeline | 0/3 | Not started | - |
+| 1. Foundation and Proxmox Integration | 3/3 | Complete | - |
+| 2. Mobotix Camera Pipeline | 0/3 | Planning complete | - |
 | 3. Loxone Pipeline and Network Discovery | 0/3 | Not started | - |
 | 4. Dashboard and UniFi Protect | 0/2 | Not started | - |
 | 5. Installer and Distribution | 0/1 | Not started | - |
