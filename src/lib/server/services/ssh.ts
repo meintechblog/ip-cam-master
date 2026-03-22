@@ -7,16 +7,24 @@ import { getSettings } from './settings';
  */
 export async function connectToProxmox(): Promise<NodeSSH> {
 	const settings = await getSettings('proxmox_');
-	const host = settings.proxmox_host;
+	let host = settings.proxmox_host;
 	const username = settings.proxmox_ssh_username || 'root';
 	const password = settings.proxmox_ssh_password;
+	const privateKeyPath = settings.proxmox_ssh_key_path || '/root/.ssh/id_ed25519';
 
-	if (!host || !password) {
-		throw new Error('Proxmox SSH not configured. Set proxmox_host and proxmox_ssh_password.');
+	if (!host) {
+		throw new Error('Proxmox host not configured. Set proxmox_host in Settings.');
 	}
 
+	// Strip port if present (API uses host:8006, SSH uses port 22)
+	host = host.replace(/:.*$/, '');
+
 	const ssh = new NodeSSH();
-	await ssh.connect({ host, username, password });
+	if (password) {
+		await ssh.connect({ host, username, password });
+	} else {
+		await ssh.connect({ host, username, privateKeyPath });
+	}
 	return ssh;
 }
 
