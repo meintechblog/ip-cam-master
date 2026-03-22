@@ -198,6 +198,11 @@
 			<div class="flex items-center gap-2 mb-3">
 				<span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
 				<span class="text-sm font-bold text-text-primary">Nativ ONVIF</span>
+				{#if camera.cameraWebUrl}
+					<a href={camera.cameraWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
+						<ExternalLink class="w-3.5 h-3.5" />
+					</a>
+				{/if}
 			</div>
 			<div class="space-y-0.5 text-xs text-text-secondary">
 				<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
@@ -207,6 +212,9 @@
 				{#if probeData?.firmwareVersion}
 					<div class="flex justify-between"><span>Firmware</span><span class="text-text-primary">{probeData.firmwareVersion}</span></div>
 				{/if}
+				{#if probeData?.codec}
+					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{probeData.codec}</span></div>
+				{/if}
 				{#if probeData?.liveFps}
 					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
 				{/if}
@@ -214,11 +222,6 @@
 			<div class="mt-3 pt-3 border-t border-border">
 				<span class="text-xs text-green-400">Direkt in UniFi Protect nutzbar — kein Container noetig</span>
 			</div>
-			{#if camera.cameraWebUrl}
-				<a href={camera.cameraWebUrl} target="_blank" class="flex items-center gap-1 mt-2 text-xs text-accent hover:text-accent/80">
-					<ExternalLink class="w-3 h-3" /> Kamera oeffnen
-				</a>
-			{/if}
 		</div>
 		{/if}
 	</div>
