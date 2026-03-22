@@ -1,2 +1,2 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<h1 class="text-2xl font-bold text-text-primary mb-4">Dashboard</h1>
+<p class="text-text-secondary">Dashboard wird in Phase 4 implementiert.</p>
