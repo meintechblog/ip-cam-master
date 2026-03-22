@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
-import { cameras } from '$lib/server/db/schema';
+import { cameras, credentials } from '$lib/server/db/schema';
+import { decrypt } from '$lib/server/services/crypto';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFileSync, unlinkSync } from 'node:fs';
@@ -14,6 +15,7 @@ export interface DiscoveredCamera {
 	ip: string;
 	type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'unknown';
 	alreadyOnboarded: boolean;
+	name: string | null;
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -62,6 +64,12 @@ wait
 		// Clean up
 		try { unlinkSync(scriptPath); } catch { /* ignore */ }
 
+		// Get saved credentials for name lookup
+		const savedCreds = (db.select().from(credentials).all() as any[])
+			.sort((a, b) => a.priority - b.priority)
+			.map((c) => { try { return { u: c.username, p: decrypt(c.password) }; } catch { return null; } })
+			.filter(Boolean) as { u: string; p: string }[];
+
 		const discovered: DiscoveredCamera[] = stdout
 			.trim()
 			.split('\n')
@@ -73,7 +81,8 @@ wait
 				return {
 					ip,
 					type,
-					alreadyOnboarded: onboarded.has(ip)
+					alreadyOnboarded: onboarded.has(ip),
+					name: null as string | null
 				};
 			})
 			.sort((a, b) => {
@@ -81,6 +90,30 @@ wait
 				const bNum = parseInt(b.ip.split('.').pop() || '0');
 				return aNum - bNum;
 			});
+
+		// Try to grab camera names using saved credentials
+		if (savedCreds.length > 0) {
+			await Promise.allSettled(
+				discovered.filter((c) => !c.alreadyOnboarded).map(async (cam) => {
+					for (const cred of savedCreds) {
+						try {
+							const { stdout: html } = await execAsync(
+								`curl -s --basic -u "${cred.u}:${cred.p}" -L "http://${cam.ip}/" --max-time 2`,
+								{ timeout: 3000, encoding: 'utf-8' }
+							);
+							const titleMatch = html.match(/<title>([^<]+)<\/title>/);
+							if (titleMatch) {
+								let name = titleMatch[1].replace(/ Live$/, '').replace(/Error.*/, '').trim();
+								if (name && !name.includes('Error') && !name.includes('Unauthorized')) {
+									cam.name = name;
+									break;
+								}
+							}
+						} catch { /* try next cred */ }
+					}
+				})
+			);
+		}
 
 		return json({ cameras: discovered });
 	} catch (err) {

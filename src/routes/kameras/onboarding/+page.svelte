@@ -6,7 +6,7 @@
 	let { data } = $props();
 
 	let selectedIp = $state<string | null>(null);
-	let discovered = $state<{ ip: string; type: string; alreadyOnboarded: boolean }[]>([]);
+	let discovered = $state<{ ip: string; type: string; alreadyOnboarded: boolean; name: string | null }[]>([]);
 	let scanning = $state(true);
 
 	// For ONVIF registration
@@ -31,7 +31,10 @@
 
 	$effect(() => { runDiscovery(); });
 
-	async function selectCamera(ip: string) {
+	let prefillName = $state('');
+
+	async function selectCamera(ip: string, name?: string | null) {
+		prefillName = name || '';
 		// Try saved credentials first
 		try {
 			const res = await fetch('/api/credentials/test', {
@@ -120,7 +123,7 @@
 			Login "{prefillCredName}" automatisch erkannt und vorausgefuellt.
 		</div>
 	{/if}
-	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} />
+	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} />
 {:else}
 	<!-- Manual entry -->
 	<div class="mb-6">
@@ -150,7 +153,10 @@
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-2">
 								<span class="w-2 h-2 rounded-full bg-green-400"></span>
-								<span class="text-text-primary font-mono font-medium">{cam.ip}</span>
+								{#if cam.name}
+									<span class="text-text-primary font-medium">{cam.name}</span>
+								{/if}
+								<span class="text-text-primary font-mono {cam.name ? 'text-text-secondary text-xs' : 'font-medium'}">{cam.ip}</span>
 								{#if cam.type === 'mobotix-onvif'}
 									<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">MOBOTIX ONVIF</span>
 									<span class="text-xs text-text-secondary">Nativ — kein Container noetig</span>
@@ -163,14 +169,14 @@
 							</div>
 							{#if cam.type === 'mobotix-onvif'}
 								<button
-									onclick={() => startRegister(cam.ip)}
+									onclick={() => { if (cam.name) registerName = cam.name; startRegister(cam.ip); }}
 									class="bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors text-sm cursor-pointer"
 								>
 									Registrieren
 								</button>
 							{:else}
 								<button
-									onclick={() => selectCamera(cam.ip)}
+									onclick={() => selectCamera(cam.ip, cam.name)}
 									class="bg-accent text-white rounded-lg px-4 py-2 hover:bg-accent/90 transition-colors text-sm cursor-pointer"
 								>
 									Einrichten

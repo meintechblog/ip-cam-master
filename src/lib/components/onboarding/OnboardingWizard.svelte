@@ -11,12 +11,14 @@
 		nextVmid,
 		prefillIp = '',
 		prefillUsername = '',
-		prefillPassword = ''
+		prefillPassword = '',
+		prefillName = ''
 	}: {
 		nextVmid: number;
 		prefillIp?: string;
 		prefillUsername?: string;
 		prefillPassword?: string;
+		prefillName?: string;
 	} = $props();
 
 	// Wizard state
@@ -29,7 +31,7 @@
 	let ip = $state(prefillIp);
 	let username = $state(prefillUsername);
 	let password = $state(prefillPassword);
-	let name = $state('');
+	let name = $state(prefillName);
 
 	// Transcode params
 	let width = $state(1280);
