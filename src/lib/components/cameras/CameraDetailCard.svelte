@@ -50,12 +50,20 @@
 	}
 
 	let isRunning = $derived(camera.containerStatus === 'running');
+	let snapshotSrc = $state('');
 
-	let streamUrl = $derived(
-		camera.containerIp && camera.go2rtcRunning && isRunning
-			? `http://${camera.containerIp}:1984/stream.html?src=${camera.streamName}&mode=webrtc`
-			: null
-	);
+	function refreshSnapshot() {
+		if (!camera.snapshotUrl || !isRunning) return;
+		const img = new Image();
+		img.onload = () => { snapshotSrc = img.src; };
+		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
+	}
+
+	$effect(() => {
+		if (isRunning) refreshSnapshot();
+		const timer = setInterval(refreshSnapshot, 10000);
+		return () => clearInterval(timer);
+	});
 
 	async function fetchProbe() {
 		try {
@@ -81,16 +89,11 @@
 	<div class="flex flex-col lg:flex-row">
 		<!-- Live Stream -->
 		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width}/{camera.height};">
-			{#if streamUrl}
-				<iframe
-					src={streamUrl}
-					title="{camera.name} Live"
-					class="w-full h-full border-0"
-					allow="autoplay"
-				></iframe>
+			{#if snapshotSrc && isRunning}
+				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
 			{:else}
 				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">
-					{isRunning ? 'Stream wird geladen...' : 'Container gestoppt'}
+					{isRunning ? 'Bild wird geladen...' : 'Container gestoppt'}
 				</div>
 			{/if}
 			<div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
