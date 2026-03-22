@@ -132,6 +132,7 @@
 					</a>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
+					<div class="flex justify-between"><span>Name</span><span class="text-text-primary">{camera.name}</span></div>
 					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{probeData?.cameraModel || camera.cameraType}</span></div>
 					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{probeData?.codec || 'MJPEG'}</span></div>
