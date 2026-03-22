@@ -213,6 +213,9 @@
 				{loading}
 				{error}
 				{connectionResult}
+				{ip}
+				{username}
+				{password}
 				onRetry={runTestConnection}
 				onNext={() => advanceToStep(2)}
 			/>

@@ -6,15 +6,50 @@
 		loading = false,
 		error = null,
 		connectionResult = null,
+		ip = '',
+		username = '',
+		password = '',
 		onRetry,
 		onNext
 	}: {
 		loading: boolean;
 		error: string | null;
 		connectionResult: { resolution?: string; fps?: number; streamPath?: string } | null;
+		ip: string;
+		username: string;
+		password: string;
 		onRetry: () => void;
 		onNext: () => void;
 	} = $props();
+
+	let snapshotUrl = $state<string | null>(null);
+	let snapshotLoading = $state(false);
+
+	async function loadSnapshot() {
+		if (!ip || !username || !password) return;
+		snapshotLoading = true;
+		try {
+			const res = await fetch('/api/onboarding/snapshot', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ip, username, password })
+			});
+			if (res.ok) {
+				const blob = await res.blob();
+				snapshotUrl = URL.createObjectURL(blob);
+			}
+		} catch {
+			// Snapshot is optional — don't block the flow
+		} finally {
+			snapshotLoading = false;
+		}
+	}
+
+	$effect(() => {
+		if (connectionResult && !error) {
+			loadSnapshot();
+		}
+	});
 </script>
 
 <div class="space-y-6">
@@ -28,6 +63,17 @@
 			<CheckCircle class="w-5 h-5" />
 			<span class="font-medium">Verbindung erfolgreich</span>
 		</div>
+
+		{#if snapshotLoading}
+			<div class="bg-bg-input rounded-lg h-48 flex items-center justify-center">
+				<Loader2 class="w-6 h-6 animate-spin text-text-secondary" />
+			</div>
+		{:else if snapshotUrl}
+			<div class="rounded-lg overflow-hidden border border-border">
+				<img src={snapshotUrl} alt="Kamera-Vorschau" class="w-full h-auto" />
+			</div>
+		{/if}
+
 		{#if connectionResult.resolution || connectionResult.fps}
 			<div class="bg-bg-card border border-border rounded-lg p-4">
 				<p class="text-sm text-text-secondary">
