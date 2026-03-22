@@ -4,6 +4,9 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const execAsync = promisify(exec);
 
@@ -19,38 +22,39 @@ export const GET: RequestHandler = async ({ url }) => {
 	const rangeEnd = parseInt(url.searchParams.get('end') || '254');
 
 	try {
-		// Get already onboarded IPs
 		const onboarded = new Set(
 			(db.select().from(cameras).all() as any[]).map((c) => c.ip)
 		);
 
-		// Scan subnet: curl each IP with 1s timeout, check for Mobotix/Loxone
-		// Run in parallel batches for speed
-		// Parallel scan: background all curls, wait for all
-		// Loxone: only detect Intercoms (have /mjpg/video.mjpg endpoint), not other Loxone devices
-		const scanScript = `
-			for ip in $(seq ${rangeStart} ${rangeEnd}); do
-				(
-					FULL="${subnet}.$ip"
-					RESP=$(curl -s --max-time 1 -L "http://$FULL/" 2>/dev/null | head -c 2000)
-					if echo "$RESP" | grep -qi 'mobotix'; then
-						echo "mobotix:$FULL"
-					elif echo "$RESP" | grep -qi 'loxone'; then
-						# Only Loxone Intercoms have a video endpoint
-						VIDEO=$(curl -s --max-time 1 -o /dev/null -w '%{http_code}' "http://$FULL/mjpg/video.mjpg" 2>/dev/null)
-						if [ "$VIDEO" = "401" ] || [ "$VIDEO" = "200" ]; then
-							echo "loxone:$FULL"
-						fi
-					fi
-				) &
-			done
-			wait
-		`;
+		// Write scan script to temp file to avoid shell quoting issues
+		const scriptPath = join(tmpdir(), `ipcam-scan-${Date.now()}.sh`);
+		writeFileSync(scriptPath, `#!/bin/bash
+for ip in $(seq ${rangeStart} ${rangeEnd}); do
+  (
+    FULL="${subnet}.$ip"
+    RESP=$(curl -s --max-time 1 "http://$FULL/" 2>/dev/null | head -c 2000)
+    # Loxone Intercom: @VERSION 1.0.x in HTML (Audioserver is 2.x)
+    if echo "$RESP" | grep -q "@VERSION 1[.]0"; then
+      echo "loxone:$FULL"
+    else
+      # Mobotix: follow redirect, check for 'mobotix' in page
+      RESP_L=$(curl -s --max-time 1 -L "http://$FULL/" 2>/dev/null | head -c 2000)
+      if echo "$RESP_L" | grep -qi "mobotix"; then
+        echo "mobotix:$FULL"
+      fi
+    fi
+  ) &
+done
+wait
+`, { mode: 0o755 });
 
-		const { stdout } = await execAsync(`bash -c '${scanScript}'`, {
+		const { stdout } = await execAsync(`bash ${scriptPath}`, {
 			timeout: 60000,
 			encoding: 'utf-8'
 		});
+
+		// Clean up
+		try { unlinkSync(scriptPath); } catch { /* ignore */ }
 
 		const discovered: DiscoveredCamera[] = stdout
 			.trim()
