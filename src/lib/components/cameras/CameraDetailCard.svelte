@@ -87,14 +87,22 @@
 	// Camera reboot (Mobotix)
 	let rebootLoading = $state(false);
 	let rebootConfirm = $state(false);
+	let rebooting = $state(false);
 
 	async function rebootCamera() {
 		rebootLoading = true;
+		rebootConfirm = false;
 		try {
-			await fetch(`/api/cameras/${camera.id}/reboot`, { method: 'POST' });
+			const res = await fetch(`/api/cameras/${camera.id}/reboot`, { method: 'POST' });
+			const data = await res.json();
+			if (data.success) {
+				rebooting = true;
+				// Mobotix reboot takes ~60-90s, clear state after 90s
+				setTimeout(() => { rebooting = false; }, 90000);
+			}
 		} catch { /* ignore */ }
 		finally {
-			setTimeout(() => { rebootLoading = false; rebootConfirm = false; }, 3000);
+			rebootLoading = false;
 		}
 	}
 
@@ -165,7 +173,12 @@
 	<div class="flex flex-col lg:flex-row">
 		<!-- Live Stream -->
 		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width || 16}/{camera.height || 9};">
-			{#if snapshotSrc && isRunning}
+			{#if rebooting}
+				<div class="absolute inset-0 flex flex-col items-center justify-center text-warning text-sm gap-2">
+					<Loader2 class="w-6 h-6 animate-spin" />
+					<span>Kamera startet neu...</span>
+				</div>
+			{:else if snapshotSrc && isRunning}
 				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
 			{:else}
 				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">
@@ -196,11 +209,11 @@
 					</a>
 					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif'}
 						{#if rebootConfirm}
-							<button onclick={rebootCamera} disabled={rebootLoading} class="bg-red-500/80 backdrop-blur-sm text-white rounded-md px-2 py-0.5 text-xs cursor-pointer" title="Neustart bestaetigen">
-								{rebootLoading ? '...' : 'Neustart?'}
+							<button onclick={rebootCamera} disabled={rebootLoading} class="bg-red-500/80 backdrop-blur-sm text-white rounded-md px-2 py-0.5 text-xs cursor-pointer">
+								Neustart?
 							</button>
 							<button onclick={() => rebootConfirm = false} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md px-2 py-0.5 text-xs cursor-pointer">
-								Nein
+								Abbrechen
 							</button>
 						{:else}
 							<button onclick={() => rebootConfirm = true} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Kamera neustarten">
@@ -303,8 +316,8 @@
 		<!-- Native ONVIF info panel -->
 		<div class="lg:w-64 xl:w-72 shrink-0 p-4 bg-bg-primary/30 border-l border-border">
 			<div class="flex items-center gap-2 mb-3">
-				<span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
-				<span class="text-sm font-bold text-text-primary">Nativ ONVIF</span>
+				<span class="w-2.5 h-2.5 rounded-full {rebooting ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}"></span>
+				<span class="text-sm font-bold text-text-primary">{rebooting ? 'Neustart...' : 'Nativ ONVIF'}</span>
 				{#if camera.cameraWebUrl}
 					<a href={camera.cameraWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
@@ -355,8 +368,8 @@
 			<!-- Kamera -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
-					<span class="w-2 h-2 rounded-full shrink-0 {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
-					<span class="text-sm font-medium text-text-primary">Kamera</span>
+					<span class="w-2 h-2 rounded-full shrink-0 {rebooting ? 'bg-yellow-400 animate-pulse' : camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
+					<span class="text-sm font-medium text-text-primary">{rebooting ? 'Neustart...' : 'Kamera'}</span>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>Name</span><span class="text-text-primary">{camera.name}</span></div>
