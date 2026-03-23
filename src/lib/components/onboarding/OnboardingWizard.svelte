@@ -177,9 +177,22 @@
 	}
 
 	// Step 1: Test connection
+	let canSkipTest = $state(false);
+
+	async function skipConnectionTest() {
+		canSkipTest = false;
+		addSubLog(`Verbindungstest uebersprungen — verwende Standardwerte`);
+		connectionInfo = `${width}x${height} @ ${fps}fps, ${bitrate} kbit/s (Standard)`;
+		addLog(1, 'Verbindung testen', `Uebersprungen — ${connectionInfo}`, 'done');
+		error = null;
+		loading = true;
+		await runStep2_CreateContainer();
+	}
+
 	async function runStep1_TestConnection() {
 		currentStep = 1;
 		error = null;
+		canSkipTest = false;
 		clearSubLog();
 		addLog(1, 'Verbindung testen', 'Starte Verbindungstest...', 'active');
 		addSubLog(`SSH-Verbindung zum Proxmox-Host wird aufgebaut...`);
@@ -213,13 +226,14 @@
 			addLog(1, 'Verbindung testen', `Kamera erreichbar — ${connectionInfo}`, 'done');
 
 			const snapshotPath = cameraType === 'loxone' ? '/mjpg/video.mjpg' : '/record/current.jpg';
-		addSubLog(`Lade Vorschaubild von http://${ip}${snapshotPath} ...`);
+			addSubLog(`Lade Vorschaubild von http://${ip}${snapshotPath} ...`);
 			loadSnapshot();
 			await new Promise(r => setTimeout(r, 3000));
 
 			await runStep2_CreateContainer();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
+			canSkipTest = true;
 			addLog(1, 'Verbindung testen', `Fehler: ${error}`, 'done');
 			loading = false;
 		}
@@ -599,9 +613,16 @@
 				{#if error}
 					<div class="mb-4">
 						<InlineAlert type="error" message={error} />
-						<button onclick={retryCurrentStep} class="mt-2 bg-accent text-white rounded-lg px-4 py-2 text-sm hover:bg-accent/90 cursor-pointer">
-							Erneut versuchen
-						</button>
+						<div class="flex gap-2 mt-2">
+							<button onclick={retryCurrentStep} class="bg-accent text-white rounded-lg px-4 py-2 text-sm hover:bg-accent/90 cursor-pointer">
+								Erneut versuchen
+							</button>
+							{#if canSkipTest}
+								<button onclick={skipConnectionTest} class="bg-bg-input text-text-secondary rounded-lg px-4 py-2 text-sm hover:bg-bg-card cursor-pointer">
+									Ueberspringen (Standardwerte)
+								</button>
+							{/if}
+						</div>
 					</div>
 				{/if}
 
