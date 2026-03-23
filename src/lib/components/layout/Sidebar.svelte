@@ -36,4 +36,24 @@
 			</a>
 		{/each}
 	</nav>
+
+	{#if $page.data.isYolo}
+		<div class="px-4 py-3 border-t border-border">
+			<span class="inline-block px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded">
+				YOLO
+			</span>
+		</div>
+	{:else if $page.data.user}
+		<div class="px-4 py-3 border-t border-border flex items-center justify-between">
+			<span class="text-sm text-text-secondary truncate">{$page.data.user.username}</span>
+			<form method="POST" action="/api/auth/logout">
+				<button
+					type="submit"
+					class="text-xs text-text-secondary hover:text-text-primary transition-colors"
+				>
+					Abmelden
+				</button>
+			</form>
+		</div>
+	{/if}
 </aside>
