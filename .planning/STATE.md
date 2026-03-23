@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-03-23T12:23:03.608Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-23T12:23:58.226Z"
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -54,6 +54,7 @@ Plan: 3 of 3
 | Phase 05 P01 | 5min | 2 tasks | 15 files |
 | Phase 04 P01 | 3min | 3 tasks | 5 files |
 | Phase 04 P03 | 3min | 2 tasks | 5 files |
+| Phase 04 P02 | 4min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [Phase 04]: 30s cache TTL for Protect status (frontend polls at 10s)
 - [Phase 04]: SQLite datetime() for flapping/cleanup queries instead of JS date math
 - [Phase 04]: Simple tab implementation with activeTab state (consistent with existing settings page pattern)
+- [Phase 04]: Protect API polling piggybacks on 10s frontend poll with 30s cache — no separate scheduler
+- [Phase 04]: SSH log scan runs as background scheduler (60s) started from hooks.server.ts
+- [Phase 04]: Map serialized to array for JSON transport in protect/cameras endpoint
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T12:23:03.606Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-03-23T12:23:58.223Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
