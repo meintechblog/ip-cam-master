@@ -3,7 +3,7 @@
 	import StepIndicator from './StepIndicator.svelte';
 	import StepCredentials from './StepCredentials.svelte';
 	import InlineAlert from '$lib/components/ui/InlineAlert.svelte';
-	import { Loader2, CheckCircle, Camera } from 'lucide-svelte';
+	import { Loader2, CheckCircle, Camera, Pencil } from 'lucide-svelte';
 
 	let {
 		nextVmid,
@@ -547,13 +547,14 @@
 					{/if}
 				</div>
 				{#if name || ip}
-					<div class="mt-2">
+					<div class="mt-2 flex items-center gap-1.5">
 						<input
 							type="text"
 							bind:value={name}
-							class="text-sm font-medium text-text-primary bg-bg-input border border-border rounded px-2 py-1 focus:border-accent focus:outline-none w-full"
+							class="text-sm font-medium text-text-primary bg-bg-input border border-border rounded px-2 py-1 focus:border-accent focus:outline-none flex-1"
 							placeholder="Kameraname"
 						/>
+						<Pencil class="w-3.5 h-3.5 text-text-secondary shrink-0" />
 					</div>
 					<p class="text-xs text-text-secondary font-mono mt-1">{ip}</p>
 				{/if}
