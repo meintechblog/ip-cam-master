@@ -547,15 +547,15 @@
 					{/if}
 				</div>
 				{#if name || ip}
-					<div class="flex items-center gap-1.5 mt-2">
+					<div class="mt-2">
 						<input
 							type="text"
 							bind:value={name}
-							class="text-sm font-medium text-text-primary bg-transparent border-b border-transparent hover:border-border focus:border-accent focus:outline-none w-full"
+							class="text-sm font-medium text-text-primary bg-bg-input border border-border rounded px-2 py-1 focus:border-accent focus:outline-none w-full"
 							placeholder="Kameraname"
 						/>
 					</div>
-					<p class="text-xs text-text-secondary font-mono">{ip}</p>
+					<p class="text-xs text-text-secondary font-mono mt-1">{ip}</p>
 				{/if}
 			</div>
 		{/if}
