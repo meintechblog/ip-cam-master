@@ -79,11 +79,12 @@ Plans:
   3. User can view live stream preview for any managed camera via go2rtc WebRTC/MSE player
   4. ONVIF-capable cameras appear as "nativ nutzbar" without workflow actions
   5. User can see UniFi Protect adoption status per camera and follow guided adoption instructions
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md -- Backend services: Protect API client, events storage, UDM SSH log parser, DB schema + types
+- [ ] 04-02-PLAN.md -- API routes + dashboard enhancement: real Protect data, events section, flapping badges
+- [ ] 04-03-PLAN.md -- Logs page activation + guided adoption flow component
 
 ### Phase 5: Installer and Distribution
 **Goal**: Anyone can install and update IP-Cam-Master with a single command on a fresh Proxmox VM, with basic access control (Zugangsschutz)
@@ -108,5 +109,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation and Proxmox Integration | 3/3 | Complete | - |
 | 2. Mobotix Camera Pipeline | 3/3 | Complete | 2026-03-22 |
 | 3. Loxone Pipeline and Network Discovery | 3/3 | Complete | 2026-03-23 |
-| 4. Dashboard and UniFi Protect | 0/2 | Not started | - |
+| 4. Dashboard and UniFi Protect | 0/3 | Not started | - |
 | 5. Installer and Distribution | 1/1 | Complete   | 2026-03-23 |
