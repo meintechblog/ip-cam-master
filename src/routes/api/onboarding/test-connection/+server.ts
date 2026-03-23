@@ -14,21 +14,26 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		if (cameraType === 'loxone') {
-			// Loxone Intercom: test HTTP MJPEG stream with Basic auth
-			const auth = Buffer.from(`${username}:${password}`).toString('base64');
-			const { stdout } = await execAsync(
-				`curl -s --max-time 5 -o /dev/null -w "%{http_code} %{size_download}" -H "Authorization: Basic ${auth}" "http://${ip}/mjpg/video.mjpg"`,
-				{ timeout: 8000, encoding: 'utf-8' }
-			);
-			const [code, size] = stdout.trim().split(' ');
-			if (code === '200' || code === '401') {
+			// Loxone Intercom: test HTTP MJPEG stream (stays open — use 1s timeout)
+			let code = '000';
+			try {
+				const { stdout } = await execAsync(
+					`curl -s --basic -u "${username}:${password}" "http://${ip}/mjpg/video.mjpg" --max-time 1 -o /dev/null -w "%{http_code}"`,
+					{ timeout: 5000, encoding: 'utf-8' }
+				);
+				code = stdout.trim();
+			} catch (e: unknown) {
+				code = (e as any)?.stdout?.trim() || '000';
+			}
+			if (code === '200') {
 				return json({
-					success: code === '200',
-					resolution: '1280x720', // Loxone Intercom default
+					success: true,
+					resolution: '1280x720',
 					fps: 20,
-					streamPath: '/mjpg/video.mjpg',
-					error: code === '401' ? 'Authentifizierung fehlgeschlagen — Passwort pruefen' : undefined
+					streamPath: '/mjpg/video.mjpg'
 				});
+			} else if (code === '401') {
+				return json({ success: false, error: 'Authentifizierung fehlgeschlagen — Passwort pruefen' });
 			}
 			return json({ success: false, error: `Intercom nicht erreichbar (HTTP ${code})` });
 		}

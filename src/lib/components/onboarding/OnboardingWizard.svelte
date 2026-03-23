@@ -234,7 +234,12 @@
 
 			addSubLog(`Container gestartet, DHCP-IP erhalten: ${containerIp}`);
 			addLog(2, 'Container erstellen', `LXC ${data.vmid} erstellt — ${hostname} @ ${containerIp}`, 'done');
-			await runStep3_ConfigureGo2rtc();
+
+			if (cameraType === 'loxone') {
+				await runStep3_ConfigureNginx();
+			} else {
+				await runStep3_ConfigureGo2rtc();
+			}
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
 			addLog(2, 'Container erstellen', `Fehler: ${error}`, 'done');
@@ -242,7 +247,139 @@
 		}
 	}
 
-	// Step 3: Configure go2rtc
+	// Step 3 (Loxone only): Configure nginx auth-proxy
+	async function runStep3_ConfigureNginx() {
+		currentStep = 3;
+		error = null;
+		clearSubLog();
+		addLog(3, 'nginx Reverse Proxy', 'nginx wird installiert und konfiguriert...', 'active');
+		startSubLogDrip();
+		addSubLog(`apt-get install -y nginx`);
+		addSubLog(`nginx.conf generieren:`);
+		addSubLog(`  listen 127.0.0.1:8081`);
+		addSubLog(`  proxy_pass http://${ip}/mjpg/`);
+		addSubLog(`  Authorization: Basic header einbetten (${username}:***)`);
+		addSubLog(`  proxy_buffering off (wichtig fuer MJPEG-Streams)`);
+		addSubLog(`  proxy_http_version 1.1`);
+		addSubLog(`Config schreiben: /etc/nginx/nginx.conf`);
+		addSubLog(`systemctl restart nginx`);
+		addSubLog(`Ergebnis: http://localhost:8081/mjpg/video.mjpg (ohne Auth)`);
+
+		try {
+			const res = await longFetch('/api/onboarding/configure-nginx', { cameraId });
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error || 'nginx Konfiguration fehlgeschlagen');
+
+			flushSubLog();
+			addSubLog(`nginx laeuft auf Port 8081 — Auth-Stripping aktiv`);
+			addLog(3, 'nginx Reverse Proxy', `nginx laeuft — strippt Auth fuer ${ip}`, 'done');
+			await runStep4_ConfigureGo2rtcLoxone();
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : String(err);
+			addLog(3, 'nginx Reverse Proxy', `Fehler: ${error}`, 'done');
+			loading = false;
+		}
+	}
+
+	// Step 4 (Loxone): Configure go2rtc (reads from nginx)
+	async function runStep4_ConfigureGo2rtcLoxone() {
+		currentStep = 4;
+		error = null;
+		clearSubLog();
+		addLog(4, 'go2rtc konfigurieren', 'Installiere ffmpeg + go2rtc im Container...', 'active');
+		startSubLogDrip();
+		addSubLog(`pct exec ${containerVmid} -- apt-get install -y ffmpeg wget`);
+		addSubLog(`go2rtc Binary von github.com/AlexxIT/go2rtc herunterladen...`);
+		addSubLog(`go2rtc.yaml generieren:`);
+		addSubLog(`  Stream: ${streamName}`);
+		addSubLog(`  Source: http://localhost:8081/mjpg/video.mjpg (via nginx)`);
+		addSubLog(`  Transcode: MJPEG → H.264, ${width}x${height}@${fps}fps, ${bitrate}k`);
+		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
+		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);
+		addSubLog(`systemd Unit: /etc/systemd/system/go2rtc.service`);
+		addSubLog(`systemctl daemon-reload && enable && restart go2rtc`);
+
+		try {
+			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId });
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
+
+			flushSubLog();
+			addSubLog(`go2rtc Service laeuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
+			addLog(4, 'go2rtc konfigurieren', `go2rtc laeuft — liest von nginx @ localhost:8081`, 'done');
+			await runStep5_ConfigureOnvifLoxone();
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : String(err);
+			addLog(4, 'go2rtc konfigurieren', `Fehler: ${error}`, 'done');
+			loading = false;
+		}
+	}
+
+	// Step 5 (Loxone): Configure ONVIF
+	async function runStep5_ConfigureOnvifLoxone() {
+		currentStep = 5;
+		error = null;
+		clearSubLog();
+		const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
+		addLog(5, 'ONVIF Server', 'Node.js + ONVIF Server werden installiert...', 'active');
+		startSubLogDrip();
+		addSubLog(`Node.js 22 LTS installieren`);
+		addSubLog(`git clone github.com/daniela-hase/onvif-server`);
+		addSubLog(`npm install --production`);
+		addSubLog(`onvif-server.js patchen: Manufacturer → "${safeName}", Model → "Loxone"`);
+		addSubLog(`config.yaml generieren mit MAC, UUID, Stream-Mapping`);
+		addSubLog(`systemd Unit anlegen + starten`);
+
+		try {
+			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId });
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
+
+			flushSubLog();
+			addSubLog(`ONVIF Server laeuft auf Port 8899`);
+			addLog(5, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899`, 'done');
+			await runStep6_VerifyStreamLoxone();
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : String(err);
+			addLog(5, 'ONVIF Server', `Fehler: ${error}`, 'done');
+			loading = false;
+		}
+	}
+
+	// Step 6 (Loxone): Verify stream
+	async function runStep6_VerifyStreamLoxone() {
+		currentStep = 6;
+		error = null;
+		clearSubLog();
+		addLog(6, 'Stream verifizieren', 'Pruefe ob alles laeuft...', 'active');
+		startSubLogDrip();
+		addSubLog(`GET http://${containerIp}:1984/api/streams`);
+		addSubLog(`Pruefe Stream "${streamName}" ...`);
+
+		try {
+			const res = await fetch('/api/onboarding/verify-stream', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ cameraId })
+			});
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error || 'Stream-Verifikation fehlgeschlagen');
+			rtspUrl = data.rtspUrl;
+
+			flushSubLog();
+			addSubLog(`Stream aktiv: Intercom → nginx → go2rtc → RTSP`);
+			addSubLog(`RTSP-Output: ${rtspUrl}`);
+			addSubLog(`ONVIF-Discovery aktiv fuer UniFi Protect`);
+			addLog(6, 'Stream verifizieren', `Alles laeuft — ${rtspUrl}`, 'done');
+			loading = false;
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : String(err);
+			addLog(6, 'Stream verifizieren', `Fehler: ${error}`, 'done');
+			loading = false;
+		}
+	}
+
+	// Step 3 (Mobotix): Configure go2rtc
 	async function runStep3_ConfigureGo2rtc() {
 		currentStep = 3;
 		error = null;
@@ -364,16 +501,25 @@
 
 	function retryCurrentStep() {
 		error = null;
-		if (currentStep === 1) runStep1_TestConnection();
-		else if (currentStep === 2) runStep2_CreateContainer();
-		else if (currentStep === 3) runStep3_ConfigureGo2rtc();
-		else if (currentStep === 4) runStep4_ConfigureOnvif();
-		else if (currentStep === 5) runStep5_VerifyStream();
+		if (cameraType === 'loxone') {
+			if (currentStep === 1) runStep1_TestConnection();
+			else if (currentStep === 2) runStep2_CreateContainer();
+			else if (currentStep === 3) runStep3_ConfigureNginx();
+			else if (currentStep === 4) runStep4_ConfigureGo2rtcLoxone();
+			else if (currentStep === 5) runStep5_ConfigureOnvifLoxone();
+			else if (currentStep === 6) runStep6_VerifyStreamLoxone();
+		} else {
+			if (currentStep === 1) runStep1_TestConnection();
+			else if (currentStep === 2) runStep2_CreateContainer();
+			else if (currentStep === 3) runStep3_ConfigureGo2rtc();
+			else if (currentStep === 4) runStep4_ConfigureOnvif();
+			else if (currentStep === 5) runStep5_VerifyStream();
+		}
 	}
 </script>
 
 <div class="max-w-3xl">
-	<StepIndicator {currentStep} />
+	<StepIndicator {currentStep} {cameraType} />
 
 	<div class="flex flex-col lg:flex-row gap-4">
 		<!-- Left: Snapshot (persistent during onboarding) -->

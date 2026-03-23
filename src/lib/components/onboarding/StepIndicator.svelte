@@ -1,14 +1,10 @@
 <script lang="ts">
-	let { currentStep = 0 }: { currentStep: number } = $props();
+	let { currentStep = 0, cameraType = 'mobotix' }: { currentStep: number; cameraType?: string } = $props();
 
-	const steps = [
-		'Zugangsdaten',
-		'Verbindung',
-		'Container',
-		'go2rtc',
-		'ONVIF',
-		'Verifizieren'
-	];
+	const mobotixSteps = ['Zugangsdaten', 'Verbindung', 'Container', 'go2rtc', 'ONVIF', 'Verifizieren'];
+	const loxoneSteps = ['Zugangsdaten', 'Verbindung', 'Container', 'nginx', 'go2rtc', 'ONVIF', 'Verifizieren'];
+
+	let steps = $derived(cameraType === 'loxone' ? loxoneSteps : mobotixSteps);
 </script>
 
 <div class="flex items-center w-full mb-8">

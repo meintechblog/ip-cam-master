@@ -189,6 +189,28 @@ export async function createCameraContainer(
 }
 
 /**
+ * Installs nginx auth-proxy in the container (Loxone Intercom only).
+ */
+export async function configureNginx(cameraId: number): Promise<void> {
+	const camera = getCameraById(cameraId);
+	const ssh = await connectToProxmox();
+
+	try {
+		const nginxCmds = getNginxInstallCommands();
+		for (const cmd of nginxCmds) {
+			await executeOnContainer(ssh, camera.vmid, cmd);
+		}
+
+		const decryptedPassword = decrypt(camera.password);
+		const nginxConfig = generateNginxConfig(camera.ip, camera.username, decryptedPassword);
+		await pushFileToContainer(ssh, camera.vmid, nginxConfig, '/etc/nginx/nginx.conf');
+		await executeOnContainer(ssh, camera.vmid, 'systemctl restart nginx');
+	} finally {
+		ssh.dispose();
+	}
+}
+
+/**
  * Installs go2rtc in the container, deploys config and systemd unit, starts the service.
  */
 export async function configureGo2rtc(cameraId: number): Promise<void> {
@@ -205,18 +227,7 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		let yamlContent: string;
 
 		if (camera.cameraType === 'loxone') {
-			// Loxone Intercom: install nginx for auth-proxy, go2rtc reads from nginx
-			const nginxCmds = getNginxInstallCommands();
-			for (const cmd of nginxCmds) {
-				await executeOnContainer(ssh, camera.vmid, cmd);
-			}
-
-			// Generate and push nginx config (auth-stripping reverse proxy)
-			const nginxConfig = generateNginxConfig(camera.ip, camera.username, decryptedPassword);
-			await pushFileToContainer(ssh, camera.vmid, nginxConfig, '/etc/nginx/nginx.conf');
-			await executeOnContainer(ssh, camera.vmid, 'systemctl restart nginx');
-
-			// go2rtc reads from local nginx (no auth needed)
+			// Loxone: go2rtc reads from local nginx proxy
 			yamlContent = generateGo2rtcConfigLoxone({
 				streamName: camera.streamName,
 				width: camera.width,
