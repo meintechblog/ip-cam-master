@@ -1,5 +1,4 @@
 import { getSettings, getSetting } from './settings';
-import { decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import type { ProtectCamera, ProtectCameraMatch, ProtectStatus } from '$lib/types';
@@ -29,7 +28,7 @@ async function login(): Promise<ProtectSession> {
 	if (!host) throw new Error('UniFi host not configured');
 
 	const username = settings.unifi_username;
-	const password = decrypt(settings.unifi_password);
+	const password = settings.unifi_password; // already decrypted by getSettings()
 
 	if (!username || !password) {
 		throw new Error('UniFi credentials not configured');
@@ -158,7 +157,8 @@ export async function getProtectStatus(): Promise<ProtectStatus> {
 		// Cache for 30s
 		statusCache = { data: status, expiresAt: Date.now() + 30_000 };
 		return status;
-	} catch {
+	} catch (err) {
+		console.error('[protect] Status fetch failed:', (err as Error).message);
 		// Do NOT cache failures
 		return {
 			connected: false,
