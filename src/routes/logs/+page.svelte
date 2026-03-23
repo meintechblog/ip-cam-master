@@ -90,9 +90,18 @@
 		fetchEvents();
 	}
 
+	// Auto-refresh events every 10s
+	let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
 	$effect(() => {
 		fetchCameras();
 		fetchEvents();
+		refreshTimer = setInterval(() => {
+			if (activeTab === 'events') fetchEvents();
+		}, 10_000);
+		return () => {
+			if (refreshTimer) clearInterval(refreshTimer);
+		};
 	});
 </script>
 

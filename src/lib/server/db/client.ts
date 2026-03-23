@@ -12,3 +12,17 @@ sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('foreign_keys = ON');
 
 export const db = drizzle(sqlite, { schema });
+
+// Auto-create tables that don't exist yet (lightweight migration for new tables)
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		camera_id INTEGER,
+		camera_name TEXT,
+		event_type TEXT NOT NULL,
+		severity TEXT NOT NULL DEFAULT 'info',
+		message TEXT NOT NULL,
+		source TEXT NOT NULL,
+		timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+	)
+`);
