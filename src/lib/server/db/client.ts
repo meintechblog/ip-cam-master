@@ -26,3 +26,12 @@ sqlite.exec(`
 		timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 	)
 `);
+
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL,
+		password_hash TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)
+`);

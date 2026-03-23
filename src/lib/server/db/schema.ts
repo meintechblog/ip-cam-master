@@ -62,6 +62,15 @@ export const credentials = sqliteTable('credentials', {
 		.$defaultFn(() => new Date().toISOString())
 });
 
+export const users = sqliteTable('users', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	username: text('username').notNull(),
+	passwordHash: text('password_hash').notNull(),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
 export const events = sqliteTable('events', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	cameraId: integer('camera_id'),
