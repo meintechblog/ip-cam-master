@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-23T21:36:11.017Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-23T21:39:44.163Z"
 last_activity: 2026-03-23
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -57,6 +57,7 @@ Plan: 2 of 2
 | Phase 04 P03 | 3min | 2 tasks | 5 files |
 | Phase 04 P02 | 4min | 2 tasks | 9 files |
 | Phase 05 P02 | 2min | 2 tasks | 1 files |
+| Phase 05 P01 | 6min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Map serialized to array for JSON transport in protect/cameras endpoint
 - [Phase 05]: SSH-based provisioning over cloud-init cicustom (simpler, debuggable)
 - [Phase 05]: Settings injected via PUT /api/settings for proper AES-256-GCM encryption
+- [Phase 05]: scryptSync for password hashing (consistent with existing crypto.ts KDF pattern)
+- [Phase 05]: In-memory session Map (sessions lost on restart, acceptable for homelab)
+- [Phase 05]: YOLO mode via auth_yolo setting in DB (skip all auth when user opts out)
+- [Phase 05]: /api/settings kept public for installer curl POST on fresh install
 
 ### Pending Todos
 
@@ -109,5 +114,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-03-23
-Stopped at: Completed 05-02-PLAN.md
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
