@@ -168,9 +168,17 @@ export async function createCameraContainer(
 	try {
 		await waitForContainerReady(ssh, camera.vmid);
 
-		// Discover container IP
-		const ipResult = await executeOnContainer(ssh, camera.vmid, 'hostname -I');
-		const containerIp = ipResult.stdout.trim().split(/\s+/)[0];
+		// Wait for DHCP IP assignment (may take a few seconds after container is ready)
+		let containerIp = '';
+		for (let i = 0; i < 15; i++) {
+			const ipResult = await executeOnContainer(ssh, camera.vmid, 'hostname -I');
+			containerIp = ipResult.stdout.trim().split(/\s+/)[0];
+			if (containerIp && containerIp.startsWith('192.168.')) break;
+			await new Promise(r => setTimeout(r, 2000));
+		}
+		if (!containerIp || !containerIp.startsWith('192.168.')) {
+			throw new Error(`Container ${camera.vmid} hat keine IP erhalten (DHCP timeout)`);
+		}
 
 		// Update camera record
 		db.update(cameras)
