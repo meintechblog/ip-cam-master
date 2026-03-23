@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
-	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2 } from 'lucide-svelte';
+	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power } from 'lucide-svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
@@ -81,6 +81,20 @@
 			credError = 'Verbindung fehlgeschlagen';
 		} finally {
 			credLoading = false;
+		}
+	}
+
+	// Camera reboot (Mobotix)
+	let rebootLoading = $state(false);
+	let rebootConfirm = $state(false);
+
+	async function rebootCamera() {
+		rebootLoading = true;
+		try {
+			await fetch(`/api/cameras/${camera.id}/reboot`, { method: 'POST' });
+		} catch { /* ignore */ }
+		finally {
+			setTimeout(() => { rebootLoading = false; rebootConfirm = false; }, 3000);
 		}
 	}
 
@@ -180,6 +194,20 @@
 					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface oeffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
+					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif'}
+						{#if rebootConfirm}
+							<button onclick={rebootCamera} disabled={rebootLoading} class="bg-red-500/80 backdrop-blur-sm text-white rounded-md px-2 py-0.5 text-xs cursor-pointer" title="Neustart bestaetigen">
+								{rebootLoading ? '...' : 'Neustart?'}
+							</button>
+							<button onclick={() => rebootConfirm = false} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md px-2 py-0.5 text-xs cursor-pointer">
+								Nein
+							</button>
+						{:else}
+							<button onclick={() => rebootConfirm = true} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Kamera neustarten">
+								<Power class="w-3.5 h-3.5" />
+							</button>
+						{/if}
+					{/if}
 				{/if}
 			</div>
 		</div>
