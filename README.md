@@ -66,10 +66,39 @@ Each camera gets a full-width card with:
 - **Security:** AES-256-GCM encryption for all stored credentials
 - **Runtime:** Node.js 22 LTS
 
-## Quick Start
+## Installation
+
+One command on your Proxmox host — creates a VM with everything ready:
 
 ```bash
-# On the app VM
+curl -fsSL https://raw.githubusercontent.com/meintechblog/ip-cam-master/main/install.sh | bash
+```
+
+The installer:
+- Creates a Debian 12 VM on your Proxmox host
+- Installs Node.js, the app, and all dependencies
+- Sets up API tokens and SSH keys (VM can manage Proxmox automatically)
+- Starts the app as a systemd service on port 80
+
+Same command for **updates** (detects existing VM, pulls latest, rebuilds) and **uninstall** (removes VM + tokens).
+
+### After Installation
+
+1. Open `http://<vm-ip>` — set up login or click "Ohne Passwort fortfahren" (YOLO mode)
+2. **Settings → Proxmox** — already configured by installer, verify connection is green
+3. **Settings → Credentials** — add standard camera logins (tried automatically during onboarding)
+4. **Kameras → + Kamera hinzufuegen** — discovered cameras appear with pre-filled credentials
+5. Click **Einrichten** → follow wizard → camera appears in UniFi Protect
+
+### Prerequisites
+
+- Proxmox VE 8.x host
+- Intel GPU on Proxmox host for VAAPI hardware transcoding (`/dev/dri/renderD128`)
+- Debian 12 LXC template: `pveam download local debian-12-standard_12.12-1_amd64.tar.zst`
+
+### Development
+
+```bash
 git clone https://github.com/meintechblog/ip-cam-master.git
 cd ip-cam-master
 npm install
@@ -77,21 +106,6 @@ cp .env.example .env  # Set DB_ENCRYPTION_KEY (min 32 characters)
 npx drizzle-kit push   # Create SQLite tables
 npm run dev -- --host 0.0.0.0
 ```
-
-### First-Time Setup
-
-1. Open `http://<vm-ip>:5173`
-2. **Settings → Proxmox** — Enter host IP + API token → Save → Storage/Bridge dropdowns appear automatically
-3. **Settings → Credentials** — Add standard camera logins (tried automatically during onboarding)
-4. **Kameras → + Kamera hinzufuegen** — Discovered cameras appear with pre-filled credentials
-5. Click **Einrichten** → Follow wizard → Camera appears in UniFi Protect
-
-### Prerequisites
-
-- Proxmox VE with API token (`root@pam`, privilege separation disabled)
-- SSH key-based access from app VM to Proxmox host: `ssh-copy-id root@<proxmox-host>`
-- Intel GPU on Proxmox host for VAAPI hardware transcoding (`/dev/dri/renderD128`)
-- Debian 12 LXC template: `pveam download local debian-12-standard_12.12-1_amd64.tar.zst`
 
 ### Container Specs
 
