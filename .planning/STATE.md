@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-03-23T01:07:44.822Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-23T01:32:40Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 6
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 02 — mobotix-camera-pipeline
+**Current focus:** Phase 05 — installer-and-distribution
 
 ## Current Position
 
 Phase: 5
-Plan: Not started
+Plan: 1 of 1 complete
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: Not started
 | Phase 01 P03 | 4min | 3 tasks | 20 files |
 | Phase 02 P01 | 5min | 2 tasks | 13 files |
 | Phase 02 P02 | 3min | 1 tasks | 11 files |
+| Phase 05 P01 | 5min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,10 @@ Recent decisions affecting current work:
 - [Phase 02]: SSH bridge via pct exec for container commands instead of direct container SSH
 - [Phase 02]: go2rtc config uses hash-param syntax for ffmpeg options per go2rtc conventions
 - [Phase 02]: Combined save-camera + advance on credentials submit for smoother wizard UX
+- [Phase 05]: scryptSync for password hashing (consistent with existing crypto.ts KDF pattern)
+- [Phase 05]: In-memory session Map (sessions lost on restart, acceptable for homelab)
+- [Phase 05]: YOLO mode via auth_yolo setting in DB (skip all auth when user opts out)
+- [Phase 05]: Single users table with upsert (D-27: only one user ever)
 
 ### Pending Todos
 
@@ -83,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T18:08:26.520Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-03-23T01:32:40Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None

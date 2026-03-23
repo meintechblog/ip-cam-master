@@ -64,11 +64,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Installation & Distribution
 
-- [ ] **INST-01**: One-line install command (`curl | bash`) sets up app on a fresh Proxmox VM
-- [ ] **INST-02**: Installer handles all dependencies (Node.js, systemd service, SQLite)
-- [ ] **INST-03**: Same command performs updates (detects existing install, pulls latest, restarts service)
-- [ ] **INST-04**: App runs as systemd service with automatic restart on failure
-- [ ] **INST-05**: Install script works on Debian/Ubuntu-based Proxmox VMs
+- [x] **INST-01**: One-line install command (`curl | bash`) sets up app on a fresh Proxmox VM
+- [x] **INST-02**: Installer handles all dependencies (Node.js, systemd service, SQLite)
+- [x] **INST-03**: Same command performs updates (detects existing install, pulls latest, restarts service)
+- [x] **INST-04**: App runs as systemd service with automatic restart on failure
+- [x] **INST-05**: Install script works on Debian/Ubuntu-based Proxmox VMs
 
 ## v2 Requirements
 
@@ -145,11 +145,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ONBD-05 | Phase 4 | Pending |
 | ONBD-06 | Phase 2 | Complete |
 | ONBD-07 | Phase 3 | Pending |
-| INST-01 | Phase 5 | Pending |
-| INST-02 | Phase 5 | Pending |
-| INST-03 | Phase 5 | Pending |
-| INST-04 | Phase 5 | Pending |
-| INST-05 | Phase 5 | Pending |
+| INST-01 | Phase 5 | Complete |
+| INST-02 | Phase 5 | Complete |
+| INST-03 | Phase 5 | Complete |
+| INST-04 | Phase 5 | Complete |
+| INST-05 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 42 total
