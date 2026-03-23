@@ -148,10 +148,10 @@ export async function scanUdmLogs(): Promise<ParsedEvent[]> {
 			return [];
 		}
 
-		// Use lastScanTimestamp or 5 minutes ago
+		// Use lastScanTimestamp or 24 hours ago (first scan catches recent history)
 		const since = lastScanTimestamp
 			? new Date(lastScanTimestamp)
-			: new Date(Date.now() - 5 * 60 * 1000);
+			: new Date(Date.now() - 24 * 60 * 60 * 1000);
 
 		const events = parseLogLines(result.stdout, since);
 
