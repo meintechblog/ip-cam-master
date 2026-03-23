@@ -295,12 +295,14 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 		const uuid = uuidResult.stdout.trim();
 
 		// Patch onvif-server.js for UniFi Protect (Manufacturer, Model, ONVIF name)
+		// Protect displays "Manufacturer Model" as camera type, so keep them clean and separate
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
 		const isLoxone = camera.cameraType === 'loxone';
-		const model = isLoxone ? 'Loxone' : 'Mobotix';
-		const onvifName = isLoxone ? `Loxone${safeName}` : 'MOBOTIXS15';
+		const manufacturer = isLoxone ? 'Loxone' : 'MOBOTIX';
+		const model = isLoxone ? 'Intercom' : 'S15';
+		const onvifName = isLoxone ? `Loxone Intercom` : `MOBOTIX ${safeName}`;
 		await executeOnContainer(ssh, camera.vmid,
-			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${safeName}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
+			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${manufacturer}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
 		);
 
 		// Patch ONVIF server to advertise audio (G.711 mulaw) — only for Mobotix (has audio on RTSP)
