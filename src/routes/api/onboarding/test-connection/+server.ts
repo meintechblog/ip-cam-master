@@ -14,12 +14,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		if (cameraType === 'loxone') {
-			// Loxone Intercom: test HTTP MJPEG stream (stays open — use 1s timeout)
+			// Loxone Intercom: test HTTP MJPEG stream (stays open — use 3s timeout for slow response)
 			let code = '000';
 			try {
 				const { stdout } = await execAsync(
-					`curl -s --basic -u "${username}:${password}" "http://${ip}/mjpg/video.mjpg" --max-time 1 -o /dev/null -w "%{http_code}"`,
-					{ timeout: 5000, encoding: 'utf-8' }
+					`curl -s --basic -u "${username}:${password}" "http://${ip}/mjpg/video.mjpg" --max-time 3 -o /dev/null -w "%{http_code}"`,
+					{ timeout: 8000, encoding: 'utf-8' }
 				);
 				code = stdout.trim();
 			} catch (e: unknown) {

@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			const password = decrypt(row.password);
 			for (const endpoint of endpoints) {
 				try {
-					const timeout = endpoint.includes('mjpg') ? 1 : 3;
+					const timeout = endpoint.includes('mjpg') ? 3 : 3;
 					let stdout = '';
 					try {
 						const result = await execAsync(
