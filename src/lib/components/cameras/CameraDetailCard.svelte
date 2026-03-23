@@ -210,7 +210,7 @@
 					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface oeffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
-					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif'}
+					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif' || camera.cameraType === 'loxone'}
 						{#if rebootConfirm}
 							<button onclick={rebootCamera} disabled={rebootLoading} class="bg-red-500/80 backdrop-blur-sm text-white rounded-md px-2 py-0.5 text-xs cursor-pointer">
 								Neustart?

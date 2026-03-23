@@ -20,6 +20,19 @@ export const POST: RequestHandler = async ({ params }) => {
 	try {
 		const password = decrypt(camera.password);
 
+		if (camera.camera_type === 'loxone') {
+			// Loxone Intercom reboot via /dev/sys/reboot
+			const { stdout } = await execAsync(
+				`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/dev/sys/reboot" --max-time 5`,
+				{ timeout: 8000, encoding: 'utf-8' }
+			);
+
+			if (stdout.includes('reboot')) {
+				return json({ success: true });
+			}
+			return json({ success: false, error: 'Intercom-Neustart fehlgeschlagen' });
+		}
+
 		// Mobotix reboot via HTTP API
 		const { stdout } = await execAsync(
 			`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/admin/rcontrol?action=reboot" --max-time 5`,
