@@ -29,11 +29,14 @@ export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 
 	const bufsize = bitrate * 2;
 
-	// HTTP MJPEG via faststream endpoint — much more stable than RTSP MJPEG.
-	// ffmpeg -reconnect flags work with HTTP (not RTSP), preventing stream drops.
+	// Two sources merged into one stream:
+	// 1. HTTP MJPEG for video — stable with reconnect (no EOF issues like RTSP)
+	// 2. RTSP for audio passthrough — pcm_mulaw copy, lightweight and stable for audio-only
+	// This gives UniFi Protect both H.264 video + G.711 audio, matching native ONVIF cameras.
 	return `streams:
   ${streamName}:
     - ffmpeg:http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength#video=h264#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
+    - ffmpeg:rtsp://${username}:${password}@${cameraIp}:554/stream0/mobotix.mjpeg#raw=-vn#audio=copy#raw=-rtsp_transport tcp
 
 ffmpeg:
   bin: ffmpeg

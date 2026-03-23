@@ -75,7 +75,7 @@ describe('go2rtc service', () => {
 			expect(yaml).toContain('-bufsize 10000k');
 		});
 
-		it('uses HTTP MJPEG faststream URL with reconnect flags', () => {
+		it('uses HTTP MJPEG for video + RTSP audio passthrough with reconnect', () => {
 			const yaml = generateGo2rtcConfig({
 				streamName: 'cam',
 				cameraIp: '192.168.3.22',
@@ -87,11 +87,14 @@ describe('go2rtc service', () => {
 				bitrate: 5000
 			});
 
+			// HTTP video source with reconnect
 			expect(yaml).toContain('http://admin:secret@192.168.3.22/control/faststream.jpg');
 			expect(yaml).toContain('stream=full');
 			expect(yaml).toContain('-reconnect 1');
-			expect(yaml).toContain('-reconnect_streamed 1');
-			expect(yaml).toContain('-reconnect_delay_max 2');
+			// RTSP audio passthrough
+			expect(yaml).toContain('rtsp://admin:secret@192.168.3.22:554/stream0/mobotix.mjpeg');
+			expect(yaml).toContain('audio=copy');
+			expect(yaml).toContain('-vn');
 		});
 	});
 
