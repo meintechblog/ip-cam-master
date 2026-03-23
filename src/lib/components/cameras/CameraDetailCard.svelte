@@ -334,7 +334,8 @@
 					<div class="flex justify-between"><span>Name</span><span class="text-text-primary">{camera.name}</span></div>
 					<div class="flex justify-between"><span>Modell</span><span class="text-text-primary">{probeData?.cameraModel || camera.cameraType}</span></div>
 					<div class="flex justify-between"><span>IP</span><span class="font-mono text-text-primary">{camera.cameraIp}</span></div>
-					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{probeData?.codec || 'MJPEG'}</span></div>
+					<div class="flex justify-between"><span>Video</span><span class="text-text-primary">{probeData?.codec || 'MJPEG'}</span></div>
+					<div class="flex justify-between"><span>Audio</span><span class="text-text-primary">{camera.streamInfo?.audioCodec ? 'G.711 mulaw' : '—'}</span></div>
 					{#if probeData?.firmwareVersion}
 						<div class="flex justify-between"><span>FW</span><span class="text-text-primary">{probeData.firmwareVersion}</span></div>
 					{/if}
