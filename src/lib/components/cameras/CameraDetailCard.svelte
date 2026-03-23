@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
-	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil } from 'lucide-svelte';
+	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2 } from 'lucide-svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
@@ -43,6 +43,46 @@
 
 	let actionLoading = $state(false);
 	let showDeleteConfirm = $state(false);
+
+	// Credentials modal
+	let showCredentials = $state(false);
+	let credUsername = $state('');
+	let credPassword = $state('');
+	let credLoading = $state(false);
+	let credError = $state('');
+	let credSuccess = $state(false);
+
+	function openCredentials() {
+		credUsername = '';
+		credPassword = '';
+		credError = '';
+		credSuccess = false;
+		showCredentials = true;
+	}
+
+	async function saveCredentials() {
+		credLoading = true;
+		credError = '';
+		credSuccess = false;
+		try {
+			const res = await fetch(`/api/cameras/${camera.id}/credentials`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ username: credUsername, password: credPassword, test: true })
+			});
+			const data = await res.json();
+			if (data.success) {
+				credSuccess = true;
+				setTimeout(() => { showCredentials = false; }, 1500);
+			} else {
+				credError = data.error || 'Fehler beim Speichern';
+			}
+		} catch {
+			credError = 'Verbindung fehlgeschlagen';
+		} finally {
+			credLoading = false;
+		}
+	}
 
 	async function containerAction(action: 'start' | 'stop' | 'restart') {
 		actionLoading = true;
@@ -131,8 +171,11 @@
 					</div>
 				{:else}
 					<span class="bg-black/70 backdrop-blur-sm text-text-primary text-sm font-bold px-3 py-1 rounded-md">{camera.name}</span>
-					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer">
+					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Umbenennen">
 						<Pencil class="w-3.5 h-3.5" />
+					</button>
+					<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten aendern">
+						<KeyRound class="w-3.5 h-3.5" />
 					</button>
 				{/if}
 			</div>
@@ -393,3 +436,55 @@
 	</div>
 	{/if}
 </div>
+
+<!-- Credentials Modal -->
+{#if showCredentials}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onclick={(e) => { if (e.target === e.currentTarget) showCredentials = false; }}>
+		<div class="bg-bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 p-5">
+			<h3 class="text-text-primary font-bold text-sm mb-1">Zugangsdaten — {camera.name}</h3>
+			<p class="text-text-secondary text-xs mb-4">{camera.cameraIp} ({camera.cameraType})</p>
+
+			{#if credSuccess}
+				<div class="flex items-center gap-2 text-success text-sm py-4 justify-center">
+					<Check class="w-5 h-5" />
+					<span>Gespeichert und verifiziert</span>
+				</div>
+			{:else}
+				<div class="space-y-3">
+					<div>
+						<label for="cred-user" class="block text-xs text-text-secondary mb-1">Benutzername</label>
+						<input id="cred-user" type="text" bind:value={credUsername} placeholder="admin"
+							class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 outline-none focus:border-accent" />
+					</div>
+					<div>
+						<label for="cred-pass" class="block text-xs text-text-secondary mb-1">Passwort</label>
+						<input id="cred-pass" type="password" bind:value={credPassword}
+							onkeydown={(e) => { if (e.key === 'Enter' && credUsername && credPassword) saveCredentials(); }}
+							class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-accent" />
+					</div>
+
+					{#if credError}
+						<div class="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 text-xs text-danger">{credError}</div>
+					{/if}
+
+					<div class="flex gap-2 pt-1">
+						<button onclick={saveCredentials} disabled={credLoading || !credUsername || !credPassword}
+							class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+							{#if credLoading}
+								<Loader2 class="w-4 h-4 animate-spin" /> Teste...
+							{:else}
+								Testen & Speichern
+							{/if}
+						</button>
+						<button onclick={() => showCredentials = false}
+							class="px-3 py-2 text-sm bg-bg-input text-text-secondary rounded-lg hover:bg-bg-primary cursor-pointer">
+							Abbrechen
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}

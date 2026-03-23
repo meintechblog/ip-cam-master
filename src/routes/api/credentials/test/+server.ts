@@ -9,25 +9,40 @@ import { promisify } from 'node:util';
 const execAsync = promisify(exec);
 
 /**
- * Try all saved credentials against a camera IP.
- * Returns the first working credential set, or null.
+ * Try saved credentials against a camera IP.
+ * Accepts optional `cameraType` hint to prioritize matching credentials.
+ * Credentials whose name contains the camera type keyword are tried first,
+ * reducing failed auth attempts that can lock out devices (e.g. Loxone Intercom).
  */
 export const POST: RequestHandler = async ({ request }) => {
-	const { ip } = await request.json();
+	const { ip, cameraType } = await request.json();
 	if (!ip) return json({ success: false, error: 'IP erforderlich' }, { status: 400 });
 
-	const rows = (db.select().from(credentials).all() as any[])
-		.sort((a, b) => a.priority - b.priority);
+	const allRows = db.select().from(credentials).all() as any[];
 
-	// Try multiple endpoints — Mobotix uses /record/current.jpg, Loxone uses /mjpg/video.mjpg
-	const endpoints = ['/record/current.jpg', '/mjpg/video.mjpg'];
+	// Sort: matching type first (by name keyword), then by priority
+	const rows = allRows.sort((a, b) => {
+		const aMatch = typeMatchScore(a.name, cameraType);
+		const bMatch = typeMatchScore(b.name, cameraType);
+		if (aMatch !== bMatch) return bMatch - aMatch; // higher score first
+		return a.priority - b.priority;
+	});
+
+	// Pick endpoints based on camera type hint — avoids unnecessary requests
+	let endpoints: string[];
+	if (cameraType === 'loxone') {
+		endpoints = ['/mjpg/video.mjpg'];
+	} else if (cameraType === 'mobotix' || cameraType === 'mobotix-onvif') {
+		endpoints = ['/record/current.jpg'];
+	} else {
+		endpoints = ['/record/current.jpg', '/mjpg/video.mjpg'];
+	}
 
 	for (const row of rows) {
 		try {
 			const password = decrypt(row.password);
 			for (const endpoint of endpoints) {
 				try {
-					// MJPEG streams stay open — use 1s timeout, ignore exit code
 					const timeout = endpoint.includes('mjpg') ? 1 : 3;
 					let stdout = '';
 					try {
@@ -59,3 +74,20 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	return json({ success: false, message: 'Kein gespeichertes Login hat funktioniert' });
 };
+
+/** Score how well a credential name matches a camera type (higher = better match) */
+function typeMatchScore(credentialName: string, cameraType?: string): number {
+	if (!cameraType) return 0;
+	const name = credentialName.toLowerCase();
+	const type = cameraType.toLowerCase();
+
+	// Direct keyword match
+	if (type.includes('loxone') && name.includes('loxone')) return 2;
+	if (type.includes('mobotix') && name.includes('mobotix')) return 2;
+
+	// Inverse penalty: wrong type in name
+	if (type.includes('loxone') && name.includes('mobotix')) return -1;
+	if (type.includes('mobotix') && name.includes('loxone')) return -1;
+
+	return 0;
+}

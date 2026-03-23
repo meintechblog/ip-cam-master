@@ -14,7 +14,11 @@ export async function getSetting(key: string): Promise<string | null> {
 	if (rows.length === 0) return null;
 	const row = rows[0];
 	if (row.encrypted) {
-		return decrypt(row.value);
+		try {
+			return decrypt(row.value);
+		} catch {
+			return null;
+		}
 	}
 	return row.value;
 }
@@ -28,7 +32,15 @@ export async function getSettings(prefix: string): Promise<Record<string, string
 
 	const result: Record<string, string> = {};
 	for (const row of rows) {
-		result[row.key] = row.encrypted ? decrypt(row.value) : row.value;
+		if (row.encrypted) {
+			try {
+				result[row.key] = decrypt(row.value);
+			} catch {
+				result[row.key] = '';
+			}
+		} else {
+			result[row.key] = row.value;
+		}
 	}
 	return result;
 }

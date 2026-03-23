@@ -1,0 +1,61 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { db } from '$lib/server/db/client';
+import { cameras } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { encrypt } from '$lib/server/services/crypto';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
+
+export const PUT: RequestHandler = async ({ params, request }) => {
+	const cameraId = parseInt(params.id);
+	const { username, password, test } = await request.json();
+
+	if (!username || !password) {
+		return json({ success: false, error: 'Benutzername und Passwort erforderlich' }, { status: 400 });
+	}
+
+	const camera = db.select().from(cameras).where(eq(cameras.id, cameraId)).get() as any;
+	if (!camera) {
+		return json({ success: false, error: 'Kamera nicht gefunden' }, { status: 404 });
+	}
+
+	// Test credentials if requested
+	if (test) {
+		const endpoint = camera.camera_type === 'loxone' ? '/mjpg/video.mjpg' : '/record/current.jpg';
+		const timeout = camera.camera_type === 'loxone' ? 1 : 3;
+
+		try {
+			let stdout = '';
+			try {
+				const result = await execAsync(
+					`curl -s --basic -u "${username}:${password}" "http://${camera.ip}${endpoint}" --max-time ${timeout} -o /dev/null -w "%{http_code}"`,
+					{ timeout: 5000, encoding: 'utf-8' }
+				);
+				stdout = result.stdout;
+			} catch (e: unknown) {
+				stdout = (e as any)?.stdout || '';
+			}
+			const code = stdout.trim();
+			if (code !== '200' && code !== '206') {
+				return json({ success: false, error: `Zugangsdaten ungueltig (HTTP ${code || 'timeout'})` });
+			}
+		} catch {
+			return json({ success: false, error: 'Verbindungstest fehlgeschlagen' });
+		}
+	}
+
+	// Save encrypted credentials
+	db.update(cameras)
+		.set({
+			username,
+			password: encrypt(password),
+			updatedAt: new Date().toISOString()
+		})
+		.where(eq(cameras.id, cameraId))
+		.run();
+
+	return json({ success: true });
+};

@@ -9,7 +9,7 @@ export interface Go2rtcConfigParams {
 	height: number;
 	fps: number;
 	bitrate: number;
-	streamPath?: string;
+	streamPath?: string; // deprecated — HTTP MJPEG URL is now generated automatically
 }
 
 /**
@@ -24,14 +24,22 @@ export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 		width,
 		height,
 		fps,
-		bitrate,
-		streamPath = '/stream0/mobotix.mjpeg'
+		bitrate
 	} = params;
 
 	const bufsize = bitrate * 2;
 
+	// HTTP MJPEG via faststream endpoint — much more stable than RTSP MJPEG.
+	// ffmpeg -reconnect flags work with HTTP (not RTSP), preventing stream drops.
 	return `streams:
-  ${streamName}: ffmpeg:rtsp://${username}:${password}@${cameraIp}:554${streamPath}#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi
+  ${streamName}:
+    - ffmpeg:http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength#video=h264#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
+
+ffmpeg:
+  bin: ffmpeg
+
+log:
+  level: info
 `;
 }
 
@@ -79,7 +87,14 @@ export function generateGo2rtcConfigLoxone(params: {
 	const bufsize = bitrate * 2;
 
 	return `streams:
-  ${streamName}: ffmpeg:http://localhost:8081/mjpg/video.mjpg#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi
+  ${streamName}:
+    - ffmpeg:http://localhost:8081/mjpg/video.mjpg#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
+
+ffmpeg:
+  bin: ffmpeg
+
+log:
+  level: info
 `;
 }
 

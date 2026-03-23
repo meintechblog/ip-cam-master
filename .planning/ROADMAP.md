@@ -13,8 +13,8 @@ IP-Cam-Master delivers one-click camera onboarding for non-ONVIF cameras into Un
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundation and Proxmox Integration** - App skeleton with settings UI, credential storage, and LXC container lifecycle management
-- [ ] **Phase 2: Mobotix Camera Pipeline** - End-to-end Mobotix onboarding: go2rtc config generation, container provisioning, MJPEG-to-H.264 transcoding, stream verification
-- [ ] **Phase 3: Loxone Pipeline and Network Discovery** - Loxone Intercom pipeline with nginx auth-proxy, plus network camera discovery
+- [x] **Phase 2: Mobotix Camera Pipeline** - End-to-end Mobotix onboarding: go2rtc config generation, container provisioning, MJPEG-to-H.264 transcoding, stream verification
+- [x] **Phase 3: Loxone Pipeline and Network Discovery** - Loxone Intercom pipeline with nginx auth-proxy, plus network camera discovery
 - [ ] **Phase 4: Dashboard and UniFi Protect** - Camera status dashboard with live preview and UniFi Protect adoption workflow
 - [x] **Phase 5: Installer and Distribution** - One-line install script, systemd service, update mechanism (completed 2026-03-23)
 
@@ -46,12 +46,12 @@ Plans:
   2. Each onboarding step shows clear success or error with retry option
   3. After successful onboarding, an RTSP URL is provided that outputs H.264 video transcoded from Mobotix MJPEG via VAAPI
   4. User can customize transcode parameters (resolution, fps, bitrate) per camera
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md -- Backend services: SSH, go2rtc config generation, onboarding orchestration, DB schema + API routes
 - [x] 02-02-PLAN.md -- 5-step onboarding wizard UI with progress indicator, step components, WebRTC preview
-- [ ] 02-03-PLAN.md -- Visual checkpoint: verify wizard UI and flow
+- [x] 02-03-PLAN.md -- Visual checkpoint: verify wizard UI and flow
 
 ### Phase 3: Loxone Pipeline and Network Discovery
 **Goal**: User can onboard Loxone Intercoms via nginx auth-proxy pipeline and discover cameras automatically on the network
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Proxmox Integration | 3/3 | Complete | - |
-| 2. Mobotix Camera Pipeline | 0/3 | Planning complete | - |
-| 3. Loxone Pipeline and Network Discovery | 0/3 | Not started | - |
+| 2. Mobotix Camera Pipeline | 3/3 | Complete | 2026-03-22 |
+| 3. Loxone Pipeline and Network Discovery | 3/3 | Complete | 2026-03-23 |
 | 4. Dashboard and UniFi Protect | 0/2 | Not started | - |
 | 5. Installer and Distribution | 1/1 | Complete   | 2026-03-23 |
