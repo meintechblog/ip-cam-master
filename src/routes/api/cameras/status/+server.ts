@@ -175,10 +175,20 @@ export const GET: RequestHandler = async () => {
 			// Events DB issue — continue without
 		}
 
+		// Get UniFi host for Protect deep-links
+		let unifiHost: string | null = null;
+		if (protectConfigured) {
+			try {
+				const s = await getSettings('unifi_');
+				unifiHost = s.unifi_host || null;
+			} catch { /* ignore */ }
+		}
+
 		// Enrich results with Protect status and flapping
 		for (const result of results) {
 			(result as any).protectStatus = protectMatches.get(result.id) || null;
 			(result as any).protectConfigured = protectConfigured;
+			(result as any).protectUrl = unifiHost ? `https://${unifiHost}/protect/devices` : null;
 			(result as any).flapping = flappingIds.includes(result.id);
 		}
 
