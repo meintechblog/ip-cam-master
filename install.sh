@@ -44,7 +44,8 @@ error_exit() {
 }
 
 confirm() {
-  read -rp "$1 " REPLY
+  # read from /dev/tty so it works with curl|bash (stdin is the script)
+  read -rp "$1 " REPLY < /dev/tty
   case "${REPLY,,}" in
     y|yes) return 0 ;;
     *) echo "Abgebrochen."; exit 0 ;;
@@ -447,7 +448,7 @@ if [ -n "$EXISTING_VMID" ]; then
   echo "  [R] Remove — VM und Konfiguration entfernen"
   echo "  [C] Cancel — Abbrechen"
   echo ""
-  read -rp "Auswahl [U/R/C]: " CHOICE
+  read -rp "Auswahl [U/R/C]: " CHOICE < /dev/tty
   case "${CHOICE,,}" in
     u) MODE="update" ;;
     r) MODE="remove" ;;
