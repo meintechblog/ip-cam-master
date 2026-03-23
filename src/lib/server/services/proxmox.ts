@@ -84,12 +84,14 @@ export async function createContainer(params: {
 	const alreadyExists = existing.find((c: { vmid: number }) => c.vmid === params.vmid);
 
 	if (alreadyExists) {
-		// Update config instead of creating a duplicate
+		// Update config instead of creating a duplicate (only if there's something to update)
 		const updateParams: Record<string, unknown> = {};
 		if (params.memory) updateParams.memory = params.memory;
 		if (params.cores) updateParams.cores = params.cores;
 
-		await proxmox.nodes.$(node).lxc.$(params.vmid).config.$put(updateParams as any);
+		if (Object.keys(updateParams).length > 0) {
+			await proxmox.nodes.$(node).lxc.$(params.vmid).config.$put(updateParams as any);
+		}
 
 		// Upsert DB record
 		db.insert(containers)
