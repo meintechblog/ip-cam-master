@@ -177,6 +177,9 @@
 					<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten aendern">
 						<KeyRound class="w-3.5 h-3.5" />
 					</button>
+					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface oeffnen">
+						<ExternalLink class="w-3.5 h-3.5" />
+					</a>
 				{/if}
 			</div>
 		</div>
@@ -326,9 +329,6 @@
 				<div class="flex items-center gap-2 mb-1.5">
 					<span class="w-2 h-2 rounded-full shrink-0 {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
 					<span class="text-sm font-medium text-text-primary">Kamera</span>
-					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="text-accent hover:text-accent/80 ml-auto">
-						<ExternalLink class="w-3.5 h-3.5" />
-					</a>
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>Name</span><span class="text-text-primary">{camera.name}</span></div>
