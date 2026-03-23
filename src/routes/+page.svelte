@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CameraCardData } from '$lib/types';
+	import type { CameraCardData, CameraEvent } from '$lib/types';
 	import {
 		Loader2,
 		CheckCircle,
@@ -14,16 +14,24 @@
 	} from 'lucide-svelte';
 
 	let cameras = $state<CameraCardData[]>([]);
+	let recentEvents = $state<CameraEvent[]>([]);
 	let loading = $state(true);
 	let lastUpdate = $state<Date | null>(null);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	async function fetchCameras() {
 		try {
-			const res = await fetch('/api/cameras/status');
-			if (res.ok) {
-				cameras = await res.json();
+			const [cameraRes, eventsRes] = await Promise.all([
+				fetch('/api/cameras/status'),
+				fetch('/api/protect/events?limit=10')
+			]);
+			if (cameraRes.ok) {
+				cameras = await cameraRes.json();
 				lastUpdate = new Date();
+			}
+			if (eventsRes.ok) {
+				const data = await eventsRes.json();
+				recentEvents = data.events || [];
 			}
 		} catch {
 			// retry next poll
@@ -53,7 +61,10 @@
 	let go2rtcUp = $derived(cameras.filter((c) => c.go2rtcRunning).length);
 	let onvifUp = $derived(cameras.filter((c) => c.onvifRunning).length);
 
-	let unifiConnected = $derived(cameras.filter((c) => c.streamInfo?.unifiConnected).length);
+	let protectAdopted = $derived(cameras.filter((c) => c.protectStatus?.isAdopted).length);
+	let protectConnected = $derived(cameras.filter((c) => c.protectStatus?.state === 'CONNECTED').length);
+	// Fallback to old indirect detection if no protectStatus available
+	let unifiConnected = $derived(protectAdopted > 0 ? protectAdopted : cameras.filter((c) => c.streamInfo?.unifiConnected).length);
 	let totalClients = $derived(cameras.reduce((sum, c) => sum + c.connectedClients, 0));
 
 	// Pipeline cameras only (have containers)
@@ -215,13 +226,16 @@
 					<Shield class="w-3.5 h-3.5" />
 					UniFi Protect
 				</div>
-				<p class="text-3xl font-bold text-text-primary">{unifiConnected}<span class="text-lg text-text-secondary font-normal">/{total}</span></p>
+				<p class="text-3xl font-bold text-text-primary">{protectAdopted}<span class="text-lg text-text-secondary font-normal">/{total}</span></p>
 				<div class="flex gap-3 mt-2 text-xs">
-					{#if unifiConnected > 0}
-						<span class="text-success">{unifiConnected} adoptiert</span>
+					{#if protectConnected > 0}
+						<span class="text-success">{protectConnected} verbunden</span>
 					{/if}
-					{#if total - unifiConnected > 0}
-						<span class="text-text-secondary">{total - unifiConnected} wartend</span>
+					{#if protectAdopted - protectConnected > 0}
+						<span class="text-danger">{protectAdopted - protectConnected} getrennt</span>
+					{/if}
+					{#if total - protectAdopted > 0}
+						<span class="text-text-secondary">{total - protectAdopted} wartend</span>
 					{/if}
 				</div>
 			</div>
@@ -271,6 +285,46 @@
 			</div>
 		{/if}
 
+		<!-- Letzte Ereignisse -->
+		<div class="bg-bg-card rounded-xl border border-border overflow-hidden">
+			<div class="px-5 py-4 border-b border-border flex items-center justify-between">
+				<span class="text-text-secondary text-xs font-medium uppercase tracking-wider">Letzte Ereignisse</span>
+				<a href="/logs" class="text-xs text-accent hover:underline">Alle anzeigen</a>
+			</div>
+			{#if recentEvents.length === 0}
+				<div class="px-5 py-6 text-center text-text-secondary text-sm">
+					Keine Ereignisse
+				</div>
+			{:else}
+				<div class="divide-y divide-border/50">
+					{#each recentEvents as event (event.id)}
+						<div class="px-5 py-3 flex items-center gap-3 text-sm">
+							<!-- Severity icon -->
+							{#if event.severity === 'error'}
+								<XCircle class="w-4 h-4 text-danger shrink-0" />
+							{:else if event.severity === 'warning'}
+								<AlertTriangle class="w-4 h-4 text-warning shrink-0" />
+							{:else}
+								<CheckCircle class="w-4 h-4 text-success shrink-0" />
+							{/if}
+							<!-- Timestamp -->
+							<span class="text-text-secondary text-xs font-mono shrink-0">
+								{new Date(event.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+							</span>
+							<!-- Camera name -->
+							<span class="text-text-primary text-xs font-medium shrink-0">
+								{event.cameraName || 'System'}
+							</span>
+							<!-- Message -->
+							<span class="text-text-secondary text-xs truncate">
+								{event.message}
+							</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
 		<!-- Camera Status Table -->
 		<div class="bg-bg-card rounded-xl border border-border overflow-hidden">
 			<div class="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -303,7 +357,12 @@
 									<span class="inline-block w-2.5 h-2.5 rounded-full {allGood ? 'bg-success' : 'bg-danger'} {allGood ? 'shadow-[0_0_6px_rgba(34,197,94,0.4)]' : 'shadow-[0_0_6px_rgba(239,68,68,0.4)]'}"></span>
 								</td>
 								<!-- Name -->
-								<td class="px-5 py-3 text-text-primary font-medium">{cam.name}</td>
+								<td class="px-5 py-3 text-text-primary font-medium">
+									{cam.name}
+									{#if cam.flapping}
+										<span class="text-xs px-1.5 py-0.5 rounded bg-warning/15 text-warning ml-1.5">instabil</span>
+									{/if}
+								</td>
 								<!-- IP -->
 								<td class="px-5 py-3 text-text-secondary font-mono text-xs">{cam.cameraIp}</td>
 								<!-- Type -->
@@ -352,10 +411,14 @@
 								</td>
 								<!-- UniFi -->
 								<td class="px-5 py-3">
-									{#if cam.streamInfo?.unifiConnected}
-										<span class="text-xs text-success">verbunden</span>
+									{#if cam.protectStatus?.isAdopted && cam.protectStatus?.state === 'CONNECTED'}
+										<span class="text-xs text-success">adoptiert</span>
+									{:else if cam.protectStatus?.isAdopted && cam.protectStatus?.state !== 'CONNECTED'}
+										<span class="text-xs text-danger">getrennt</span>
+									{:else if cam.protectStatus && !cam.protectStatus.isAdopted}
+										<span class="text-xs text-warning">wird adoptiert</span>
 									{:else}
-										<span class="text-xs text-warning">wartend</span>
+										<span class="text-xs text-text-secondary">wartend</span>
 									{/if}
 								</td>
 							</tr>

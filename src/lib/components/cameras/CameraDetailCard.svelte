@@ -461,24 +461,41 @@
 			<!-- UniFi Protect -->
 			<div class="bg-bg-primary/50 rounded-lg px-3 py-2.5">
 				<div class="flex items-center gap-2 mb-1.5">
-					{#if camera.streamInfo?.unifiConnected}
+					{#if camera.protectStatus?.isAdopted && camera.protectStatus?.state === 'CONNECTED'}
 						<span class="w-2 h-2 rounded-full shrink-0 bg-green-400"></span>
-					{:else}
+					{:else if camera.protectStatus?.isAdopted}
+						<span class="w-2 h-2 rounded-full shrink-0 bg-red-400"></span>
+					{:else if camera.protectStatus}
 						<span class="w-2 h-2 rounded-full shrink-0 bg-yellow-400"></span>
+					{:else}
+						<span class="w-2 h-2 rounded-full shrink-0 bg-gray-400"></span>
 					{/if}
 					<span class="text-sm font-medium text-text-primary">UniFi Protect</span>
+					{#if camera.flapping}
+						<span class="text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning font-medium">instabil</span>
+					{/if}
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between">
 						<span>Status</span>
-						{#if camera.streamInfo?.unifiConnected}
-							<span class="text-green-400 font-medium">verbunden</span>
+						{#if camera.protectStatus?.isAdopted && camera.protectStatus?.state === 'CONNECTED'}
+							<span class="text-green-400 font-medium">Adoptiert</span>
+						{:else if camera.protectStatus?.isAdopted}
+							<span class="text-red-400 font-medium">Getrennt ({camera.protectStatus.state})</span>
+						{:else if camera.protectStatus}
+							<span class="text-yellow-400">Wird adoptiert</span>
 						{:else}
-							<span class="text-yellow-400">wartend</span>
+							<span class="text-gray-400">Wartend</span>
 						{/if}
 					</div>
-					{#if camera.streamInfo?.unifiConnected}
-						<div class="flex justify-between"><span>Streams</span><span class="text-text-primary">{camera.streamInfo.unifiStreams}</span></div>
+					{#if camera.protectStatus?.protectName}
+						<div class="flex justify-between"><span>Protect Name</span><span class="text-text-primary">{camera.protectStatus.protectName}</span></div>
+					{/if}
+					{#if camera.protectStatus?.connectedSince}
+						<div class="flex justify-between"><span>Verbunden seit</span><span class="text-text-primary">{new Date(camera.protectStatus.connectedSince).toLocaleString('de-DE')}</span></div>
+					{/if}
+					{#if camera.protectStatus?.isThirdPartyCamera}
+						<div class="flex justify-between"><span>Typ</span><span class="text-text-primary">Third-Party</span></div>
 					{/if}
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{(camera.streamInfo?.codec || 'H.264').replace('H264', 'H.264')}</span></div>
 				</div>
