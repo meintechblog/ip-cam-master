@@ -79,6 +79,7 @@ export interface OnboardingState {
 export interface StreamInfo {
 	active: boolean;
 	codec: string | null;
+	audioCodec: string | null;
 	producers: number;
 	resolution: string | null;
 	unifiConnected?: boolean;

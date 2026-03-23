@@ -76,12 +76,24 @@ export const GET: RequestHandler = async () => {
 								const unifiStreams = consumerList.filter(
 									(c: any) => c.user_agent?.includes('ui.com') || c.user_agent?.includes('Media Server') || c.user_agent?.includes('GStreamer')
 								).length;
-								streamInfo = {
-									active: producers > 0,
-									codec: stream.producers?.[0]?.codec || null,
-									producers,
-									resolution: stream.producers?.[0]?.resolution || null
-								};
+								// Extract video codec from first video producer, audio from audio producer
+							const videoProducer = stream.producers?.find((p: any) =>
+								p.medias?.some((m: string) => m.includes('video'))
+							);
+							const audioProducer = stream.producers?.find((p: any) =>
+								p.medias?.some((m: string) => m.includes('audio'))
+							);
+							const audioCodec = audioProducer?.medias
+								?.find((m: string) => m.includes('audio'))
+								?.match(/audio,\s*\w+,\s*(.+)/)?.[1] || null;
+
+							streamInfo = {
+								active: producers > 0,
+								codec: videoProducer?.medias?.find((m: string) => m.includes('video'))?.match(/video,\s*\w+,\s*(.+)/)?.[1] || stream.producers?.[0]?.codec || null,
+								audioCodec,
+								producers,
+								resolution: videoProducer?.resolution || stream.producers?.[0]?.resolution || null
+							};
 								connectedClients = consumers;
 								(streamInfo as any).unifiConnected = unifiConnected;
 								(streamInfo as any).unifiStreams = unifiStreams;

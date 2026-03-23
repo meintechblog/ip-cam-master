@@ -356,8 +356,17 @@
 					{/if}
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
-					<div class="flex justify-between"><span>Transcode</span><span class="text-text-primary">MJPEG → H.264</span></div>
-					<div class="flex justify-between"><span>Accel</span><span class="text-text-primary">VAAPI</span></div>
+					<div class="flex justify-between"><span>Video</span><span class="text-text-primary">MJPEG → H.264 (VAAPI)</span></div>
+					<div class="flex justify-between">
+						<span>Audio</span>
+						<span class="text-text-primary">
+							{#if camera.streamInfo?.audioCodec}
+								{camera.streamInfo.audioCodec}
+							{:else}
+								—
+							{/if}
+						</span>
+					</div>
 					<div class="flex justify-between">
 						<span>FPS</span>
 						<span class="text-text-primary">

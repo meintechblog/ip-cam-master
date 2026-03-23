@@ -341,18 +341,25 @@ export async function checkStreamHealth(
 
 		const stream = data[streamName];
 		if (!stream) {
-			return { active: false, codec: null, producers: 0, resolution: null };
+			return { active: false, codec: null, audioCodec: null, producers: 0, resolution: null };
 		}
 
 		const producers = Array.isArray(stream.producers) ? stream.producers.length : 0;
+		const audioProducer = stream.producers?.find((p: any) =>
+			p.medias?.some((m: string) => m.includes('audio'))
+		);
+		const audioCodec = audioProducer?.medias
+			?.find((m: string) => m.includes('audio'))
+			?.match(/audio,\s*\w+,\s*(.+)/)?.[1] || null;
 
 		return {
 			active: producers > 0,
 			codec: stream.producers?.[0]?.codec || null,
+			audioCodec,
 			producers,
 			resolution: stream.producers?.[0]?.resolution || null
 		};
 	} catch {
-		return { active: false, codec: null, producers: 0, resolution: null };
+		return { active: false, codec: null, audioCodec: null, producers: 0, resolution: null };
 	}
 }
