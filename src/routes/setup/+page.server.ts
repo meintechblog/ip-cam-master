@@ -1,6 +1,6 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
-import { isSetupComplete, createUser, setYoloMode, isYoloMode, getUser, deleteUser, verifyPassword } from '$lib/server/services/auth';
+import { isSetupComplete, createUser, createSession, setYoloMode, isYoloMode, getUser, deleteUser } from '$lib/server/services/auth';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = getUser();
@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	// Initial setup or create new user (from YOLO mode)
-	setup: async ({ request }) => {
+	setup: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const username = data.get('username')?.toString().trim();
 		const password = data.get('password')?.toString();
@@ -29,7 +29,16 @@ export const actions: Actions = {
 
 		createUser(username, password);
 		await setYoloMode(false);
-		throw redirect(303, '/login');
+
+		// Auto-login after setup
+		const token = createSession(username);
+		cookies.set('session', token, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			maxAge: 60 * 60 * 24
+		});
+		throw redirect(303, '/');
 	},
 
 	// YOLO mode — skip auth
