@@ -130,6 +130,11 @@
 
 	// Step 0: Save camera
 	async function handleCredentialsSubmit() {
+		// Auto-generate name if empty
+		if (!name && ip) {
+			const lastOctet = ip.split('.').pop();
+			name = cameraType === 'loxone' ? `Intercom` : `Kamera-${lastOctet}`;
+		}
 		if (!name || !ip || !username || !password) {
 			error = 'Bitte alle Pflichtfelder ausfuellen';
 			return;

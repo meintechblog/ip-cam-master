@@ -19,26 +19,41 @@ export const POST: RequestHandler = async ({ request }) => {
 	const rows = (db.select().from(credentials).all() as any[])
 		.sort((a, b) => a.priority - b.priority);
 
+	// Try multiple endpoints — Mobotix uses /record/current.jpg, Loxone uses /mjpg/video.mjpg
+	const endpoints = ['/record/current.jpg', '/mjpg/video.mjpg'];
+
 	for (const row of rows) {
 		try {
 			const password = decrypt(row.password);
-			// Try HTTP Basic auth to camera's snapshot endpoint
-			const { stdout } = await execAsync(
-				`curl -s --basic -u "${row.username}:${password}" "http://${ip}/record/current.jpg" --max-time 3 -o /dev/null -w "%{http_code}"`,
-				{ timeout: 5000, encoding: 'utf-8' }
-			);
-			const code = stdout.trim();
-			if (code === '200') {
-				return json({
-					success: true,
-					credentialId: row.id,
-					name: row.name,
-					username: row.username,
-					password // Return decrypted for use in onboarding form
-				});
+			for (const endpoint of endpoints) {
+				try {
+					// MJPEG streams stay open — use 1s timeout, ignore exit code
+					const timeout = endpoint.includes('mjpg') ? 1 : 3;
+					let stdout = '';
+					try {
+						const result = await execAsync(
+							`curl -s --basic -u "${row.username}:${password}" "http://${ip}${endpoint}" --max-time ${timeout} -o /dev/null -w "%{http_code}"`,
+							{ timeout: 5000, encoding: 'utf-8' }
+						);
+						stdout = result.stdout;
+					} catch (e: unknown) {
+						// curl exits 28 on timeout for streaming — check stdout anyway
+						stdout = (e as any)?.stdout || '';
+					}
+					const code = stdout.trim();
+					if (code === '200' || code === '206') {
+						return json({
+							success: true,
+							credentialId: row.id,
+							name: row.name,
+							username: row.username,
+							password
+						});
+					}
+				} catch { /* try next endpoint */ }
 			}
 		} catch {
-			// This credential failed, try next
+			// Decryption failed, try next credential
 		}
 	}
 
