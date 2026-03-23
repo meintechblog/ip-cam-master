@@ -1,20 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock better-sqlite3 and drizzle before any imports
-const mockAll = vi.fn().mockReturnValue([]);
-const mockRun = vi.fn();
-const mockFrom = vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ all: mockAll }) });
-const mockValues = vi.fn().mockReturnValue({
-	onConflictDoUpdate: vi.fn().mockReturnValue({ run: mockRun })
+// All mocks must use inline values (vi.mock is hoisted above variable declarations)
+vi.mock('$lib/server/db/client', () => {
+	const mockAll = vi.fn().mockReturnValue([]);
+	const mockRun = vi.fn();
+	return {
+		db: {
+			select: vi.fn().mockReturnValue({
+				from: vi.fn().mockReturnValue({
+					where: vi.fn().mockReturnValue({ all: mockAll }),
+					all: mockAll
+				})
+			}),
+			insert: vi.fn().mockReturnValue({
+				values: vi.fn().mockReturnValue({
+					onConflictDoUpdate: vi.fn().mockReturnValue({ run: mockRun }),
+					run: mockRun
+				})
+			}),
+			delete: vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({ run: mockRun }),
+				run: mockRun
+			}),
+			_mockAll: mockAll
+		}
+	};
 });
-
-vi.mock('$lib/server/db/client', () => ({
-	db: {
-		select: vi.fn().mockReturnValue({ from: mockFrom }),
-		insert: vi.fn().mockReturnValue({ values: mockValues }),
-		delete: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ run: mockRun }) })
-	}
-}));
 
 vi.mock('$lib/server/db/schema', () => ({
 	users: { id: 'id', username: 'username', passwordHash: 'passwordHash' },
@@ -22,7 +33,7 @@ vi.mock('$lib/server/db/schema', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
-	eq: vi.fn((col, val) => ({ col, val }))
+	eq: vi.fn((col: string, val: string) => ({ col, val }))
 }));
 
 vi.mock('$lib/server/services/settings', () => ({
@@ -39,6 +50,7 @@ import {
 	isSetupComplete,
 	_resetSessionsForTest
 } from './auth';
+import { db } from '$lib/server/db/client';
 
 describe('auth service', () => {
 	beforeEach(() => {
@@ -51,7 +63,6 @@ describe('auth service', () => {
 			const hash = hashPassword('test123');
 			expect(hash).not.toBe('test123');
 			expect(hash).toContain(':');
-			// Format: salt:hash in hex
 			const parts = hash.split(':');
 			expect(parts).toHaveLength(2);
 			expect(parts[0]).toMatch(/^[0-9a-f]+$/);
@@ -110,11 +121,12 @@ describe('auth service', () => {
 
 	describe('isSetupComplete', () => {
 		it('returns false when no user exists in DB', () => {
-			mockAll.mockReturnValueOnce([]);
+			// Default mockAll returns []
 			expect(isSetupComplete()).toBe(false);
 		});
 
 		it('returns true when a user exists in DB', () => {
+			const mockAll = (db as any)._mockAll;
 			mockAll.mockReturnValueOnce([{ id: 1, username: 'admin', passwordHash: 'hash' }]);
 			expect(isSetupComplete()).toBe(true);
 		});
