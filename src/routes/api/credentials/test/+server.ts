@@ -72,6 +72,25 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 	}
 
+	// Live test failed — fallback: return best matching credential by type without testing
+	// This handles lockout situations where the camera blocks auth attempts
+	if (cameraType) {
+		const bestMatch = rows.find(r => typeMatchScore(r.name, cameraType) > 0);
+		if (bestMatch) {
+			try {
+				const password = decrypt(bestMatch.password);
+				return json({
+					success: true,
+					credentialId: bestMatch.id,
+					name: bestMatch.name,
+					username: bestMatch.username,
+					password,
+					untested: true
+				});
+			} catch { /* decryption failed */ }
+		}
+	}
+
 	return json({ success: false, message: 'Kein gespeichertes Login hat funktioniert' });
 };
 

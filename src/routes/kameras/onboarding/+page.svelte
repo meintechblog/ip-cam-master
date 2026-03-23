@@ -37,12 +37,12 @@
 	async function selectCamera(ip: string, name?: string | null, type?: string) {
 		prefillName = name || '';
 		selectedCameraType = type || 'mobotix';
-		// Try saved credentials first
+		// Try saved credentials first (pass cameraType to prioritize matching credentials)
 		try {
 			const res = await fetch('/api/credentials/test', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip })
+				body: JSON.stringify({ ip, cameraType: selectedCameraType })
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -67,12 +67,12 @@
 		registerUser = '';
 		registerPass = '';
 		registerError = null;
-		// Try saved credentials
+		// Try saved credentials (native ONVIF = mobotix-onvif)
 		try {
 			const res = await fetch('/api/credentials/test', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip })
+				body: JSON.stringify({ ip, cameraType: 'mobotix-onvif' })
 			});
 			if (res.ok) {
 				const data = await res.json();
