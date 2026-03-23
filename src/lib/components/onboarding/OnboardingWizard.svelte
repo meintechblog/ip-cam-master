@@ -546,8 +546,15 @@
 						</div>
 					{/if}
 				</div>
-				{#if name}
-					<p class="text-sm text-text-primary font-medium mt-2">{name}</p>
+				{#if name || ip}
+					<div class="flex items-center gap-1.5 mt-2">
+						<input
+							type="text"
+							bind:value={name}
+							class="text-sm font-medium text-text-primary bg-transparent border-b border-transparent hover:border-border focus:border-accent focus:outline-none w-full"
+							placeholder="Kameraname"
+						/>
+					</div>
 					<p class="text-xs text-text-secondary font-mono">{ip}</p>
 				{/if}
 			</div>
