@@ -6,7 +6,9 @@ import { listContainers } from '$lib/server/services/proxmox';
 import { getSettings } from '$lib/server/services/settings';
 import { checkStreamHealth } from '$lib/server/services/go2rtc';
 import { decrypt } from '$lib/server/services/crypto';
-import type { CameraCardData, ContainerStatus } from '$lib/types';
+import { getProtectStatus } from '$lib/server/services/protect';
+import { getFlappingCameras } from '$lib/server/services/events';
+import type { CameraCardData, ContainerStatus, ProtectCameraMatch } from '$lib/types';
 
 export const GET: RequestHandler = async () => {
 	try {
@@ -155,6 +157,27 @@ export const GET: RequestHandler = async () => {
 				} satisfies CameraCardData;
 			})
 		);
+
+		// Fetch Protect status (30s cache, cheap on 10s polling) and flapping cameras
+		let protectMatches = new Map<number, ProtectCameraMatch>();
+		let flappingIds: number[] = [];
+		try {
+			const protectStatus = await getProtectStatus();
+			protectMatches = protectStatus.cameras;
+		} catch {
+			// Protect unreachable — continue without
+		}
+		try {
+			flappingIds = getFlappingCameras();
+		} catch {
+			// Events DB issue — continue without
+		}
+
+		// Enrich results with Protect status and flapping
+		for (const result of results) {
+			(result as any).protectStatus = protectMatches.get(result.id) || null;
+			(result as any).flapping = flappingIds.includes(result.id);
+		}
 
 		results.sort((a, b) => a.name.localeCompare(b.name));
 		return json(results);
