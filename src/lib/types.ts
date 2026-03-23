@@ -116,4 +116,59 @@ export interface CameraCardData {
 	lxcCpu: number | null;
 	lxcMemory: { used: number; total: number } | null;
 	lxcMac: string | null;
+	protectStatus?: ProtectCameraMatch | null;
+	flapping?: boolean;
+}
+
+export interface ProtectCamera {
+	id: string;
+	name: string;
+	type: string;
+	modelKey: string;
+	host: string;
+	mac: string;
+	state: string;
+	isAdopted: boolean;
+	isAdopting: boolean;
+	isThirdPartyCamera: boolean;
+	connectedSince: number;
+	lastSeen: number;
+	thirdPartyCameraInfo?: {
+		port: number;
+		rtspUrl: string;
+		rtspUrlLQ: string;
+		snapshotUrl: string;
+	};
+}
+
+export interface ProtectCameraMatch {
+	protectId: string;
+	protectName: string;
+	state: string;
+	isAdopted: boolean;
+	connectedSince: number | null;
+	isThirdPartyCamera: boolean;
+}
+
+export type EventType = 'camera_disconnect' | 'camera_reconnect' | 'stream_failed' | 'adoption_changed' | 'aiport_error';
+export type EventSeverity = 'info' | 'warning' | 'error';
+export type EventSource = 'protect_api' | 'ssh_logs' | 'app';
+
+export interface CameraEvent {
+	id: number;
+	cameraId: number | null;
+	cameraName: string | null;
+	eventType: EventType;
+	severity: EventSeverity;
+	message: string;
+	source: EventSource;
+	timestamp: string;
+}
+
+export interface ProtectStatus {
+	connected: boolean;
+	adoptedCount: number;
+	connectedCount: number;
+	totalProtectCameras: number;
+	cameras: Map<number, ProtectCameraMatch>;
 }
