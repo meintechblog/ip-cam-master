@@ -96,8 +96,14 @@ None yet.
 - Research flag: Loxone Intercom auth-proxy documentation is sparse -- needs real hardware testing in Phase 3
 - Research flag: UniFi Protect adoption has no stable public API -- validate in Phase 4
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260323-krt | Phase 4 QA sweep — fix Protect status UI and logic | 2026-03-23 | fe32585 | [260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a](./quick/260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a/) |
+
 ## Session Continuity
 
-Last session: 2026-03-23T12:23:58.223Z
-Stopped at: Completed 04-02-PLAN.md
+Last activity: 2026-03-23 - Completed quick task 260323-krt: Phase 4 QA sweep
+Stopped at: Quick task complete
 Resume file: None
