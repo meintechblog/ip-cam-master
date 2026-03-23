@@ -28,13 +28,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.authenticated = false;
 	event.locals.username = null;
 
-	// YOLO mode: skip all auth checks
+	// YOLO mode: skip all auth checks, but allow /setup for adding credentials later
 	if (yolo) {
 		event.locals.authenticated = true;
-		// If user navigates to setup but YOLO is on, redirect to home
-		if (pathname === '/setup') {
-			throw redirect(303, '/');
-		}
 		return resolve(event);
 	}
 
@@ -52,8 +48,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.authenticated = true;
 		event.locals.username = getSessionUsername(sessionToken);
 
-		// Authenticated user trying to access setup/login, redirect to home
-		if (pathname === '/setup' || pathname === '/login') {
+		// Authenticated user trying to access login, redirect to home (already logged in)
+		if (pathname === '/login') {
 			throw redirect(303, '/');
 		}
 		return resolve(event);
