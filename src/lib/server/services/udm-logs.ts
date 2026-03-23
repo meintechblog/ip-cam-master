@@ -4,27 +4,41 @@ import type { EventType, EventSeverity, EventSource } from '$lib/types';
 
 let lastScanTimestamp: string | null = null;
 
+// Matches real UDM Protect log format:
+// "2026-03-23T10:43:09.576Z - error: ... Third party camera Hochbeet [BC24118C53BB @ 192.168.3.222] stream failed"
+// "2026-03-23T11:37:16.519Z - info: Adopting camera at 192.168.3.206:8899"
 const LOG_PATTERNS: Record<
 	string,
 	{ regex: RegExp; eventType: EventType; severity: EventSeverity }
 > = {
 	disconnect: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*\[([^\]]+)\s*@\s*([\d.]+)\].*disconnect/i,
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*disconnect/i,
 		eventType: 'camera_disconnect',
 		severity: 'warning'
 	},
 	reconnect: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*\[([^\]]+)\s*@\s*([\d.]+)\].*reconnect/i,
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*reconnect/i,
 		eventType: 'camera_reconnect',
 		severity: 'info'
 	},
 	streamFailed: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*stream.*(?:failed|error|timeout)/i,
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*stream\s+failed/i,
 		eventType: 'stream_failed',
 		severity: 'error'
 	},
+	healthCheckFailed: {
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*health\s+check\s+failed/i,
+		eventType: 'stream_failed',
+		severity: 'warning'
+	},
+	adopting: {
+		// "Adopting camera at 192.168.3.206:8899" — no [Name @ IP] format
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*[Aa]dopting\s+camera\s+at\s+([\d.]+)/i,
+		eventType: 'adoption_changed',
+		severity: 'info'
+	},
 	adopted: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:adopted|adoption)/i,
+		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*adopted/i,
 		eventType: 'adoption_changed',
 		severity: 'info'
 	},
@@ -37,9 +51,10 @@ const LOG_PATTERNS: Record<
 
 const NOISE_PATTERNS = [
 	/ONVIF discovery/i,
-	/health check/i,
 	/go2rtc.*started/i,
-	/periodic/i
+	/periodic/i,
+	/Updating ONVIF camera info/i,
+	/has at least one in-stream channel/i
 ];
 
 interface ParsedEvent {
@@ -62,7 +77,7 @@ export function parseLogLines(stdout: string, since: Date): ParsedEvent[] {
 			continue;
 		}
 
-		for (const [, pattern] of Object.entries(LOG_PATTERNS)) {
+		for (const [key, pattern] of Object.entries(LOG_PATTERNS)) {
 			const match = pattern.regex.exec(line);
 			if (match) {
 				const timestamp = match[1];
@@ -71,8 +86,15 @@ export function parseLogLines(stdout: string, since: Date): ParsedEvent[] {
 				// Filter lines older than since
 				if (lineDate <= since) continue;
 
-				const cameraName = match[2]?.trim() || null;
-				const cameraIp = match[3] || null;
+				// "adopting" pattern has only 2 groups: timestamp + IP (no camera name)
+				let cameraName: string | null = null;
+				let cameraIp: string | null = null;
+				if (key === 'adopting') {
+					cameraIp = match[2] || null;
+				} else {
+					cameraName = match[2]?.trim() || null;
+					cameraIp = match[3] || null;
+				}
 
 				parsed.push({
 					eventType: pattern.eventType,
