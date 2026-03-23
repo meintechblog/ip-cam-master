@@ -115,17 +115,29 @@
 	// Load snapshot from camera
 	async function loadSnapshot() {
 		if (!ip || !username || !password) return;
-		try {
-			const res = await fetch('/api/onboarding/snapshot', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip, username, password })
-			});
-			if (res.ok) {
-				const blob = await res.blob();
-				snapshotUrl = URL.createObjectURL(blob);
-			}
-		} catch { /* optional */ }
+		// For Loxone: use the camera ID snapshot endpoint (handles ffmpeg grab)
+		// For Mobotix: use the onboarding snapshot endpoint
+		if (cameraType === 'loxone' && cameraId) {
+			try {
+				const res = await fetch(`/api/cameras/${cameraId}/snapshot`);
+				if (res.ok) {
+					const blob = await res.blob();
+					if (blob.size > 500) snapshotUrl = URL.createObjectURL(blob);
+				}
+			} catch { /* optional */ }
+		} else {
+			try {
+				const res = await fetch('/api/onboarding/snapshot', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ip, username, password })
+				});
+				if (res.ok) {
+					const blob = await res.blob();
+					snapshotUrl = URL.createObjectURL(blob);
+				}
+			} catch { /* optional */ }
+		}
 	}
 
 	// Step 0: Save camera

@@ -18,6 +18,40 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	try {
 		const password = decrypt(camera.password);
+
+		if (camera.cameraType === 'loxone') {
+			// Loxone Intercom: grab single frame from MJPEG stream via ffmpeg
+			// Use containerIp nginx proxy if available, otherwise direct with auth
+			let source: string;
+			if (camera.containerIp) {
+				source = `http://${camera.containerIp}:8081/mjpg/video.mjpg`;
+			} else {
+				const auth = Buffer.from(`${camera.username}:${password}`).toString('base64');
+				source = `http://${camera.ip}/mjpg/video.mjpg`;
+			}
+
+			let stdout: Buffer;
+			try {
+				const result = await execAsync(
+					`ffmpeg -y -v quiet -headers "Authorization: Basic ${Buffer.from(`${camera.username}:${password}`).toString('base64')}\\r\\n" -i "http://${camera.ip}/mjpg/video.mjpg" -frames:v 1 -f image2 -q:v 2 pipe:1`,
+					{ timeout: 8000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
+				);
+				stdout = result.stdout;
+			} catch (e: any) {
+				// ffmpeg exits non-zero but might still have output
+				stdout = e?.stdout || Buffer.alloc(0);
+			}
+
+			if (stdout.length < 500) {
+				return new Response('Snapshot unavailable', { status: 502 });
+			}
+
+			return new Response(stdout, {
+				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
+			});
+		}
+
+		// Mobotix: direct snapshot from /record/current.jpg
 		const { stdout } = await execAsync(
 			`curl -s --basic -u "${camera.username}:${password}" "http://${camera.ip}/record/current.jpg" --max-time 3`,
 			{ timeout: 4000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
@@ -28,10 +62,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 
 		return new Response(stdout, {
-			headers: {
-				'Content-Type': 'image/jpeg',
-				'Cache-Control': 'no-cache, no-store'
-			}
+			headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
 		});
 	} catch {
 		return new Response('Snapshot timeout', { status: 504 });
