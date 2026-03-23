@@ -40,6 +40,9 @@
 	let fps = $state(20);
 	let bitrate = $state(5000);
 
+	// Name editing
+	let editingName = $state(false);
+
 	// Results
 	let snapshotUrl = $state<string | null>(null);
 	let connectionInfo = $state<string | null>(null);
@@ -548,13 +551,21 @@
 				</div>
 				{#if name || ip}
 					<div class="mt-2 flex items-center gap-1.5">
-						<input
-							type="text"
-							bind:value={name}
-							class="text-sm font-medium text-text-primary bg-bg-input border border-border rounded px-2 py-1 focus:border-accent focus:outline-none flex-1"
-							placeholder="Kameraname"
-						/>
-						<Pencil class="w-3.5 h-3.5 text-text-secondary shrink-0" />
+						{#if editingName}
+							<input
+								type="text"
+								bind:value={name}
+								class="text-sm font-medium text-text-primary bg-bg-input border border-border rounded px-2 py-1 focus:border-accent focus:outline-none flex-1"
+								placeholder="Kameraname"
+								onkeydown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') editingName = false; }}
+								onblur={() => editingName = false}
+							/>
+						{:else}
+							<span class="text-sm font-medium text-text-primary">{name}</span>
+							<button onclick={() => editingName = true} class="text-text-secondary hover:text-text-primary cursor-pointer">
+								<Pencil class="w-3.5 h-3.5" />
+							</button>
+						{/if}
 					</div>
 					<p class="text-xs text-text-secondary font-mono mt-1">{ip}</p>
 				{/if}
