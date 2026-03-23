@@ -424,7 +424,7 @@
 					{#if camera.streamInfo?.unifiConnected}
 						<div class="flex justify-between"><span>Streams</span><span class="text-text-primary">{camera.streamInfo.unifiStreams}</span></div>
 					{/if}
-					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{camera.streamInfo?.codec || 'H.264'}</span></div>
+					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{(camera.streamInfo?.codec || 'H.264').replace('H264', 'H.264')}</span></div>
 				</div>
 			</div>
 		</div>
