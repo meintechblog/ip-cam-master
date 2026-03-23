@@ -99,7 +99,7 @@ Plans:
 
 Plans:
 - [ ] 05-01-PLAN.md -- Auth system: users table, auth service, hooks middleware, setup/login pages, settings integration
-- [ ] 05-02-PLAN.md -- Proxmox host installer: VM creation, app provisioning, API token management, update/remove flows
+- [x] 05-02-PLAN.md -- Proxmox host installer: VM creation, app provisioning, API token management, update/remove flows
 
 ## Progress
 

@@ -3,12 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-23T13:14:13.859Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-23T21:36:11.017Z"
+last_activity: 2026-03-23
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 10
+  completed_phases: 3
+  total_plans: 11
   completed_plans: 10
 ---
 
@@ -19,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 04 — dashboard-and-unifi-protect
+**Current focus:** Phase 05 — installer-and-distribution
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
+Phase: 05 (installer-and-distribution) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -55,6 +56,7 @@ Plan: Not started
 | Phase 04 P01 | 3min | 3 tasks | 5 files |
 | Phase 04 P03 | 3min | 2 tasks | 5 files |
 | Phase 04 P02 | 4min | 2 tasks | 9 files |
+| Phase 05 P02 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -85,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Protect API polling piggybacks on 10s frontend poll with 30s cache — no separate scheduler
 - [Phase 04]: SSH log scan runs as background scheduler (60s) started from hooks.server.ts
 - [Phase 04]: Map serialized to array for JSON transport in protect/cameras endpoint
+- [Phase 05]: SSH-based provisioning over cloud-init cicustom (simpler, debuggable)
+- [Phase 05]: Settings injected via PUT /api/settings for proper AES-256-GCM encryption
 
 ### Pending Todos
 
@@ -104,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-23 - Completed quick task 260323-krt: Phase 4 QA sweep
-Stopped at: Quick task complete
+Last activity: 2026-03-23
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
