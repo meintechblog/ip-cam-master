@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Mobotix Camera Pipeline** - End-to-end Mobotix onboarding: go2rtc config generation, container provisioning, MJPEG-to-H.264 transcoding, stream verification
 - [x] **Phase 3: Loxone Pipeline and Network Discovery** - Loxone Intercom pipeline with nginx auth-proxy, plus network camera discovery
 - [ ] **Phase 4: Dashboard and UniFi Protect** - Camera status dashboard with live preview and UniFi Protect adoption workflow
-- [x] **Phase 5: Installer and Distribution** - One-line install script, systemd service, update mechanism (completed 2026-03-23)
+- [ ] **Phase 5: Installer and Distribution** - Proxmox host installer (VM creation), systemd service, auth system (re-planned 2026-03-23)
 
 ## Phase Details
 
@@ -87,17 +87,19 @@ Plans:
 - [x] 04-03-PLAN.md -- Logs page activation + guided adoption flow component
 
 ### Phase 5: Installer and Distribution
-**Goal**: Anyone can install and update IP-Cam-Master with a single command on a fresh Proxmox VM, with basic access control (Zugangsschutz)
+**Goal**: Anyone can install and update IP-Cam-Master with a single command on a Proxmox host, with basic access control (Zugangsschutz)
 **Depends on**: Phase 4
 **Requirements**: INST-01, INST-02, INST-03, INST-04, INST-05
 **Success Criteria** (what must be TRUE):
-  1. Running `curl | bash` on a fresh Debian/Ubuntu Proxmox VM installs the app with all dependencies and starts it as a systemd service
-  2. Running the same command on an existing install updates to the latest version and restarts the service
+  1. Running `curl | bash` on a Proxmox host creates a VM with the app installed and running as a systemd service
+  2. Running the same command on an existing install offers update or removal
   3. App automatically restarts on failure via systemd
-**Plans:** 1/1 plans complete
+  4. App has basic access control (setup, login, YOLO mode)
+**Plans:** 2 plans
 
 Plans:
-- [x] 05-01-PLAN.md -- Install script, systemd service, and authentication system (Zugangsschutz)
+- [ ] 05-01-PLAN.md -- Auth system: users table, auth service, hooks middleware, setup/login pages, settings integration
+- [ ] 05-02-PLAN.md -- Proxmox host installer: VM creation, app provisioning, API token management, update/remove flows
 
 ## Progress
 
@@ -109,5 +111,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation and Proxmox Integration | 3/3 | Complete | - |
 | 2. Mobotix Camera Pipeline | 3/3 | Complete | 2026-03-22 |
 | 3. Loxone Pipeline and Network Discovery | 3/3 | Complete | 2026-03-23 |
-| 4. Dashboard and UniFi Protect | 0/3 | Not started | - |
-| 5. Installer and Distribution | 1/1 | Complete   | 2026-03-23 |
+| 4. Dashboard and UniFi Protect | 3/3 | Complete | 2026-03-23 |
+| 5. Installer and Distribution | 0/2 | Not started | - |
