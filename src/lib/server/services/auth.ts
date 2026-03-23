@@ -86,6 +86,8 @@ export function deleteUser(): void {
 }
 
 export async function isYoloMode(): Promise<boolean> {
+	// If a user exists, YOLO is always false (user takes precedence)
+	if (isSetupComplete()) return false;
 	const val = await getSetting('auth_yolo');
 	return val === 'true';
 }
