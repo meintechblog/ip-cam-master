@@ -9,6 +9,15 @@ set -euo pipefail
 # Debian 12 VM with the app fully provisioned inside it.
 # ──────────────────────────────────────────────────────
 
+# ── Parse flags ───────────────────────────────────────
+
+AUTO_YES=false
+for arg in "$@"; do
+  case "$arg" in
+    --yes|-y) AUTO_YES=true ;;
+  esac
+done
+
 # ── Constants ─────────────────────────────────────────
 
 VM_NAME="ip-cam-master"
@@ -44,8 +53,16 @@ error_exit() {
 }
 
 confirm() {
+  if [ "$AUTO_YES" = true ]; then
+    echo "$1 y (--yes)"
+    return 0
+  fi
   # read from /dev/tty so it works with curl|bash (stdin is the script)
-  read -rp "$1 " REPLY < /dev/tty
+  if [ -e /dev/tty ]; then
+    read -rp "$1 " REPLY < /dev/tty
+  else
+    read -rp "$1 " REPLY
+  fi
   case "${REPLY,,}" in
     y|yes) return 0 ;;
     *) echo "Abgebrochen."; exit 0 ;;
@@ -448,7 +465,14 @@ if [ -n "$EXISTING_VMID" ]; then
   echo "  [R] Remove — VM und Konfiguration entfernen"
   echo "  [C] Cancel — Abbrechen"
   echo ""
-  read -rp "Auswahl [U/R/C]: " CHOICE < /dev/tty
+  if [ "$AUTO_YES" = true ]; then
+    CHOICE="u"
+    echo "Auswahl [U/R/C]: u (--yes)"
+  elif [ -e /dev/tty ]; then
+    read -rp "Auswahl [U/R/C]: " CHOICE < /dev/tty
+  else
+    read -rp "Auswahl [U/R/C]: " CHOICE
+  fi
   case "${CHOICE,,}" in
     u) MODE="update" ;;
     r) MODE="remove" ;;
