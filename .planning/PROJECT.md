@@ -112,5 +112,13 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+## Current State
+
+**v1.0 shipped** (2026-03-23) — All 5 phases complete, 11 plans executed, 27k+ lines of code.
+
+The app is fully functional: camera discovery, Mobotix/Loxone onboarding, LXC provisioning, dashboard with UniFi Protect integration, event logging, and one-line installer for Proxmox hosts.
+
+Running in production on 192.168.3.233 with 6+ cameras managed.
+
 ---
-*Last updated: 2026-03-23 after Phase 04 (Dashboard & UniFi Protect) completion*
+*Last updated: 2026-03-23 after v1.0 milestone completion*
