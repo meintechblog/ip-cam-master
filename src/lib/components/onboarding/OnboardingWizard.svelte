@@ -28,6 +28,13 @@
 	let cameraId = $state<number | null>(null);
 	let credentialsMatched = $derived(!!(prefillUsername && prefillPassword));
 
+	// Auto-start if credentials are pre-filled (matched from presets)
+	$effect(() => {
+		if (credentialsMatched && prefillIp && currentStep === 0 && !loading && !cameraId) {
+			handleCredentialsSubmit();
+		}
+	});
+
 	// Form data
 	let ip = $state(prefillIp);
 	let username = $state(prefillUsername);
