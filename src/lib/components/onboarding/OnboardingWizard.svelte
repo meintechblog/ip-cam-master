@@ -423,7 +423,11 @@
 			addSubLog(`  Audio: RTSP passthrough (G.711 mulaw copy)`);
 		}
 		addSubLog(`  Transcode: MJPEG → H.264, ${width}x${height}@${fps}fps, ${bitrate}k`);
-		addSubLog(`  Audio: pcm_mulaw passthrough (kein Transcoding)`);
+		if (cameraType !== 'loxone') {
+			addSubLog(`  Audio: pcm_mulaw passthrough (kein Transcoding)`);
+		} else {
+			addSubLog(`  Audio: nicht verfuegbar (Intercom hat keinen Audio-Stream)`);
+		}
 		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
 		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);
 		addSubLog(`systemd Unit: /etc/systemd/system/go2rtc.service`);
@@ -461,11 +465,15 @@
 		addSubLog(`  Manufacturer: 'Onvif' → '${safeName}'`);
 		addSubLog(`  Model: 'Cardinal' → 'Mobotix'`);
 		addSubLog(`  ONVIF-Name: 'Cardinal' → 'MOBOTIXS15'`);
-		addSubLog(`Audio-Profil patchen (G.711 mulaw fuer UniFi Protect)`);
+		if (cameraType !== 'loxone') {
+			addSubLog(`Audio-Profil patchen (G.711 mulaw fuer UniFi Protect)`);
+		}
 		addSubLog(`config.yaml generieren:`);
 		addSubLog(`  Stream: /${streamName} → localhost:8554`);
 		addSubLog(`  Snapshot: /api/frame.jpeg?src=${streamName} → localhost:1984`);
-		addSubLog(`  Audio: G.711 mulaw, 8kHz, mono`);
+		if (cameraType !== 'loxone') {
+			addSubLog(`  Audio: G.711 mulaw, 8kHz, mono`);
+		}
 		addSubLog(`  ONVIF Port: 8899`);
 		addSubLog(`systemd Unit: /etc/systemd/system/onvif-server.service`);
 		addSubLog(`systemctl daemon-reload && enable && restart onvif-server`);
@@ -508,10 +516,17 @@
 
 			addSubLog(`Stream aktiv: ${data.streamInfo?.producers || 1} Producer`);
 			addSubLog(`Video: H.264 (VAAPI)`);
-			addSubLog(`Audio: G.711 mulaw (passthrough)`);
-			addSubLog(`RTSP-Output: ${rtspUrl}`);
-			addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar (mit Audio)`);
-			addLog(5, 'Stream verifizieren', `H.264 + Audio — ${rtspUrl}`, 'done');
+			if (cameraType !== 'loxone') {
+				addSubLog(`Audio: G.711 mulaw (passthrough)`);
+				addSubLog(`RTSP-Output: ${rtspUrl}`);
+				addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar (mit Audio)`);
+				addLog(5, 'Stream verifizieren', `H.264 + Audio — ${rtspUrl}`, 'done');
+			} else {
+				addSubLog(`Audio: nicht verfuegbar`);
+				addSubLog(`RTSP-Output: ${rtspUrl}`);
+				addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar`);
+				addLog(5, 'Stream verifizieren', `H.264 (Video only) — ${rtspUrl}`, 'done');
+			}
 			loading = false;
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
