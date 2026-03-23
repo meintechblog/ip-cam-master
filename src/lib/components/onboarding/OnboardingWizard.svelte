@@ -206,7 +206,7 @@
 				body: JSON.stringify({ ip, username, password, cameraType })
 			});
 			const data = await res.json();
-			if (!data.success && !data.resolution) throw new Error(data.error || 'Verbindungstest fehlgeschlagen');
+			if (!data.success) throw new Error(data.error || 'Verbindungstest fehlgeschlagen');
 
 			if (data.resolution) {
 				const parts = data.resolution.split('x');
