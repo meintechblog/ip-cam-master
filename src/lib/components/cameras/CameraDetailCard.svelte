@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
 	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power } from 'lucide-svelte';
+	import AdoptionGuide from './AdoptionGuide.svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
@@ -129,6 +130,8 @@
 		showDeleteConfirm = false;
 		window.location.reload();
 	}
+
+	let showAdoptionGuide = $state(false);
 
 	let isNativeOnvif = $derived(camera.status === 'native-onvif' || camera.cameraType === 'mobotix-onvif');
 	let isRunning = $derived(isNativeOnvif || camera.containerStatus === 'running');
@@ -342,8 +345,17 @@
 					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
 				{/if}
 			</div>
-			<!-- Delete button for native ONVIF -->
+			<!-- Protect status check for native ONVIF -->
 			<div class="mt-3 pt-3 border-t border-border">
+				<button
+					onclick={() => showAdoptionGuide = true}
+					class="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full mb-2"
+				>
+					Protect-Status pruefen
+				</button>
+			</div>
+			<!-- Delete button for native ONVIF -->
+			<div class="pt-2">
 				{#if !showDeleteConfirm}
 					<button onclick={() => showDeleteConfirm = true}
 						class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer">
@@ -470,6 +482,14 @@
 					{/if}
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{(camera.streamInfo?.codec || 'H.264').replace('H264', 'H.264')}</span></div>
 				</div>
+				{#if !camera.protectStatus?.isAdopted}
+					<button
+						onclick={() => showAdoptionGuide = true}
+						class="mt-2 text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full"
+					>
+						In Protect aufnehmen
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -490,6 +510,16 @@
 	</div>
 	{/if}
 </div>
+
+<!-- Adoption Guide Modal -->
+{#if showAdoptionGuide}
+	<AdoptionGuide
+		cameraId={camera.id}
+		cameraName={camera.name}
+		containerIp={camera.containerIp}
+		onClose={() => showAdoptionGuide = false}
+	/>
+{/if}
 
 <!-- Credentials Modal -->
 {#if showCredentials}
