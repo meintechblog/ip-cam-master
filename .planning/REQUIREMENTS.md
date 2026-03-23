@@ -47,10 +47,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **DASH-01**: Dashboard shows all managed cameras in a grid/list view
 - [ ] **DASH-02**: Each camera card shows: name, IP, type (Mobotix/Loxone/ONVIF), container status, stream status
-- [ ] **DASH-03**: Camera status updates automatically (polling go2rtc API + Proxmox API)
+- [x] **DASH-03**: Camera status updates automatically (polling go2rtc API + Proxmox API)
 - [ ] **DASH-04**: User can view live stream preview (via go2rtc WebRTC/MSE player) for any managed camera
 - [ ] **DASH-05**: ONVIF-capable cameras are displayed as "nativ nutzbar" without workflow actions
-- [ ] **DASH-06**: Dashboard shows UniFi Protect adoption status per camera
+- [x] **DASH-06**: Dashboard shows UniFi Protect adoption status per camera
 
 ### Camera Onboarding Pipeline
 
@@ -58,7 +58,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **ONBD-02**: Onboarding flow: select camera -> enter/confirm credentials -> test connection -> create container -> deploy config -> verify stream
 - [x] **ONBD-03**: Each onboarding step shows clear success/error with retry option
 - [x] **ONBD-04**: After successful stream verification, app provides RTSP URL for UniFi Protect adoption
-- [ ] **ONBD-05**: App triggers or guides UniFi Protect adoption (semi-automatic with clear instructions)
+- [x] **ONBD-05**: App triggers or guides UniFi Protect adoption (semi-automatic with clear instructions)
 - [x] **ONBD-06**: Mobotix-specific pipeline works end-to-end (MJPEG source -> H.264 RTSP output)
 - [ ] **ONBD-07**: Loxone Intercom-specific pipeline works end-to-end (HTTP+auth -> nginx -> go2rtc -> RTSP)
 
@@ -134,15 +134,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | G2R-06 | Phase 2 | Complete |
 | DASH-01 | Phase 4 | Pending |
 | DASH-02 | Phase 4 | Pending |
-| DASH-03 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Complete |
 | DASH-04 | Phase 4 | Pending |
 | DASH-05 | Phase 4 | Pending |
-| DASH-06 | Phase 4 | Pending |
+| DASH-06 | Phase 4 | Complete |
 | ONBD-01 | Phase 2 | Complete |
 | ONBD-02 | Phase 2 | Complete |
 | ONBD-03 | Phase 2 | Complete |
 | ONBD-04 | Phase 2 | Complete |
-| ONBD-05 | Phase 4 | Pending |
+| ONBD-05 | Phase 4 | Complete |
 | ONBD-06 | Phase 2 | Complete |
 | ONBD-07 | Phase 3 | Pending |
 | INST-01 | Phase 5 | Complete |

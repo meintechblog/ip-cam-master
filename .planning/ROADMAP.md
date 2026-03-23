@@ -82,7 +82,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Backend services: Protect API client, events storage, UDM SSH log parser, DB schema + types
+- [x] 04-01-PLAN.md -- Backend services: Protect API client, events storage, UDM SSH log parser, DB schema + types
 - [ ] 04-02-PLAN.md -- API routes + dashboard enhancement: real Protect data, events section, flapping badges
 - [ ] 04-03-PLAN.md -- Logs page activation + guided adoption flow component
 

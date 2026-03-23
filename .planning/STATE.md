@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-23T01:38:04.087Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-23T12:17:30.385Z"
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 9
+  total_plans: 10
   completed_plans: 8
 ---
 
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 04 — Dashboard and UniFi Protect
+**Current focus:** Phase 04 — dashboard-and-unifi-protect
 
 ## Current Position
 
-Phase: 04
-Plan: Not started
+Phase: 04 (dashboard-and-unifi-protect) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Plan: Not started
 | Phase 02 P01 | 5min | 2 tasks | 13 files |
 | Phase 02 P02 | 3min | 1 tasks | 11 files |
 | Phase 05 P01 | 5min | 2 tasks | 15 files |
+| Phase 04 P01 | 3min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 05]: In-memory session Map (sessions lost on restart, acceptable for homelab)
 - [Phase 05]: YOLO mode via auth_yolo setting in DB (skip all auth when user opts out)
 - [Phase 05]: Single users table with upsert (D-27: only one user ever)
+- [Phase 04]: Direct fetch() to Protect REST API instead of unifi-protect npm package
+- [Phase 04]: 30s cache TTL for Protect status (frontend polls at 10s)
+- [Phase 04]: SQLite datetime() for flapping/cleanup queries instead of JS date math
 
 ### Pending Todos
 
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23
-Stopped at: Verified Phase 2 & 3 complete, advancing to Phase 4
+Last session: 2026-03-23T12:17:30.382Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
