@@ -97,6 +97,7 @@
 			const data = await res.json();
 			if (data.success) {
 				rebooting = true;
+				snapshotSrc = '';
 				// Mobotix reboot takes ~60-90s, clear state after 90s
 				setTimeout(() => { rebooting = false; }, 90000);
 			}
@@ -134,12 +135,14 @@
 	let snapshotSrc = $state('');
 
 	function refreshSnapshot() {
-		if (!isRunning) return;
-		// Native ONVIF: snapshot directly from camera via proxy
-		// Pipeline cameras: also via proxy
+		if (!isRunning || rebooting) return;
 		if (!camera.snapshotUrl && !isNativeOnvif) return;
 		const img = new Image();
-		img.onload = () => { snapshotSrc = img.src; };
+		img.onload = () => { if (!rebooting) snapshotSrc = img.src; };
+		img.onerror = () => {
+			// Snapshot failed — camera might be rebooting or offline
+			if (rebooting) snapshotSrc = '';
+		};
 		img.src = `${camera.snapshotUrl}?t=${Date.now()}`;
 	}
 
