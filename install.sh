@@ -2,13 +2,26 @@
 set -euo pipefail
 
 # ──────────────────────────────────────────────────────
-# IP-Cam-Master Installer / Updater
+# IP-Cam-Master Installer (Proxmox Host)
 # Usage: curl -fsSL https://raw.githubusercontent.com/meintechblog/ip-cam-master/main/install.sh | bash
+#
+# This script runs on the Proxmox host and creates a
+# Debian 12 VM with the app fully provisioned inside it.
 # ──────────────────────────────────────────────────────
 
-APP_DIR="/opt/ip-cam-master"
-SERVICE_NAME="ip-cam-master"
+# ── Constants ─────────────────────────────────────────
+
+VM_NAME="ip-cam-master"
+VM_TAG="ip-cam-master"
 REPO_URL="https://github.com/meintechblog/ip-cam-master.git"
+APP_DIR="/opt/ip-cam-master"
+PVE_USER="ipcm@pve"
+PVE_TOKEN_NAME="ipcm"
+PVE_ROLE="IPCamMaster"
+IMG_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+IMG_CACHE="/var/lib/vz/template/iso/debian-12-genericcloud-amd64.qcow2"
+INSTALLER_KEY="/root/.ssh/ipcm_installer"
+SERVICE_NAME="ip-cam-master"
 
 # ── Helpers ───────────────────────────────────────────
 
@@ -30,160 +43,424 @@ error_exit() {
   exit 1
 }
 
-trap 'error_exit "Installation abgebrochen. Pruefe die Ausgabe oben."' ERR
+confirm() {
+  read -rp "$1 " REPLY
+  case "${REPLY,,}" in
+    y|yes) return 0 ;;
+    *) echo "Abgebrochen."; exit 0 ;;
+  esac
+}
+
+# ── VM Detection ──────────────────────────────────────
+
+detect_existing_vm() {
+  pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+    | jq -r '.[] | select(.type=="qemu" and .tags!=null and (.tags | contains("ip-cam-master"))) | .vmid' \
+    | head -1
+}
+
+get_vm_ip() {
+  local vmid="$1"
+  local max=30
+  local i=0
+
+  while [ $i -lt $max ]; do
+    local ip
+    ip=$(qm agent "$vmid" network-get-interfaces 2>/dev/null \
+      | jq -r '.[] | select(.name != "lo") | .["ip-addresses"][]? | select(.["ip-address-type"] == "ipv4") | .["ip-address"]' \
+      | head -1) || true
+
+    if [ -n "$ip" ] && [ "$ip" != "null" ]; then
+      echo "$ip"
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 5
+  done
+  error_exit "Konnte keine IP-Adresse fuer VM $vmid ermitteln (Timeout nach $((max * 5))s)."
+}
+
+wait_for_ssh() {
+  local ip="$1"
+  local max=30
+  local i=0
+
+  while [ $i -lt $max ]; do
+    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -o BatchMode=yes \
+         -i "$INSTALLER_KEY" root@"$ip" "echo ok" >/dev/null 2>&1; then
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 5
+  done
+  error_exit "SSH-Zugriff auf $ip nicht moeglich (Timeout nach $((max * 5))s)."
+}
+
+# ── Cleanup trap for fresh install ────────────────────
+
+CREATED_VMID=""
+cleanup_on_failure() {
+  if [ -n "$CREATED_VMID" ]; then
+    echo ""
+    echo ">> Raeume fehlgeschlagene Installation auf (VM $CREATED_VMID)..."
+    qm stop "$CREATED_VMID" 2>/dev/null || true
+    qm destroy "$CREATED_VMID" --purge 2>/dev/null || true
+  fi
+  error_exit "Installation abgebrochen. Pruefe die Ausgabe oben."
+}
+
+# ── Fresh Install ─────────────────────────────────────
+
+fresh_install() {
+  trap cleanup_on_failure ERR
+
+  # Security warning (D-07, D-09)
+  echo "WARNUNG: Dieses Skript wird:"
+  echo "  - Eine VM auf diesem Proxmox-Host erstellen"
+  echo "  - Einen API-Token fuer die VM erstellen"
+  echo "  - Der VM SSH-Zugriff auf diesen Host geben"
+  echo ""
+  confirm "Moechtest du fortfahren? (y/N)"
+
+  # Detect storage (Pitfall 1)
+  NODE=$(hostname)
+  STORAGE=$(pvesh get /nodes/"$NODE"/storage --output-format json \
+    | jq -r '[.[] | select(.content | contains("images"))] | .[0].storage')
+  if [ -z "$STORAGE" ] || [ "$STORAGE" = "null" ]; then
+    error_exit "Kein passender Storage gefunden."
+  fi
+  step "Verwende Storage: $STORAGE"
+
+  # Download Debian 12 cloud image (cached)
+  if [ ! -f "$IMG_CACHE" ]; then
+    step "Lade Debian 12 Cloud-Image herunter..."
+    wget -q --show-progress "$IMG_URL" -O "$IMG_CACHE"
+  else
+    step "Debian 12 Cloud-Image bereits vorhanden (Cache)."
+  fi
+
+  # Get next VMID
+  VMID=$(pvesh get /cluster/nextid)
+  CREATED_VMID="$VMID"
+
+  # Create VM (D-10, D-11)
+  step "Erstelle VM $VMID ($VM_NAME)..."
+  qm create "$VMID" \
+    --name "$VM_NAME" \
+    --tags "$VM_TAG" \
+    --memory 2048 --cores 2 \
+    --net0 virtio,bridge=vmbr0 \
+    --scsihw virtio-scsi-pci \
+    --ostype l26 \
+    --agent enabled=1
+
+  # Import disk + cloud-init
+  step "Importiere Disk und konfiguriere Cloud-Init..."
+  qm set "$VMID" --scsi0 "$STORAGE:0,import-from=$IMG_CACHE"
+  qm set "$VMID" --ide2 "$STORAGE:cloudinit"
+  qm set "$VMID" --boot order=scsi0
+  qm set "$VMID" --serial0 socket --vga serial0
+  qm disk resize "$VMID" scsi0 10G
+
+  # Generate installer SSH key if needed
+  if [ ! -f "$INSTALLER_KEY" ]; then
+    step "Generiere Installer-SSH-Key..."
+    mkdir -p /root/.ssh
+    ssh-keygen -t ed25519 -f "$INSTALLER_KEY" -N "" -q
+  fi
+
+  # Cloud-init config
+  qm set "$VMID" --ciuser root
+  qm set "$VMID" --sshkeys "${INSTALLER_KEY}.pub"
+  qm set "$VMID" --ipconfig0 ip=dhcp
+  NAMESERVER=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+  if [ -n "$NAMESERVER" ]; then
+    qm set "$VMID" --nameserver "$NAMESERVER"
+  fi
+
+  # Start VM + wait for IP + wait for SSH
+  step "Starte VM..."
+  qm start "$VMID"
+  step "Warte auf VM-Start..."
+  VM_IP=$(get_vm_ip "$VMID")
+  step "VM-IP: $VM_IP"
+  step "Warte auf SSH-Zugriff..."
+  wait_for_ssh "$VM_IP"
+
+  # Provision app inside VM via SSH (D-12, D-17, D-18, D-19, D-20, D-21)
+  step "Provisioniere App in der VM..."
+  VM_PUBKEY=$(ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "$INSTALLER_KEY" root@"$VM_IP" bash <<'PROVISION_SCRIPT'
+set -euo pipefail
+
+# Install system dependencies
+apt-get update -qq
+apt-get install -y -qq curl git ffmpeg qemu-guest-agent > /dev/null 2>&1
+
+# Enable and start guest agent
+systemctl enable qemu-guest-agent 2>/dev/null || true
+systemctl start qemu-guest-agent 2>/dev/null || true
+
+# Node.js 22 LTS via NodeSource
+if ! command -v node &>/dev/null || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 22 ]; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
+  apt-get install -y -qq nodejs > /dev/null
+fi
+
+# Clone repo
+git clone https://github.com/meintechblog/ip-cam-master.git /opt/ip-cam-master
+cd /opt/ip-cam-master
+
+# Full npm install (drizzle-kit and vite are devDependencies needed for build and DB push)
+npm install
+
+# Create data directory
+mkdir -p data
+
+# Generate .env with random DB_ENCRYPTION_KEY (D-19)
+DB_ENCRYPTION_KEY=$(openssl rand -hex 32)
+cat > .env <<EOF
+# Auto-generated by IP-Cam-Master installer
+DB_ENCRYPTION_KEY=$DB_ENCRYPTION_KEY
+EOF
+
+# Build
+npm run build
+
+# DB migration (D-21)
+npx drizzle-kit push
+
+# Prune devDependencies after build and DB push
+npm prune --omit=dev
+
+# systemd service
+cp ip-cam-master.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable ip-cam-master
+
+# Generate VM-to-host SSH key (D-14)
+mkdir -p /root/.ssh
+ssh-keygen -t ed25519 -f /root/.ssh/ip-cam-master -N "" -q
+cat /root/.ssh/ip-cam-master.pub
+PROVISION_SCRIPT
+  )
+
+  # Add VM's public key to host's authorized_keys (D-15)
+  step "Fuege VM-SSH-Key zum Host hinzu..."
+  mkdir -p /root/.ssh
+  echo "$VM_PUBKEY" >> /root/.ssh/authorized_keys
+
+  # Create API token (D-08)
+  step "Erstelle API-Token..."
+
+  # Create user
+  pveum user add "$PVE_USER" --comment "IP-Cam-Master service account" 2>/dev/null || true
+
+  # Create role with minimal permissions
+  pveum role add "$PVE_ROLE" --privs \
+    "VM.Allocate,VM.Audit,VM.Config.Disk,VM.Config.CPU,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,VM.Console,Datastore.AllocateSpace,Datastore.Audit,SDN.Use" \
+    2>/dev/null || pveum role modify "$PVE_ROLE" --privs \
+    "VM.Allocate,VM.Audit,VM.Config.Disk,VM.Config.CPU,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,VM.Console,Datastore.AllocateSpace,Datastore.Audit,SDN.Use"
+
+  # Delete existing token if any
+  pveum user token remove "$PVE_USER" "$PVE_TOKEN_NAME" 2>/dev/null || true
+
+  # Create token
+  TOKEN_OUTPUT=$(pveum user token add "$PVE_USER" "$PVE_TOKEN_NAME" --privsep 1 --output-format json)
+  TOKEN_SECRET=$(echo "$TOKEN_OUTPUT" | jq -r '.value // .data.value // empty')
+  if [ -z "$TOKEN_SECRET" ]; then
+    error_exit "API-Token konnte nicht erstellt werden."
+  fi
+  TOKEN_ID="${PVE_USER}!${PVE_TOKEN_NAME}"
+
+  # Set ACLs
+  pveum acl modify / --user "$PVE_USER" --role "$PVE_ROLE"
+  pveum acl modify "/nodes/$NODE" --tokens "$TOKEN_ID" --role "$PVE_ROLE"
+  pveum acl modify /storage --tokens "$TOKEN_ID" --role "$PVE_ROLE"
+
+  # Start service and inject settings via app API (D-08)
+  step "Starte App und uebertrage Proxmox-Konfiguration..."
+  ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "$INSTALLER_KEY" root@"$VM_IP" \
+    "systemctl start ip-cam-master"
+
+  # Wait for the app to be ready
+  step "Warte auf App-Start..."
+  for i in $(seq 1 30); do
+    if curl -sf "http://${VM_IP}/api/settings" >/dev/null 2>&1; then break; fi
+    sleep 2
+  done
+
+  HOST_IP=$(hostname -I | awk '{print $1}')
+
+  # Inject settings via the app's API (handles encryption for sensitive keys)
+  curl -sf -X PUT "http://${VM_IP}/api/settings" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"proxmox_host\": \"${HOST_IP}\",
+      \"proxmox_token_id\": \"${TOKEN_ID}\",
+      \"proxmox_token_secret\": \"${TOKEN_SECRET}\",
+      \"proxmox_ssh_host\": \"${HOST_IP}\",
+      \"proxmox_ssh_user\": \"root\",
+      \"proxmox_ssh_key_path\": \"/root/.ssh/ip-cam-master\"
+    }" >/dev/null 2>&1
+
+  # Clear trap on success
+  CREATED_VMID=""
+  trap - ERR
+
+  # Success message
+  echo ""
+  echo "======================================"
+  echo "  Installation erfolgreich!"
+  echo "  IP-Cam-Master: http://${VM_IP}"
+  echo "  VM-ID: ${VMID}"
+  echo "======================================"
+  echo ""
+}
+
+# ── Update ────────────────────────────────────────────
+
+update_vm() {
+  local vmid="$1"
+
+  step "Ermittle VM-IP..."
+  VM_IP=$(get_vm_ip "$vmid")
+  step "VM-IP: $VM_IP"
+
+  # Ensure installer key exists
+  if [ ! -f "$INSTALLER_KEY" ]; then
+    error_exit "Installer-SSH-Key nicht gefunden: $INSTALLER_KEY. Wurde die Installation mit diesem Script durchgefuehrt?"
+  fi
+
+  step "Aktualisiere App in VM $vmid..."
+  ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "$INSTALLER_KEY" root@"$VM_IP" bash <<'UPDATE_SCRIPT'
+set -euo pipefail
+
+cd /opt/ip-cam-master
+
+# Stop service
+systemctl stop ip-cam-master || true
+
+# Pull latest
+git pull
+
+# Full npm install (drizzle-kit and vite are devDependencies needed for build and DB push)
+npm install
+
+# Build
+npm run build
+
+# DB migration (D-21)
+npx drizzle-kit push
+
+# Prune devDependencies after build and DB push
+npm prune --omit=dev
+
+# Update service file
+cp ip-cam-master.service /etc/systemd/system/
+systemctl daemon-reload
+
+# Start service
+systemctl start ip-cam-master
+UPDATE_SCRIPT
+
+  # Check if API token still works (D-06)
+  step "Pruefe API-Token..."
+  NODE=$(hostname)
+  TOKEN_ID="${PVE_USER}!${PVE_TOKEN_NAME}"
+
+  # Try the token via the app's settings API
+  if ! curl -sf "http://${VM_IP}/api/settings" >/dev/null 2>&1; then
+    step "App antwortet nicht. Warte auf Neustart..."
+    for i in $(seq 1 30); do
+      if curl -sf "http://${VM_IP}/api/settings" >/dev/null 2>&1; then break; fi
+      sleep 2
+    done
+  fi
+
+  echo ""
+  echo "======================================"
+  echo "  Update erfolgreich."
+  echo "  IP-Cam-Master: http://${VM_IP}"
+  echo "  VM-ID: ${vmid}"
+  echo "======================================"
+  echo ""
+}
+
+# ── Remove ────────────────────────────────────────────
+
+remove_vm() {
+  local vmid="$1"
+
+  confirm "VM $vmid und alle Daten werden geloescht. Fortfahren? (y/N)"
+
+  step "Stoppe VM $vmid..."
+  qm stop "$vmid" 2>/dev/null || true
+  sleep 3
+
+  step "Zerstoere VM $vmid..."
+  qm destroy "$vmid" --purge
+
+  # Remove API user/token
+  step "Entferne API-Token und Benutzer..."
+  pveum user token remove "$PVE_USER" "$PVE_TOKEN_NAME" 2>/dev/null || true
+  pveum user delete "$PVE_USER" 2>/dev/null || true
+
+  # Remove role
+  pveum role delete "$PVE_ROLE" 2>/dev/null || true
+
+  # Clean up installer SSH key
+  if [ -f "$INSTALLER_KEY" ]; then
+    step "Entferne Installer-SSH-Key..."
+    rm -f "$INSTALLER_KEY" "${INSTALLER_KEY}.pub"
+  fi
+
+  echo ""
+  echo "======================================"
+  echo "  Deinstallation erfolgreich."
+  echo "  VM $vmid und Konfiguration entfernt."
+  echo "======================================"
+  echo ""
+}
 
 # ── Pre-checks ────────────────────────────────────────
 
 banner
 
 if [ "$(id -u)" -ne 0 ]; then
-  error_exit "Dieses Skript muss als root ausgefuehrt werden. Verwende: sudo bash install.sh"
+  error_exit "Dieses Skript muss als root ausgefuehrt werden."
 fi
 
-# ── Detect mode ───────────────────────────────────────
+if ! command -v pvesh &>/dev/null; then
+  error_exit "Dieses Skript muss auf einem Proxmox-Host ausgefuehrt werden."
+fi
 
-if [ -d "$APP_DIR" ]; then
-  MODE="update"
-  step "Vorhandene Installation erkannt. Update-Modus."
+# Ensure jq is installed
+apt-get install -y -qq jq 2>/dev/null || true
+
+# ── Mode Detection (D-02, D-05) ──────────────────────
+
+EXISTING_VMID=$(detect_existing_vm)
+if [ -n "$EXISTING_VMID" ]; then
+  echo "Bestehende Installation gefunden (VM $EXISTING_VMID)."
+  echo ""
+  echo "  [U] Update — Neueste Version installieren"
+  echo "  [R] Remove — VM und Konfiguration entfernen"
+  echo "  [C] Cancel — Abbrechen"
+  echo ""
+  read -rp "Auswahl [U/R/C]: " CHOICE
+  case "${CHOICE,,}" in
+    u) MODE="update" ;;
+    r) MODE="remove" ;;
+    *) echo "Abgebrochen."; exit 0 ;;
+  esac
 else
   MODE="install"
-  step "Keine Installation gefunden. Neuinstallation."
 fi
 
-# ══════════════════════════════════════════════════════
-# FRESH INSTALL
-# ══════════════════════════════════════════════════════
+# ── Main ──────────────────────────────────────────────
 
-if [ "$MODE" = "install" ]; then
-
-  # 1. System dependencies
-  step "Installiere Systemabhaengigkeiten (curl, git, ffmpeg)..."
-  apt-get update -qq
-  apt-get install -y -qq curl git ffmpeg > /dev/null
-
-  # 2. Node.js 22 LTS via NodeSource
-  if ! command -v node &> /dev/null || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 22 ]; then
-    step "Installiere Node.js 22 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
-    apt-get install -y -qq nodejs > /dev/null
-  else
-    step "Node.js $(node -v) ist bereits installiert."
-  fi
-
-  # 3. Clone repo
-  step "Klone Repository nach $APP_DIR..."
-  git clone "$REPO_URL" "$APP_DIR"
-
-  cd "$APP_DIR"
-
-  # 4. Install dependencies (production only)
-  step "Installiere npm-Abhaengigkeiten..."
-  npm install --omit=dev
-
-  # 5. Create data directory
-  mkdir -p data
-
-  # 6. Generate .env if missing
-  if [ ! -f .env ]; then
-    step "Erstelle .env mit zufaelligem DB_ENCRYPTION_KEY..."
-    DB_ENCRYPTION_KEY=$(openssl rand -hex 32)
-    cat > .env <<EOF
-# Auto-generated by IP-Cam-Master installer
-DB_ENCRYPTION_KEY=$DB_ENCRYPTION_KEY
-EOF
-  else
-    step ".env existiert bereits, ueberspringe."
-  fi
-
-  # 7. Build
-  step "Baue Anwendung..."
-  npm run build
-
-  # 8. DB migration
-  step "Fuehre Datenbank-Migration aus..."
-  npx drizzle-kit push
-
-  # 9. systemd service
-  step "Richte systemd-Service ein..."
-  cp ip-cam-master.service /etc/systemd/system/
-  systemctl daemon-reload
-  systemctl enable "$SERVICE_NAME"
-  systemctl start "$SERVICE_NAME"
-
-  # 10. SSH key setup (optional)
-  echo ""
-  echo "──────────────────────────────────────"
-  echo "  SSH-Key fuer Proxmox einrichten"
-  echo "──────────────────────────────────────"
-  echo ""
-  read -rp "Proxmox Host IP eingeben (oder Enter zum Ueberspringen): " PROXMOX_IP
-
-  if [ -n "$PROXMOX_IP" ]; then
-    SSH_KEY="/root/.ssh/ip-cam-master"
-    if [ ! -f "$SSH_KEY" ]; then
-      step "Generiere SSH-Key..."
-      mkdir -p /root/.ssh
-      ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -q
-    else
-      step "SSH-Key existiert bereits: $SSH_KEY"
-    fi
-    step "Kopiere SSH-Key auf Proxmox-Host ($PROXMOX_IP)..."
-    ssh-copy-id -i "${SSH_KEY}.pub" "root@${PROXMOX_IP}"
-    echo ""
-    echo "SSH-Key wurde eingerichtet. Kein Passwort mehr noetig."
-  fi
-
-  # Done
-  APP_IP=$(hostname -I | awk '{print $1}')
-  echo ""
-  echo "======================================"
-  echo "  Installation erfolgreich!"
-  echo "  IP-Cam-Master laeuft auf http://${APP_IP}"
-  echo "======================================"
-  echo ""
-
-# ══════════════════════════════════════════════════════
-# UPDATE
-# ══════════════════════════════════════════════════════
-
-elif [ "$MODE" = "update" ]; then
-
-  cd "$APP_DIR"
-
-  # 1. Stop service
-  step "Stoppe $SERVICE_NAME..."
-  systemctl stop "$SERVICE_NAME" || true
-
-  # 2. Pull latest
-  step "Lade neueste Version..."
-  git pull
-
-  # 3. Install dependencies
-  step "Aktualisiere npm-Abhaengigkeiten..."
-  npm install --omit=dev
-
-  # 4. Build
-  step "Baue Anwendung..."
-  npm run build
-
-  # 5. DB migration
-  step "Fuehre Datenbank-Migration aus..."
-  npx drizzle-kit push
-
-  # 6. Update service file
-  step "Aktualisiere systemd-Service..."
-  cp ip-cam-master.service /etc/systemd/system/
-  systemctl daemon-reload
-
-  # 7. Start service
-  step "Starte $SERVICE_NAME..."
-  systemctl start "$SERVICE_NAME"
-
-  echo ""
-  echo "======================================"
-  echo "  Update erfolgreich."
-  echo "  IP-Cam-Master wurde neu gestartet."
-  echo "======================================"
-  echo ""
-
-fi
+case "$MODE" in
+  install) fresh_install ;;
+  update)  update_vm "$EXISTING_VMID" ;;
+  remove)  remove_vm "$EXISTING_VMID" ;;
+esac
