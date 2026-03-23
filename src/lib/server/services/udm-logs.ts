@@ -7,38 +7,40 @@ let lastScanTimestamp: string | null = null;
 // Matches real UDM Protect log format:
 // "2026-03-23T10:43:09.576Z - error: ... Third party camera Hochbeet [BC24118C53BB @ 192.168.3.222] stream failed"
 // "2026-03-23T11:37:16.519Z - info: Adopting camera at 192.168.3.206:8899"
+// Camera name pattern: captured from "Third party camera <NAME> [MAC @ IP]"
+const CAMERA_WITH_BRACKET = /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*[Tt]hird\s+party\s+camera\s+(.+?)\s*\[\w+\s*@\s*([\d.]+)\]/;
 const LOG_PATTERNS: Record<
 	string,
 	{ regex: RegExp; eventType: EventType; severity: EventSeverity }
 > = {
-	disconnect: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*disconnect/i,
-		eventType: 'camera_disconnect',
-		severity: 'warning'
-	},
-	reconnect: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*reconnect/i,
-		eventType: 'camera_reconnect',
-		severity: 'info'
-	},
 	streamFailed: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*stream\s+failed/i,
+		regex: new RegExp(CAMERA_WITH_BRACKET.source + '.*stream\\s+failed', 'i'),
 		eventType: 'stream_failed',
 		severity: 'error'
 	},
 	healthCheckFailed: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*health\s+check\s+failed/i,
+		regex: new RegExp(CAMERA_WITH_BRACKET.source + '.*health\\s+check\\s+failed', 'i'),
 		eventType: 'stream_failed',
 		severity: 'warning'
+	},
+	disconnect: {
+		regex: new RegExp(CAMERA_WITH_BRACKET.source + '.*disconnect', 'i'),
+		eventType: 'camera_disconnect',
+		severity: 'warning'
+	},
+	reconnect: {
+		regex: new RegExp(CAMERA_WITH_BRACKET.source + '.*reconnect', 'i'),
+		eventType: 'camera_reconnect',
+		severity: 'info'
+	},
+	adopted: {
+		regex: new RegExp(CAMERA_WITH_BRACKET.source + '.*adopted', 'i'),
+		eventType: 'adoption_changed',
+		severity: 'info'
 	},
 	adopting: {
 		// "Adopting camera at 192.168.3.206:8899" — no [Name @ IP] format
 		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*[Aa]dopting\s+camera\s+at\s+([\d.]+)/i,
-		eventType: 'adoption_changed',
-		severity: 'info'
-	},
-	adopted: {
-		regex: /(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s.*(?:camera\s+)?(\S+)\s*\[[^\]]*@\s*([\d.]+)\].*adopted/i,
 		eventType: 'adoption_changed',
 		severity: 'info'
 	},

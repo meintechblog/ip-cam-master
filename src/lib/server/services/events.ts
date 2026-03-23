@@ -5,7 +5,21 @@ import type { CameraEvent, EventType, EventSeverity, EventSource } from '$lib/ty
 
 export function storeEvent(
 	event: Omit<CameraEvent, 'id'>
-): CameraEvent {
+): CameraEvent | null {
+	// Dedup: skip if identical event already exists (same timestamp + type + message)
+	const existing = db
+		.select({ id: events.id })
+		.from(events)
+		.where(
+			and(
+				eq(events.timestamp, event.timestamp),
+				eq(events.eventType, event.eventType),
+				eq(events.message, event.message)
+			)
+		)
+		.get();
+	if (existing) return null;
+
 	const result = db
 		.insert(events)
 		.values({
@@ -28,7 +42,8 @@ export function storeEvents(
 ): CameraEvent[] {
 	const stored: CameraEvent[] = [];
 	for (const event of eventList) {
-		stored.push(storeEvent(event));
+		const result = storeEvent(event);
+		if (result) stored.push(result);
 	}
 	return stored;
 }
