@@ -415,10 +415,10 @@
 										<span class="text-xs text-success">adoptiert</span>
 									{:else if cam.protectStatus?.isAdopted && cam.protectStatus?.state !== 'CONNECTED'}
 										<span class="text-xs text-danger">getrennt</span>
-									{:else if cam.protectStatus && !cam.protectStatus.isAdopted}
-										<span class="text-xs text-warning">wird adoptiert</span>
+									{:else if cam.protectConfigured}
+										<span class="text-xs text-warning">nicht adoptiert</span>
 									{:else}
-										<span class="text-xs text-text-secondary">wartend</span>
+										<span class="text-xs text-text-secondary">—</span>
 									{/if}
 								</td>
 							</tr>

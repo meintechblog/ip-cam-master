@@ -117,6 +117,7 @@ export interface CameraCardData {
 	lxcMemory: { used: number; total: number } | null;
 	lxcMac: string | null;
 	protectStatus?: ProtectCameraMatch | null;
+	protectConfigured?: boolean;
 	flapping?: boolean;
 }
 

@@ -345,15 +345,26 @@
 					<div class="flex justify-between"><span>FPS</span><span class="text-text-primary">{probeData.liveFps}</span></div>
 				{/if}
 			</div>
-			<!-- Protect status check for native ONVIF -->
-			<div class="mt-3 pt-3 border-t border-border">
-				<button
-					onclick={() => showAdoptionGuide = true}
-					class="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full mb-2"
-				>
-					Protect-Status pruefen
-				</button>
-			</div>
+			<!-- Protect status for native ONVIF -->
+			{#if camera.protectConfigured}
+				<div class="mt-3 pt-3 border-t border-border">
+					<div class="flex items-center gap-2 mb-1.5">
+						{#if camera.protectStatus?.isAdopted && camera.protectStatus?.state === 'CONNECTED'}
+							<span class="w-2 h-2 rounded-full shrink-0 bg-green-400"></span>
+							<span class="text-xs text-green-400 font-medium">In Protect adoptiert</span>
+						{:else if camera.protectStatus?.isAdopted}
+							<span class="w-2 h-2 rounded-full shrink-0 bg-red-400"></span>
+							<span class="text-xs text-red-400 font-medium">Getrennt ({camera.protectStatus.state})</span>
+						{:else}
+							<span class="w-2 h-2 rounded-full shrink-0 bg-yellow-400"></span>
+							<span class="text-xs text-yellow-400">Nicht in Protect</span>
+						{/if}
+					</div>
+					{#if camera.protectStatus?.protectName}
+						<div class="flex justify-between text-xs text-text-secondary"><span>Protect Name</span><span class="text-text-primary">{camera.protectStatus.protectName}</span></div>
+					{/if}
+				</div>
+			{/if}
 			<!-- Delete button for native ONVIF -->
 			<div class="pt-2">
 				{#if !showDeleteConfirm}
@@ -465,7 +476,7 @@
 						<span class="w-2 h-2 rounded-full shrink-0 bg-green-400"></span>
 					{:else if camera.protectStatus?.isAdopted}
 						<span class="w-2 h-2 rounded-full shrink-0 bg-red-400"></span>
-					{:else if camera.protectStatus}
+					{:else if camera.protectConfigured}
 						<span class="w-2 h-2 rounded-full shrink-0 bg-yellow-400"></span>
 					{:else}
 						<span class="w-2 h-2 rounded-full shrink-0 bg-gray-400"></span>
@@ -482,10 +493,10 @@
 							<span class="text-green-400 font-medium">Adoptiert</span>
 						{:else if camera.protectStatus?.isAdopted}
 							<span class="text-red-400 font-medium">Getrennt ({camera.protectStatus.state})</span>
-						{:else if camera.protectStatus}
-							<span class="text-yellow-400">Wird adoptiert</span>
+						{:else if camera.protectConfigured}
+							<span class="text-yellow-400">Nicht adoptiert</span>
 						{:else}
-							<span class="text-gray-400">Wartend</span>
+							<span class="text-gray-400">Nicht konfiguriert</span>
 						{/if}
 					</div>
 					{#if camera.protectStatus?.protectName}
@@ -499,7 +510,7 @@
 					{/if}
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{(camera.streamInfo?.codec || 'H.264').replace('H264', 'H.264')}</span></div>
 				</div>
-				{#if !camera.protectStatus?.isAdopted}
+				{#if camera.protectConfigured && !camera.protectStatus?.isAdopted}
 					<button
 						onclick={() => showAdoptionGuide = true}
 						class="mt-2 text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full"
@@ -534,6 +545,8 @@
 		cameraId={camera.id}
 		cameraName={camera.name}
 		containerIp={camera.containerIp}
+		cameraIp={camera.cameraIp}
+		isNativeOnvif={isNativeOnvif}
 		onClose={() => showAdoptionGuide = false}
 	/>
 {/if}

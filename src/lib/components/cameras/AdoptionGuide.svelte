@@ -5,13 +5,19 @@
 		cameraId,
 		cameraName,
 		containerIp,
+		cameraIp,
+		isNativeOnvif = false,
 		onClose
 	}: {
 		cameraId: number;
 		cameraName: string;
 		containerIp: string | null;
+		cameraIp?: string;
+		isNativeOnvif?: boolean;
 		onClose: () => void;
 	} = $props();
+
+	let targetIp = $derived(isNativeOnvif ? cameraIp : containerIp);
 
 	let loading = $state(true);
 	let result = $state<{
@@ -61,7 +67,7 @@
 			Protect Adoption -- {cameraName}
 		</h3>
 		<p class="text-text-secondary text-xs mb-5">
-			{containerIp ? `Container IP: ${containerIp}` : 'Kamera wird geprueft...'}
+			{targetIp ? `${isNativeOnvif ? 'Kamera' : 'Container'} IP: ${targetIp}` : 'Kamera wird geprueft...'}
 		</p>
 
 		{#if loading}

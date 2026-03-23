@@ -160,9 +160,11 @@ export const GET: RequestHandler = async () => {
 
 		// Fetch Protect status (30s cache, cheap on 10s polling) and flapping cameras
 		let protectMatches = new Map<number, ProtectCameraMatch>();
+		let protectConfigured = false;
 		let flappingIds: number[] = [];
 		try {
 			const protectStatus = await getProtectStatus();
+			protectConfigured = protectStatus.connected;
 			protectMatches = protectStatus.cameras;
 		} catch {
 			// Protect unreachable — continue without
@@ -176,6 +178,7 @@ export const GET: RequestHandler = async () => {
 		// Enrich results with Protect status and flapping
 		for (const result of results) {
 			(result as any).protectStatus = protectMatches.get(result.id) || null;
+			(result as any).protectConfigured = protectConfigured;
 			(result as any).flapping = flappingIds.includes(result.id);
 		}
 
