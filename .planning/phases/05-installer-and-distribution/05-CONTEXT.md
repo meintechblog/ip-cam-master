@@ -46,6 +46,14 @@ One-line install script (`curl | bash`) that sets up IP-Cam-Master from scratch 
 - **D-20:** Installer generates random DB_ENCRYPTION_KEY (64 hex chars) on fresh install
 - **D-21:** Existing .env preserved during updates
 
+### Zugangsschutz
+- **D-22:** Beim ersten Start der App: Bildschirm mit User + Passwort Feldern + "Speichern" Button
+- **D-23:** Alternativ: "YOLO" Button (gleicher Button, heisst "YOLO" wenn Felder leer) — App ohne Login nutzbar
+- **D-24:** Wenn Login gesetzt: Session-basierter Login (Cookie), einfacher Login-Screen
+- **D-25:** In Settings: Zugang anlegen/aendern/entfernen. Ganz rudimentaer, kein fancy UI
+- **D-26:** Passwort gehasht in SQLite gespeichert (bcrypt oder scrypt)
+- **D-27:** Nur ein User (kein Multi-User, kein Rollen-System)
+
 ### Claude's Discretion
 - Exact install script structure and error handling
 - Firewall configuration (ufw allow 80)
