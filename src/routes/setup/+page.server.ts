@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	create: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const username = data.get('username')?.toString().trim() ?? '';
 		const password = data.get('password')?.toString() ?? '';

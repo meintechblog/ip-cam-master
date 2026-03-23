@@ -35,7 +35,7 @@
 				</div>
 			{/if}
 
-			<form method="POST" use:enhance>
+			<form method="POST" action="?/create" use:enhance>
 				<div class="space-y-4">
 					<div>
 						<label for="username" class="block text-sm font-medium text-text-secondary mb-1">
@@ -105,7 +105,7 @@
 					<button
 						type="submit"
 						class="w-full px-4 py-2 border border-border text-text-secondary rounded font-medium
-							hover:bg-bg-primary hover:text-text-primary transition-colors"
+							hover:bg-bg-primary hover:text-text-primary transition-colors cursor-pointer"
 					>
 						Ohne Passwort fortfahren
 					</button>
