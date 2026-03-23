@@ -512,26 +512,21 @@
 					<div class="flex justify-between"><span>Codec</span><span class="text-text-primary">{(camera.streamInfo?.codec || 'H.264').replace('H264', 'H.264')}</span></div>
 				</div>
 				{#if camera.protectConfigured && !camera.protectStatus?.isAdopted}
-					{#if showAdoptInline}
-						<div class="mt-2 bg-bg-primary rounded-lg p-3 space-y-2 text-xs">
-							<p class="text-text-primary font-medium">Kamera in Protect aufnehmen:</p>
-							<p class="text-text-secondary">Diese Kamera ist per ONVIF sichtbar. Oeffne Protect und uebernimm sie unter "Geraete".</p>
-							{#if camera.protectUrl}
-								<a href={camera.protectUrl} target="_blank"
-									class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent/90 font-medium">
-									Protect oeffnen ↗
-								</a>
-							{/if}
-							<button onclick={() => showAdoptInline = false}
-								class="text-text-secondary hover:text-text-primary text-xs cursor-pointer w-full">Schliessen</button>
-						</div>
-					{:else}
-						<button
-							onclick={() => showAdoptInline = true}
-							class="mt-2 text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full"
+					{#if camera.protectStatus}
+						<!-- Discovered by Protect but not adopted yet — direct link -->
+						<a
+							href={camera.protectUrl}
+							target="_blank"
+							class="mt-2 text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full block text-center"
 						>
-							In Protect aufnehmen
-						</button>
+							Jetzt in Protect uebernehmen ↗
+						</a>
+					{:else}
+						<!-- Not yet discovered by Protect -->
+						<div class="mt-2 flex items-center gap-2 text-xs text-text-secondary">
+							<span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse shrink-0"></span>
+							<span>Warte auf Protect-Erkennung...</span>
+						</div>
 					{/if}
 				{/if}
 			</div>
