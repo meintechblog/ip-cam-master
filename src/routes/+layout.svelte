@@ -9,7 +9,7 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<AppShell username={data.username} authenticated={data.authenticated}>
+<AppShell>
 	{#if !data.configured.proxmox}
 		<Banner
 			message="Proxmox ist nicht konfiguriert."

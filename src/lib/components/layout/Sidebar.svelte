@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { Camera, LayoutDashboard, Monitor, Settings, ScrollText, LogOut, Shield } from 'lucide-svelte';
-
-	let { username = null, authenticated = false }: { username?: string | null; authenticated?: boolean } = $props();
+	import { Camera, LayoutDashboard, Monitor, Settings, ScrollText } from 'lucide-svelte';
 
 	const links = [
 		{ href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,28 +36,4 @@
 			</a>
 		{/each}
 	</nav>
-
-	<!-- Auth section at bottom -->
-	<div class="p-3 border-t border-border">
-		{#if username}
-			<div class="flex items-center justify-between px-3 py-2">
-				<span class="text-xs text-text-secondary truncate">{username}</span>
-				<div class="flex gap-1">
-					<a href="/setup" class="text-text-secondary hover:text-text-primary" title="Zugang aendern">
-						<Shield class="w-4 h-4" />
-					</a>
-					<a href="/api/auth?action=logout" class="text-text-secondary hover:text-red-400" title="Logout" data-sveltekit-preload-data="off">
-						<LogOut class="w-4 h-4" />
-					</a>
-				</div>
-			</div>
-		{:else if authenticated}
-			<div class="flex items-center justify-between px-3 py-2">
-				<span class="text-xs text-yellow-400">YOLO-Modus</span>
-				<a href="/setup" class="text-text-secondary hover:text-text-primary text-xs" title="Zugang einrichten">
-					<Shield class="w-4 h-4" />
-				</a>
-			</div>
-		{/if}
-	</div>
 </aside>
