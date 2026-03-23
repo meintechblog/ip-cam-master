@@ -233,6 +233,102 @@ WantedBy=multi-user.target
 }
 
 /**
+ * Returns a Node.js script that patches the ONVIF server to advertise
+ * AudioSourceConfiguration + G.711 AudioEncoderConfiguration in profiles.
+ * This makes UniFi Protect enable the mic toggle and receive audio.
+ */
+export function getOnvifAudioPatch(): string {
+	return `const fs = require('fs');
+const path = '/root/onvif-server/src/onvif-server.js';
+let code = fs.readFileSync(path, 'utf8');
+
+if (code.includes('AudioSourceConfiguration')) {
+  console.log('Already patched');
+  process.exit(0);
+}
+
+// Add audioSource after videoSource
+code = code.replace(
+  "this.profiles = [",
+  \`this.audioSource = {
+            attributes: { token: 'audio_src_token' },
+            Channels: 1
+        };
+
+        this.profiles = [\`
+);
+
+// Audio config block for profiles
+const audioConfig = \`                AudioSourceConfiguration: {
+                    Name: 'AudioSource',
+                    UseCount: 2,
+                    attributes: { token: 'audio_src_config_token' },
+                    SourceToken: 'audio_src_token'
+                },
+                AudioEncoderConfiguration: {
+                    attributes: { token: 'audio_encoder_config_token' },
+                    Name: 'G711',
+                    UseCount: 1,
+                    Encoding: 'G711',
+                    Bitrate: 64,
+                    SampleRate: 8,
+                    SessionTimeout: 'PT1000S'
+                },\`;
+
+// Insert into MainStream profile
+code = code.replace(
+  \`                VideoEncoderConfiguration: {
+                    attributes: {
+                        token: 'encoder_hq_config_token'
+                    },\`,
+  audioConfig + \`
+                VideoEncoderConfiguration: {
+                    attributes: {
+                        token: 'encoder_hq_config_token'
+                    },\`
+);
+
+// Insert into SubStream profile
+code = code.replace(
+  \`                    VideoEncoderConfiguration: {
+                        attributes: {
+                            token: 'encoder_lq_config_token'
+                        },\`,
+  audioConfig.replace(/^/gm, '    ') + \`
+                    VideoEncoderConfiguration: {
+                        attributes: {
+                            token: 'encoder_lq_config_token'
+                        },\`
+);
+
+// Add GetAudioSources handler
+code = code.replace(
+  "GetProfiles: (args) =>",
+  \`GetAudioSources: (args) => {
+                        return { AudioSources: this.audioSource };
+                    },
+                    GetAudioEncoderConfigurations: (args) => {
+                        return {
+                            Configurations: {
+                                attributes: { token: 'audio_encoder_config_token' },
+                                Name: 'G711',
+                                UseCount: 1,
+                                Encoding: 'G711',
+                                Bitrate: 64,
+                                SampleRate: 8,
+                                SessionTimeout: 'PT1000S'
+                            }
+                        };
+                    },
+                    GetProfiles: (args) =>\`
+);
+
+fs.writeFileSync(path, code);
+console.log('ONVIF audio patch applied');
+`;
+}
+
+/**
  * Checks stream health via go2rtc HTTP API.
  */
 export async function checkStreamHealth(

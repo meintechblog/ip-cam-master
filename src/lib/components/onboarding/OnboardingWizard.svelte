@@ -417,11 +417,13 @@
 			addSubLog(`  Stream: ${streamName}`);
 			addSubLog(`  Source: http://localhost:8081/mjpg/video.mjpg (via nginx)`);
 		} else {
-			addSubLog(`go2rtc.yaml generieren:`);
+			addSubLog(`go2rtc.yaml generieren (Dual-Source):`);
 			addSubLog(`  Stream: ${streamName}`);
-			addSubLog(`  Source: rtsp://${username}:***@${ip}:554/stream0/mobotix.mjpeg`);
+			addSubLog(`  Video: HTTP MJPEG (faststream.jpg) + reconnect`);
+			addSubLog(`  Audio: RTSP passthrough (G.711 mulaw copy)`);
 		}
 		addSubLog(`  Transcode: MJPEG → H.264, ${width}x${height}@${fps}fps, ${bitrate}k`);
+		addSubLog(`  Audio: pcm_mulaw passthrough (kein Transcoding)`);
 		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
 		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);
 		addSubLog(`systemd Unit: /etc/systemd/system/go2rtc.service`);
@@ -459,9 +461,11 @@
 		addSubLog(`  Manufacturer: 'Onvif' → '${safeName}'`);
 		addSubLog(`  Model: 'Cardinal' → 'Mobotix'`);
 		addSubLog(`  ONVIF-Name: 'Cardinal' → 'MOBOTIXS15'`);
+		addSubLog(`Audio-Profil patchen (G.711 mulaw fuer UniFi Protect)`);
 		addSubLog(`config.yaml generieren:`);
 		addSubLog(`  Stream: /${streamName} → localhost:8554`);
 		addSubLog(`  Snapshot: /api/frame.jpeg?src=${streamName} → localhost:1984`);
+		addSubLog(`  Audio: G.711 mulaw, 8kHz, mono`);
 		addSubLog(`  ONVIF Port: 8899`);
 		addSubLog(`systemd Unit: /etc/systemd/system/onvif-server.service`);
 		addSubLog(`systemctl daemon-reload && enable && restart onvif-server`);
@@ -471,8 +475,8 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
-			addSubLog(`ONVIF Server laeuft auf Port 8899 — Discovery aktiv`);
-			addLog(4, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899`, 'done');
+			addSubLog(`ONVIF Server laeuft auf Port 8899 — Discovery + Audio aktiv`);
+			addLog(4, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899 (mit Audio)`, 'done');
 			await runStep5_VerifyStream();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -503,9 +507,11 @@
 			rtspUrl = data.rtspUrl;
 
 			addSubLog(`Stream aktiv: ${data.streamInfo?.producers || 1} Producer`);
+			addSubLog(`Video: H.264 (VAAPI)`);
+			addSubLog(`Audio: G.711 mulaw (passthrough)`);
 			addSubLog(`RTSP-Output: ${rtspUrl}`);
-			addSubLog(`Kamera ist jetzt per ONVIF-Discovery in UniFi Protect auffindbar`);
-			addLog(5, 'Stream verifizieren', `Alles laeuft — ${rtspUrl}`, 'done');
+			addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar (mit Audio)`);
+			addLog(5, 'Stream verifizieren', `H.264 + Audio — ${rtspUrl}`, 'done');
 			loading = false;
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);

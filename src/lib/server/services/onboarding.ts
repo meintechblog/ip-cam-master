@@ -1,5 +1,5 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
 import { createContainer, startContainer } from './proxmox';
 import { getSettings } from './settings';
 import { encrypt, decrypt } from './crypto';
@@ -294,6 +294,10 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 		await executeOnContainer(ssh, camera.vmid,
 			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${safeName}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
 		);
+
+		// Patch ONVIF server to advertise audio (G.711 mulaw) so UniFi Protect enables mic
+		await pushFileToContainer(ssh, camera.vmid, getOnvifAudioPatch(), '/tmp/patch-onvif-audio.js');
+		await executeOnContainer(ssh, camera.vmid, 'node /tmp/patch-onvif-audio.js');
 
 		// Generate and push ONVIF config
 		const onvifConfig = generateOnvifConfig({

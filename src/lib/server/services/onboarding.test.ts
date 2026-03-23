@@ -69,7 +69,14 @@ vi.mock('./go2rtc', () => ({
 	generateGo2rtcConfig: mockGenerateGo2rtcConfig,
 	generateSystemdUnit: mockGenerateSystemdUnit,
 	getInstallCommands: mockGetInstallCommands,
-	checkStreamHealth: mockCheckStreamHealth
+	checkStreamHealth: mockCheckStreamHealth,
+	getOnvifAudioPatch: vi.fn().mockReturnValue('// audio patch script'),
+	getOnvifInstallCommands: vi.fn().mockReturnValue(['echo install']),
+	generateOnvifConfig: vi.fn().mockReturnValue('onvif: []'),
+	generateOnvifSystemdUnit: vi.fn().mockReturnValue('[Service]'),
+	generateGo2rtcConfigLoxone: vi.fn().mockReturnValue('streams: {}'),
+	generateNginxConfig: vi.fn().mockReturnValue('server {}'),
+	getNginxInstallCommands: vi.fn().mockReturnValue(['echo nginx'])
 }));
 
 vi.mock('./proxmox', () => ({
@@ -324,7 +331,7 @@ describe('onboarding service', () => {
 			await configureGo2rtc(1);
 
 			expect(mockSet).toHaveBeenCalledWith(
-				expect.objectContaining({ status: 'configured' })
+				expect.objectContaining({ status: 'go2rtc_configured' })
 			);
 		});
 	});
