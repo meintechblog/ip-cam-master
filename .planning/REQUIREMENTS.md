@@ -48,7 +48,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DASH-01**: Dashboard shows all managed cameras in a grid/list view
 - [ ] **DASH-02**: Each camera card shows: name, IP, type (Mobotix/Loxone/ONVIF), container status, stream status
 - [x] **DASH-03**: Camera status updates automatically (polling go2rtc API + Proxmox API)
-- [ ] **DASH-04**: User can view live stream preview (via go2rtc WebRTC/MSE player) for any managed camera
+- [x] **DASH-04**: User can view live stream preview (via go2rtc WebRTC/MSE player) for any managed camera
 - [ ] **DASH-05**: ONVIF-capable cameras are displayed as "nativ nutzbar" without workflow actions
 - [x] **DASH-06**: Dashboard shows UniFi Protect adoption status per camera
 
@@ -135,7 +135,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-01 | Phase 4 | Pending |
 | DASH-02 | Phase 4 | Pending |
 | DASH-03 | Phase 4 | Complete |
-| DASH-04 | Phase 4 | Pending |
+| DASH-04 | Phase 4 | Complete |
 | DASH-05 | Phase 4 | Pending |
 | DASH-06 | Phase 4 | Complete |
 | ONBD-01 | Phase 2 | Complete |
