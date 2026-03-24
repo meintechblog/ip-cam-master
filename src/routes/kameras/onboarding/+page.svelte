@@ -19,10 +19,15 @@
 	let registerLoading = $state(false);
 
 	// Batch mode
+	interface BatchSubStep {
+		label: string;
+		status: 'pending' | 'active' | 'done';
+	}
 	interface BatchStep {
 		label: string;
 		status: 'pending' | 'active' | 'done' | 'error';
 		detail?: string;
+		subs: BatchSubStep[];
 	}
 	interface BatchCamera {
 		ip: string;
@@ -147,25 +152,99 @@
 
 	function makePipelineSteps(type: string): BatchStep[] {
 		const steps: BatchStep[] = [
-			{ label: 'Zugangsdaten', status: 'pending' },
-			{ label: 'Verbindungstest', status: 'pending' },
-			{ label: 'Container erstellen', status: 'pending' },
-			{ label: 'go2rtc', status: 'pending' },
+			{ label: 'Zugangsdaten', status: 'pending', subs: [
+				{ label: 'Gespeicherte Credentials pruefen', status: 'pending' },
+				{ label: 'Login testen', status: 'pending' },
+			]},
+			{ label: 'Verbindungstest', status: 'pending', subs: [
+				{ label: 'RTSP-Stream proben (ffprobe)', status: 'pending' },
+				{ label: 'Aufloesung + FPS erkennen', status: 'pending' },
+				{ label: 'Vorschaubild laden', status: 'pending' },
+			]},
+			{ label: 'Container erstellen', status: 'pending', subs: [
+				{ label: 'LXC auf Proxmox anlegen (Debian 12)', status: 'pending' },
+				{ label: 'VAAPI Passthrough (/dev/dri)', status: 'pending' },
+				{ label: 'Container starten + IP per DHCP', status: 'pending' },
+			]},
+			{ label: 'go2rtc', status: 'pending', subs: [
+				{ label: 'go2rtc Binary herunterladen', status: 'pending' },
+				{ label: 'YAML-Config generieren (MJPEG → H.264)', status: 'pending' },
+				{ label: 'systemd Service starten', status: 'pending' },
+			]},
 		];
-		if (type === 'loxone') steps.push({ label: 'nginx Proxy', status: 'pending' });
-		steps.push({ label: 'ONVIF Server', status: 'pending' });
-		steps.push({ label: 'Stream pruefen', status: 'pending' });
+		if (type === 'loxone') steps.push({ label: 'nginx Proxy', status: 'pending', subs: [
+			{ label: 'nginx installieren', status: 'pending' },
+			{ label: 'Auth-Proxy Config generieren', status: 'pending' },
+			{ label: 'nginx starten', status: 'pending' },
+		]});
+		steps.push({ label: 'ONVIF Server', status: 'pending', subs: [
+			{ label: 'Node.js 22 LTS installieren', status: 'pending' },
+			{ label: 'git clone onvif-server', status: 'pending' },
+			{ label: 'npm install', status: 'pending' },
+			{ label: 'MAC + UUID auslesen', status: 'pending' },
+			{ label: 'Geraetename patchen', status: 'pending' },
+			{ label: 'config.yaml generieren', status: 'pending' },
+			{ label: 'systemd Service starten', status: 'pending' },
+		]});
+		steps.push({ label: 'Stream pruefen', status: 'pending', subs: [
+			{ label: 'go2rtc API abfragen', status: 'pending' },
+			{ label: 'RTSP-Stream verifizieren', status: 'pending' },
+		]});
 		return steps;
 	}
 
 	function makeOnvifSteps(): BatchStep[] {
 		return [
-			{ label: 'Zugangsdaten', status: 'pending' },
-			{ label: 'Registrieren', status: 'pending' },
+			{ label: 'Zugangsdaten', status: 'pending', subs: [
+				{ label: 'Gespeicherte Credentials pruefen', status: 'pending' },
+			]},
+			{ label: 'Registrieren', status: 'pending', subs: [
+				{ label: 'In Datenbank speichern', status: 'pending' },
+				{ label: 'Nativ ONVIF — kein Container noetig', status: 'pending' },
+			]},
 		];
 	}
 
+	// Animate sub-steps while an API call is running
+	let subStepTimer: ReturnType<typeof setInterval> | null = null;
+
+	function startSubStepAnimation(camIdx: number, stepIdx: number) {
+		stopSubStepAnimation();
+		let subIdx = 0;
+		const subs = batchResults[camIdx].steps[stepIdx].subs;
+		if (subs.length === 0) return;
+		subs[0].status = 'active';
+
+		subStepTimer = setInterval(() => {
+			if (subIdx < subs.length && subs[subIdx].status === 'active') {
+				subs[subIdx].status = 'done';
+			}
+			subIdx++;
+			if (subIdx < subs.length) {
+				subs[subIdx].status = 'active';
+			} else {
+				stopSubStepAnimation();
+			}
+		}, 2500); // tick every 2.5s
+	}
+
+	function stopSubStepAnimation() {
+		if (subStepTimer) { clearInterval(subStepTimer); subStepTimer = null; }
+	}
+
+	function finishAllSubs(camIdx: number, stepIdx: number) {
+		stopSubStepAnimation();
+		for (const sub of batchResults[camIdx].steps[stepIdx].subs) {
+			sub.status = 'done';
+		}
+	}
+
 	function setStep(camIdx: number, stepIdx: number, status: BatchStep['status'], detail?: string) {
+		if (status === 'active') {
+			startSubStepAnimation(camIdx, stepIdx);
+		} else if (status === 'done') {
+			finishAllSubs(camIdx, stepIdx);
+		}
 		batchResults[camIdx].steps[stepIdx].status = status;
 		if (detail) batchResults[camIdx].steps[stepIdx].detail = detail;
 	}
@@ -490,23 +569,47 @@
 						<div class="px-4 pb-3 border-t border-border/50">
 							<div class="space-y-1.5 pt-2.5">
 								{#each cam.steps as step, si}
-									<div class="flex items-center gap-2.5 text-xs">
-										{#if step.status === 'done'}
-											<Check class="w-3.5 h-3.5 text-green-400 shrink-0" />
-										{:else if step.status === 'active'}
-											<Loader2 class="w-3.5 h-3.5 text-accent animate-spin shrink-0" />
-										{:else if step.status === 'error'}
-											<XCircle class="w-3.5 h-3.5 text-red-400 shrink-0" />
-										{:else}
-											<div class="w-3.5 h-3.5 rounded-full border border-border shrink-0"></div>
-										{/if}
+									<div>
+										<!-- Main step -->
+										<div class="flex items-center gap-2.5 text-xs">
+											{#if step.status === 'done'}
+												<Check class="w-3.5 h-3.5 text-green-400 shrink-0" />
+											{:else if step.status === 'active'}
+												<Loader2 class="w-3.5 h-3.5 text-accent animate-spin shrink-0" />
+											{:else if step.status === 'error'}
+												<XCircle class="w-3.5 h-3.5 text-red-400 shrink-0" />
+											{:else}
+												<div class="w-3.5 h-3.5 rounded-full border border-border shrink-0"></div>
+											{/if}
 
-										<span class="{step.status === 'active' ? 'text-accent font-medium' : step.status === 'done' ? 'text-text-primary' : step.status === 'error' ? 'text-red-400' : 'text-text-secondary'}">
-											{step.label}
-										</span>
+											<span class="font-medium {step.status === 'active' ? 'text-accent' : step.status === 'done' ? 'text-text-primary' : step.status === 'error' ? 'text-red-400' : 'text-text-secondary'}">
+												{step.label}
+											</span>
 
-										{#if step.detail}
-											<span class="text-text-secondary ml-auto font-mono">{step.detail}</span>
+											{#if step.detail}
+												<span class="text-text-secondary ml-auto font-mono">{step.detail}</span>
+											{/if}
+										</div>
+
+										<!-- Sub-steps (visible when step is active or just completed) -->
+										{#if step.status === 'active' || (step.status === 'done' && step.subs.some(s => s.status === 'done'))}
+											<div class="ml-6 mt-1 mb-1.5 space-y-0.5 border-l border-border/50 pl-3">
+												{#each step.subs as sub}
+													<div class="flex items-center gap-2 text-[11px] transition-opacity duration-300
+														{sub.status === 'pending' ? 'opacity-30' : 'opacity-100'}">
+														{#if sub.status === 'done'}
+															<Check class="w-3 h-3 text-green-400 shrink-0" />
+														{:else if sub.status === 'active'}
+															<Loader2 class="w-3 h-3 text-accent animate-spin shrink-0" />
+														{:else}
+															<div class="w-3 h-3 shrink-0"></div>
+														{/if}
+														<span class="{sub.status === 'active' ? 'text-accent' : sub.status === 'done' ? 'text-text-secondary' : 'text-text-secondary/50'}">
+															{sub.label}
+														</span>
+													</div>
+												{/each}
+											</div>
 										{/if}
 									</div>
 								{/each}
