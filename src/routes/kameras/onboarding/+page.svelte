@@ -322,6 +322,20 @@
 		const { username, password } = cred;
 		setStep(idx, 0, 'done', username);
 
+		// Load snapshot
+		try {
+			const snapRes = await fetch('/api/onboarding/snapshot', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ip: cam.ip, username, password }),
+				signal: AbortSignal.timeout(10000)
+			});
+			if (snapRes.ok) {
+				const blob = await snapRes.blob();
+				if (blob.size > 500) batchResults[idx].snapshotUrl = URL.createObjectURL(blob);
+			}
+		} catch { /* optional */ }
+
 		// Step 1: Register
 		setStep(idx, 1, 'active');
 		const res = await fetch('/api/cameras/register', {
@@ -510,7 +524,25 @@
 
 					<!-- Camera header -->
 					<div class="px-4 py-3 flex items-center gap-3">
-						{#if cam.status === 'done'}
+						<!-- Snapshot thumbnail or status icon -->
+						{#if cam.snapshotUrl}
+							<div class="w-12 h-9 rounded overflow-hidden bg-black shrink-0 relative">
+								<img src={cam.snapshotUrl} alt={cam.name} class="w-full h-full object-cover" />
+								{#if cam.status === 'done'}
+									<div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-tl flex items-center justify-center">
+										<Check class="w-2.5 h-2.5 text-white" />
+									</div>
+								{:else if cam.status === 'active'}
+									<div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-accent rounded-tl flex items-center justify-center">
+										<Loader2 class="w-2.5 h-2.5 text-white animate-spin" />
+									</div>
+								{:else if cam.status === 'error'}
+									<div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-tl flex items-center justify-center">
+										<XCircle class="w-2.5 h-2.5 text-white" />
+									</div>
+								{/if}
+							</div>
+						{:else if cam.status === 'done'}
 							<div class="w-7 h-7 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
 								<Check class="w-4 h-4 text-green-400" />
 							</div>
@@ -562,12 +594,6 @@
 					<!-- Live step details (always visible for active, stays visible for done/error) -->
 					{#if cam.status === 'active' || cam.expanded || cam.status === 'error'}
 						<div class="px-4 pb-3 border-t border-border/50">
-							<!-- Snapshot thumbnail -->
-							{#if cam.snapshotUrl}
-								<div class="mt-2.5 mb-2 rounded-lg overflow-hidden bg-black" style="max-height: 160px;">
-									<img src={cam.snapshotUrl} alt={cam.name} class="w-full object-contain" style="max-height: 160px;" />
-								</div>
-							{/if}
 							<div class="space-y-1.5 pt-2.5">
 								{#each cam.steps as step, si}
 									<div>
