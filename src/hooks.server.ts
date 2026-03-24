@@ -1,16 +1,12 @@
 import { startScheduler } from '$lib/server/services/scheduler';
 import { validateSession, isYoloMode, getUser } from '$lib/server/services/auth';
+import { isPublicPath } from '$lib/config/routes';
 import type { Handle } from '@sveltejs/kit';
 
 startScheduler();
 
-const PUBLIC_PATHS = ['/setup', '/login', '/api/auth', '/api/settings'];
-
 export const handle: Handle = async ({ event, resolve }) => {
-	const path = event.url.pathname;
-
-	// Allow public paths
-	if (PUBLIC_PATHS.some((p) => path.startsWith(p))) {
+	if (isPublicPath(event.url.pathname)) {
 		return resolve(event);
 	}
 

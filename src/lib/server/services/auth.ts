@@ -59,17 +59,23 @@ export function deleteSession(sessionId: string): void {
 // --- YOLO mode ---
 
 export function isYoloMode(): boolean {
-	const rows = db.select().from(settings).where(eq(settings.key, 'auth_yolo')).all();
-	if (rows.length === 0) return false;
-	return rows[0].value === 'true';
+	const row = db.select().from(settings).where(eq(settings.key, 'auth_yolo')).get();
+	return row?.value === 'true';
 }
 
 // --- User management ---
 
 export function getUser(): { id: number; username: string; passwordHash: string } | null {
-	const rows = db.select().from(users).all();
-	if (rows.length === 0) return null;
-	return rows[0];
+	return db.select().from(users).get() ?? null;
+}
+
+// --- Session cleanup (call from scheduler) ---
+
+export function cleanupExpiredSessions(): void {
+	const now = new Date();
+	for (const [id, session] of sessions.entries()) {
+		if (session.expiresAt < now) sessions.delete(id);
+	}
 }
 
 export function createUser(username: string, password: string): void {
@@ -81,4 +87,15 @@ export function createUser(username: string, password: string): void {
 
 export function deleteUser(): void {
 	db.delete(users).run();
+}
+
+// --- Cookie helpers ---
+
+export function setSessionCookie(cookies: { set: (name: string, value: string, opts: any) => void }, sessionId: string): void {
+	cookies.set('session', sessionId, {
+		path: '/',
+		httpOnly: true,
+		sameSite: 'lax',
+		maxAge: SESSION_TTL_MS / 1000
+	});
 }

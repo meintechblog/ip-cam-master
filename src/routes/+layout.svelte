@@ -4,11 +4,11 @@
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import Banner from '$lib/components/ui/Banner.svelte';
 	import { page } from '$app/stores';
+	import { isStandalonePage } from '$lib/config/routes';
 
 	let { data, children } = $props();
 
-	const standaloneRoutes = ['/setup', '/login'];
-	let isStandalone = $derived(standaloneRoutes.some((r) => $page.url.pathname.startsWith(r)));
+	let isStandalone = $derived(isStandalonePage($page.url.pathname));
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>

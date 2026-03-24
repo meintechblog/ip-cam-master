@@ -1,6 +1,7 @@
 import { scanUdmLogs } from './udm-logs';
 import { storeEvents, cleanupOldEvents } from './events';
 import { getSettings } from './settings';
+import { cleanupExpiredSessions } from './auth';
 
 let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
@@ -35,13 +36,14 @@ export function startScheduler(): void {
 		}, 60_000);
 	}
 
-	// Cleanup old events once per hour
+	// Cleanup old events + expired sessions once per hour
 	if (!cleanupInterval) {
 		cleanupInterval = setInterval(() => {
 			try {
 				cleanupOldEvents();
+				cleanupExpiredSessions();
 			} catch (err) {
-				console.error('[scheduler] Event cleanup failed:', err);
+				console.error('[scheduler] Cleanup failed:', err);
 			}
 		}, 3600_000);
 	}

@@ -13,30 +13,22 @@ export interface Go2rtcConfigParams {
 }
 
 /**
- * Generates go2rtc YAML config for a Mobotix camera with VAAPI hardware transcoding.
+ * Generates go2rtc YAML config with VAAPI hardware transcoding.
+ * Works for both Mobotix (HTTP MJPEG + RTSP audio) and Loxone (nginx proxy, no audio).
  */
 export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
-	const {
-		streamName,
-		cameraIp,
-		username,
-		password,
-		width,
-		height,
-		fps,
-		bitrate
-	} = params;
-
+	const { streamName, cameraIp, username, password, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
+	const vaapiFlags = `#video=h264#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
 
-	// Two sources merged into one stream:
-	// 1. HTTP MJPEG for video — stable with reconnect (no EOF issues like RTSP)
-	// 2. RTSP for audio passthrough — pcm_mulaw copy, lightweight and stable for audio-only
-	// This gives UniFi Protect both H.264 video + G.711 audio, matching native ONVIF cameras.
+	// Mobotix: HTTP MJPEG for video + RTSP for audio passthrough (G.711 mulaw)
+	const videoSource = `ffmpeg:http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength${vaapiFlags}`;
+	const audioSource = `ffmpeg:rtsp://${username}:${password}@${cameraIp}:554/stream0/mobotix.mjpeg#raw=-vn#audio=copy#raw=-rtsp_transport tcp`;
+
 	return `streams:
   ${streamName}:
-    - ffmpeg:http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength#video=h264#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
-    - ffmpeg:rtsp://${username}:${password}@${cameraIp}:554/stream0/mobotix.mjpeg#raw=-vn#audio=copy#raw=-rtsp_transport tcp
+    - ${videoSource}
+    - ${audioSource}
 
 ffmpeg:
   bin: ffmpeg
@@ -77,7 +69,7 @@ export function getInstallCommands(): string[] {
 }
 
 /**
- * Generates go2rtc YAML config for a Loxone Intercom (reads from local nginx proxy).
+ * Generates go2rtc YAML config for a Loxone Intercom (reads from local nginx proxy, no audio).
  */
 export function generateGo2rtcConfigLoxone(params: {
 	streamName: string;
@@ -88,10 +80,11 @@ export function generateGo2rtcConfigLoxone(params: {
 }): string {
 	const { streamName, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
+	const vaapiFlags = `#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
 
 	return `streams:
   ${streamName}:
-    - ffmpeg:http://localhost:8081/mjpg/video.mjpg#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
+    - ffmpeg:http://localhost:8081/mjpg/video.mjpg${vaapiFlags}
 
 ffmpeg:
   bin: ffmpeg

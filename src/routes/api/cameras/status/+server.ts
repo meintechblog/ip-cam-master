@@ -4,7 +4,6 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { listContainers } from '$lib/server/services/proxmox';
 import { getSettings } from '$lib/server/services/settings';
-import { checkStreamHealth } from '$lib/server/services/go2rtc';
 import { decrypt } from '$lib/server/services/crypto';
 import { getProtectStatus } from '$lib/server/services/protect';
 import { getFlappingCameras } from '$lib/server/services/events';
@@ -19,9 +18,6 @@ export const GET: RequestHandler = async () => {
 
 		// Get container statuses from Proxmox
 		let containerMap: Map<number, any> = new Map();
-		const pxSettings = await getSettings('proxmox_');
-		const pxHost = pxSettings.proxmox_host?.replace(/:.*$/, '') || '';
-		const pxAuthHeader = `PVEAPIToken=${pxSettings.proxmox_token_id}=${pxSettings.proxmox_token_secret}`;
 		try {
 			const containers = await listContainers();
 			containerMap = new Map(containers.map((c) => [c.vmid, c]));
@@ -37,21 +33,7 @@ export const GET: RequestHandler = async () => {
 				const containerIp = cam.containerIp;
 				const lxcCpu = containerData?.cpu ?? null;
 				const lxcMemory = containerData?.memory ?? null;
-				let lxcMac: string | null = null;
-
-				// Get MAC from Proxmox container config
-				if (containerData && pxHost) {
-					try {
-						const { execSync } = await import('node:child_process');
-						const configJson = execSync(
-							`curl -sk -H "Authorization: ${pxAuthHeader}" "https://${pxHost}:8006/api2/json/nodes/prox3/lxc/${cam.vmid}/config" --max-time 2`,
-							{ timeout: 3000, encoding: 'utf-8' }
-						);
-						const net0 = JSON.parse(configJson)?.data?.net0 || '';
-						const macMatch = net0.match(/hwaddr=([A-Fa-f0-9:]+)/i);
-						if (macMatch) lxcMac = macMatch[1].toLowerCase();
-					} catch { /* skip */ }
-				}
+				const lxcMac: string | null = null; // MAC display-only, not worth per-camera API call
 
 				let go2rtcRunning = false;
 				let onvifRunning = false;

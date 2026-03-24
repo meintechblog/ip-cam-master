@@ -1,5 +1,5 @@
 import { redirect, fail } from '@sveltejs/kit';
-import { getUser, createUser, createSession, isYoloMode, validateSession } from '$lib/server/services/auth';
+import { getUser, createUser, createSession, isYoloMode, validateSession, setSessionCookie } from '$lib/server/services/auth';
 import { saveSetting } from '$lib/server/services/settings';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -37,12 +37,7 @@ export const actions: Actions = {
 
 		createUser(username, password);
 		const sessionId = createSession(username);
-		cookies.set('session', sessionId, {
-			path: '/',
-			httpOnly: true,
-			sameSite: 'lax',
-			maxAge: 86400
-		});
+		setSessionCookie(cookies, sessionId);
 		redirect(303, '/');
 	},
 
