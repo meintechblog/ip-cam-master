@@ -2,6 +2,7 @@
 	import OnboardingWizard from '$lib/components/onboarding/OnboardingWizard.svelte';
 	import { Loader2, Wifi, Check, PlayCircle, XCircle } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { tick } from 'svelte';
 
 	let { data } = $props();
 
@@ -18,11 +19,28 @@
 	let registerLoading = $state(false);
 
 	// Batch mode
+	interface BatchStep {
+		label: string;
+		status: 'pending' | 'active' | 'done' | 'error';
+		detail?: string;
+	}
+	interface BatchCamera {
+		ip: string;
+		name: string;
+		type: string;
+		status: 'pending' | 'active' | 'done' | 'error' | 'skipped';
+		error?: string;
+		steps: BatchStep[];
+		expanded: boolean;
+	}
 	let batchMode = $state(false);
 	let batchCancelled = $state(false);
 	let batchCurrentIndex = $state(0);
-	let batchResults = $state<{ ip: string; name: string; status: 'pending' | 'active' | 'done' | 'error' | 'skipped'; error?: string }[]>([]);
+	let batchResults = $state<BatchCamera[]>([]);
 	let batchCurrentIp = $state<string | null>(null);
+	let batchDoneCount = $derived(batchResults.filter(r => r.status === 'done').length);
+	let batchErrorCount = $derived(batchResults.filter(r => r.status === 'error').length);
+	let batchRunning = $derived(batchResults.some(r => r.status === 'active'));
 
 	// Pipeline cameras that need the wizard
 	let pipelineCameras = $derived(discovered.filter(c => c.type === 'mobotix' || c.type === 'loxone'));
@@ -127,43 +145,68 @@
 
 	// ── Batch: Add All ──────────────────────────────
 
+	function makePipelineSteps(type: string): BatchStep[] {
+		const steps: BatchStep[] = [
+			{ label: 'Zugangsdaten', status: 'pending' },
+			{ label: 'Verbindungstest', status: 'pending' },
+			{ label: 'Container erstellen', status: 'pending' },
+			{ label: 'go2rtc', status: 'pending' },
+		];
+		if (type === 'loxone') steps.push({ label: 'nginx Proxy', status: 'pending' });
+		steps.push({ label: 'ONVIF Server', status: 'pending' });
+		steps.push({ label: 'Stream pruefen', status: 'pending' });
+		return steps;
+	}
+
+	function makeOnvifSteps(): BatchStep[] {
+		return [
+			{ label: 'Zugangsdaten', status: 'pending' },
+			{ label: 'Registrieren', status: 'pending' },
+		];
+	}
+
+	function setStep(camIdx: number, stepIdx: number, status: BatchStep['status'], detail?: string) {
+		batchResults[camIdx].steps[stepIdx].status = status;
+		if (detail) batchResults[camIdx].steps[stepIdx].detail = detail;
+	}
+
 	async function startBatch() {
 		batchMode = true;
 		batchCancelled = false;
 		batchCurrentIndex = 0;
 
-		// Build queue: ONVIF cameras first (instant), then pipeline cameras
 		batchResults = [
-			...onvifCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, status: 'pending' as const })),
-			...pipelineCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, status: 'pending' as const }))
+			...onvifCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makeOnvifSteps(), expanded: false })),
+			...pipelineCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makePipelineSteps(c.type), expanded: false }))
 		];
 
 		for (let i = 0; i < batchResults.length; i++) {
 			if (batchCancelled) {
-				// Mark remaining as skipped
-				for (let j = i; j < batchResults.length; j++) {
-					batchResults[j].status = 'skipped';
-				}
+				for (let j = i; j < batchResults.length; j++) batchResults[j].status = 'skipped';
 				break;
 			}
 
 			batchCurrentIndex = i;
 			batchResults[i].status = 'active';
+			batchResults[i].expanded = true;
 			batchCurrentIp = batchResults[i].ip;
+			await scrollToCamera(i);
 			const cam = discovered.find(c => c.ip === batchResults[i].ip);
 
 			try {
 				if (cam?.type === 'mobotix-onvif') {
-					// Native ONVIF: just register
-					await batchRegisterOnvif(cam);
+					await batchRegisterOnvif(i, cam);
 				} else {
-					// Pipeline: run full onboarding via API calls
-					await batchOnboardPipeline(cam!);
+					await batchOnboardPipeline(i, cam!);
 				}
 				batchResults[i].status = 'done';
+				batchResults[i].expanded = false;
 			} catch (err: any) {
 				batchResults[i].status = 'error';
 				batchResults[i].error = err.message || 'Unbekannter Fehler';
+				// Mark current step as error
+				const activeStep = batchResults[i].steps.findIndex(s => s.status === 'active');
+				if (activeStep >= 0) batchResults[i].steps[activeStep].status = 'error';
 			}
 		}
 
@@ -174,8 +217,21 @@
 		batchCancelled = true;
 	}
 
-	async function batchRegisterOnvif(cam: { ip: string; name: string | null; type: string }) {
-		// Try credentials
+	async function scrollToCamera(idx: number) {
+		await tick();
+		const el = document.getElementById(`batch-cam-${idx}`);
+		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
+
+	// Auto-scroll when step changes
+	function setStepAndScroll(camIdx: number, stepIdx: number, status: BatchStep['status'], detail?: string) {
+		setStep(camIdx, stepIdx, status, detail);
+		if (status === 'active') scrollToCamera(camIdx);
+	}
+
+	async function batchRegisterOnvif(idx: number, cam: { ip: string; name: string | null; type: string }) {
+		// Step 0: Credentials
+		setStep(idx, 0, 'active');
 		let username = '';
 		let password = '';
 		try {
@@ -185,24 +241,31 @@
 				body: JSON.stringify({ ip: cam.ip, cameraType: 'mobotix-onvif' })
 			});
 			if (res.ok) {
-				const data = await res.json();
-				if (data.success) { username = data.username; password = data.password; }
+				const d = await res.json();
+				if (d.success) { username = d.username; password = d.password; }
 			}
 		} catch { /* ignore */ }
+		if (!username || !password) throw new Error('Keine passenden Zugangsdaten');
+		setStep(idx, 0, 'done', username);
 
-		if (!username || !password) throw new Error('Keine passenden Zugangsdaten gefunden');
-
+		// Step 1: Register
+		setStep(idx, 1, 'active');
 		const res = await fetch('/api/cameras/register', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name: cam.name || cam.ip, ip: cam.ip, username, password, cameraType: 'mobotix-onvif' })
 		});
-		const data = await res.json();
-		if (!data.success) throw new Error(data.error || 'Registrierung fehlgeschlagen');
+		const d = await res.json();
+		if (!d.success) throw new Error(d.error || 'Registrierung fehlgeschlagen');
+		setStep(idx, 1, 'done', 'Nativ ONVIF — kein Container');
 	}
 
-	async function batchOnboardPipeline(cam: { ip: string; name: string | null; type: string }) {
-		// Try credentials
+	async function batchOnboardPipeline(idx: number, cam: { ip: string; name: string | null; type: string }) {
+		let stepNum = 0;
+		const isLoxone = cam.type === 'loxone';
+
+		// Step 0: Credentials
+		setStep(idx, stepNum, 'active');
 		let username = '';
 		let password = '';
 		try {
@@ -212,18 +275,16 @@
 				body: JSON.stringify({ ip: cam.ip, cameraType: cam.type })
 			});
 			if (res.ok) {
-				const data = await res.json();
-				if (data.success) { username = data.username; password = data.password; }
+				const d = await res.json();
+				if (d.success) { username = d.username; password = d.password; }
 			}
 		} catch { /* ignore */ }
-
-		if (!username || !password) throw new Error('Keine passenden Zugangsdaten gefunden');
-
-		// Get fresh nextVmid
-		const vmidRes = await fetch('/api/proxmox/containers');
-		const nextVmidRes = await fetch(`${window.location.origin}/kameras/onboarding`, { headers: { 'Accept': 'application/json' } });
+		if (!username || !password) throw new Error('Keine passenden Zugangsdaten');
+		setStep(idx, stepNum, 'done', username);
+		stepNum++;
 
 		// Step 1: Test connection
+		setStep(idx, stepNum, 'active');
 		const testRes = await fetch('/api/onboarding/test-connection', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -232,28 +293,26 @@
 		});
 		const testData = await testRes.json();
 		if (!testData.success) throw new Error(testData.error || 'Verbindungstest fehlgeschlagen');
+		setStep(idx, stepNum, 'done', `${testData.width || 1280}x${testData.height || 720} @ ${testData.fps || 20}fps`);
+		stepNum++;
 
-		// Save camera (get fresh VMID from server)
+		// Save camera
 		const saveRes = await fetch('/api/onboarding/save-camera', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				name: cam.name || cam.ip,
-				ip: cam.ip,
-				username, password,
-				width: testData.width || 1280,
-				height: testData.height || 720,
-				fps: testData.fps || 20,
-				bitrate: testData.bitrate || 5000,
-				vmid: testData.nextVmid || data.nextVmid + batchCurrentIndex,
-				cameraType: cam.type
+				name: cam.name || cam.ip, ip: cam.ip, username, password,
+				width: testData.width || 1280, height: testData.height || 720,
+				fps: testData.fps || 20, bitrate: testData.bitrate || 5000,
+				vmid: testData.nextVmid || data.nextVmid + idx, cameraType: cam.type
 			}),
 		});
 		const saveData = await saveRes.json();
-		if (!saveData.success) throw new Error(saveData.error || 'Kamera speichern fehlgeschlagen');
+		if (!saveData.success) throw new Error(saveData.error || 'Speichern fehlgeschlagen');
 		const cameraId = saveData.cameraId;
 
 		// Step 2: Create container
+		setStep(idx, stepNum, 'active');
 		const createRes = await fetch('/api/onboarding/create-container', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -262,30 +321,39 @@
 		});
 		const createData = await createRes.json();
 		if (!createData.success) throw new Error(createData.error || 'Container fehlgeschlagen');
+		setStep(idx, stepNum, 'done', `LXC ${createData.vmid} @ ${createData.containerIp}`);
+		stepNum++;
 
-		// Step 3: Configure go2rtc
-		const go2rtcRes = await fetch('/api/onboarding/configure-go2rtc', {
+		// Step 3: go2rtc
+		setStep(idx, stepNum, 'active');
+		const g2rRes = await fetch('/api/onboarding/configure-go2rtc', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ cameraId }),
 			signal: AbortSignal.timeout(120000)
 		});
-		const go2rtcData = await go2rtcRes.json();
-		if (!go2rtcData.success) throw new Error(go2rtcData.error || 'go2rtc fehlgeschlagen');
+		const g2rData = await g2rRes.json();
+		if (!g2rData.success) throw new Error(g2rData.error || 'go2rtc fehlgeschlagen');
+		setStep(idx, stepNum, 'done', 'MJPEG → H.264 VAAPI');
+		stepNum++;
 
-		// Step 3b: Configure nginx (Loxone only)
-		if (cam.type === 'loxone') {
-			const nginxRes = await fetch('/api/onboarding/configure-nginx', {
+		// Step 3b: nginx (Loxone)
+		if (isLoxone) {
+			setStep(idx, stepNum, 'active');
+			const ngxRes = await fetch('/api/onboarding/configure-nginx', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ cameraId }),
 				signal: AbortSignal.timeout(120000)
 			});
-			const nginxData = await nginxRes.json();
-			if (!nginxData.success) throw new Error(nginxData.error || 'nginx fehlgeschlagen');
+			const ngxData = await ngxRes.json();
+			if (!ngxData.success) throw new Error(ngxData.error || 'nginx fehlgeschlagen');
+			setStep(idx, stepNum, 'done', 'Auth-Proxy aktiv');
+			stepNum++;
 		}
 
-		// Step 4: Configure ONVIF server
+		// Step 4: ONVIF
+		setStep(idx, stepNum, 'active');
 		const onvifRes = await fetch('/api/onboarding/configure-onvif', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -294,16 +362,20 @@
 		});
 		const onvifData = await onvifRes.json();
 		if (!onvifData.success) throw new Error(onvifData.error || 'ONVIF fehlgeschlagen');
+		setStep(idx, stepNum, 'done', 'Port 8899 aktiv');
+		stepNum++;
 
-		// Step 5: Verify stream
-		const verifyRes = await fetch('/api/onboarding/verify-stream', {
+		// Step 5: Verify
+		setStep(idx, stepNum, 'active');
+		const verRes = await fetch('/api/onboarding/verify-stream', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ cameraId }),
 			signal: AbortSignal.timeout(60000)
 		});
-		const verifyData = await verifyRes.json();
-		if (!verifyData.success) throw new Error('Stream-Verifikation fehlgeschlagen');
+		const verData = await verRes.json();
+		if (!verData.success) throw new Error('Stream-Verifikation fehlgeschlagen');
+		setStep(idx, stepNum, 'done', 'RTSP Stream OK');
 	}
 </script>
 
@@ -312,9 +384,21 @@
 {#if batchMode}
 	<!-- Batch Mode UI -->
 	<div class="space-y-4">
+		<!-- Header with progress + cancel -->
 		<div class="flex items-center justify-between">
-			<h2 class="text-lg font-bold text-text-primary">Alle Kameras hinzufuegen</h2>
-			{#if batchCurrentIp}
+			<div>
+				<h2 class="text-lg font-bold text-text-primary">
+					{#if batchRunning}
+						Kameras werden eingerichtet...
+					{:else}
+						Einrichtung abgeschlossen
+					{/if}
+				</h2>
+				<p class="text-sm text-text-secondary">
+					{batchDoneCount}/{batchResults.length} fertig{#if batchErrorCount > 0}<span class="text-red-400"> — {batchErrorCount} Fehler</span>{/if}
+				</p>
+			</div>
+			{#if batchRunning}
 				<button
 					onclick={cancelBatch}
 					class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium cursor-pointer"
@@ -332,38 +416,110 @@
 			{/if}
 		</div>
 
-		<div class="space-y-2">
-			{#each batchResults as result, i}
-				<div class="bg-bg-card border border-border rounded-lg px-4 py-3 flex items-center gap-3">
-					{#if result.status === 'done'}
-						<Check class="w-5 h-5 text-green-400 shrink-0" />
-					{:else if result.status === 'active'}
-						<Loader2 class="w-5 h-5 text-accent animate-spin shrink-0" />
-					{:else if result.status === 'error'}
-						<XCircle class="w-5 h-5 text-red-400 shrink-0" />
-					{:else if result.status === 'skipped'}
-						<span class="w-5 h-5 text-text-secondary shrink-0 text-center">—</span>
-					{:else}
-						<span class="w-5 h-5 rounded-full border-2 border-border shrink-0"></span>
-					{/if}
+		<!-- Progress bar -->
+		<div class="h-1.5 bg-bg-input rounded-full overflow-hidden">
+			<div
+				class="h-full rounded-full transition-all duration-500 {batchErrorCount > 0 ? 'bg-yellow-400' : 'bg-accent'}"
+				style="width: {((batchDoneCount + batchErrorCount) / batchResults.length * 100).toFixed(0)}%"
+			></div>
+		</div>
 
-					<span class="text-text-primary text-sm font-medium flex-1">{result.name}</span>
-					<span class="text-text-secondary text-xs font-mono">{result.ip}</span>
+		<!-- Camera cards -->
+		<div class="space-y-3">
+			{#each batchResults as cam, i (cam.ip)}
+				<div id="batch-cam-{i}" class="bg-bg-card border rounded-lg overflow-hidden transition-colors
+					{cam.status === 'active' ? 'border-accent/50' : cam.status === 'error' ? 'border-red-500/30' : cam.status === 'done' ? 'border-green-500/20' : 'border-border'}">
 
-					{#if result.status === 'active'}
-						<span class="text-xs text-accent">Wird eingerichtet...</span>
-					{:else if result.status === 'error'}
-						<span class="text-xs text-red-400">{result.error}</span>
-					{:else if result.status === 'skipped'}
-						<span class="text-xs text-text-secondary">Uebersprungen</span>
+					<!-- Camera header -->
+					<div class="px-4 py-3 flex items-center gap-3">
+						{#if cam.status === 'done'}
+							<div class="w-7 h-7 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+								<Check class="w-4 h-4 text-green-400" />
+							</div>
+						{:else if cam.status === 'active'}
+							<div class="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+								<Loader2 class="w-4 h-4 text-accent animate-spin" />
+							</div>
+						{:else if cam.status === 'error'}
+							<div class="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+								<XCircle class="w-4 h-4 text-red-400" />
+							</div>
+						{:else if cam.status === 'skipped'}
+							<div class="w-7 h-7 rounded-full bg-bg-input flex items-center justify-center shrink-0">
+								<span class="text-text-secondary text-xs">—</span>
+							</div>
+						{:else}
+							<div class="w-7 h-7 rounded-full border-2 border-border shrink-0"></div>
+						{/if}
+
+						<div class="flex-1 min-w-0">
+							<div class="flex items-center gap-2">
+								<span class="text-text-primary text-sm font-semibold">{cam.name}</span>
+								<span class="text-text-secondary text-xs font-mono">{cam.ip}</span>
+								{#if cam.type === 'mobotix-onvif'}
+									<span class="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">ONVIF</span>
+								{:else if cam.type === 'loxone'}
+									<span class="text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">Loxone</span>
+								{:else}
+									<span class="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Mobotix</span>
+								{/if}
+							</div>
+							{#if cam.status === 'error' && cam.error}
+								<p class="text-xs text-red-400 mt-0.5">{cam.error}</p>
+							{/if}
+						</div>
+
+						<!-- Compact step indicators for done/pending cameras -->
+						{#if cam.status === 'done'}
+							<div class="flex items-center gap-1">
+								{#each cam.steps as step}
+									<div class="w-2 h-2 rounded-full bg-green-400"></div>
+								{/each}
+							</div>
+						{:else if cam.status === 'pending'}
+							<div class="flex items-center gap-1">
+								{#each cam.steps as step}
+									<div class="w-2 h-2 rounded-full bg-border"></div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Live step details (always visible for active, stays visible for done/error) -->
+					{#if cam.status === 'active' || cam.expanded || cam.status === 'error'}
+						<div class="px-4 pb-3 border-t border-border/50">
+							<div class="space-y-1.5 pt-2.5">
+								{#each cam.steps as step, si}
+									<div class="flex items-center gap-2.5 text-xs">
+										{#if step.status === 'done'}
+											<Check class="w-3.5 h-3.5 text-green-400 shrink-0" />
+										{:else if step.status === 'active'}
+											<Loader2 class="w-3.5 h-3.5 text-accent animate-spin shrink-0" />
+										{:else if step.status === 'error'}
+											<XCircle class="w-3.5 h-3.5 text-red-400 shrink-0" />
+										{:else}
+											<div class="w-3.5 h-3.5 rounded-full border border-border shrink-0"></div>
+										{/if}
+
+										<span class="{step.status === 'active' ? 'text-accent font-medium' : step.status === 'done' ? 'text-text-primary' : step.status === 'error' ? 'text-red-400' : 'text-text-secondary'}">
+											{step.label}
+										</span>
+
+										{#if step.detail}
+											<span class="text-text-secondary ml-auto font-mono">{step.detail}</span>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
 					{/if}
 				</div>
 			{/each}
 		</div>
 
-		{#if batchCancelled && !batchCurrentIp}
+		{#if batchCancelled && !batchRunning}
 			<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-yellow-400 text-sm">
-				Batch abgebrochen. Bereits eingerichtete Kameras bleiben bestehen.
+				Abgebrochen. Bereits eingerichtete Kameras bleiben bestehen.
 			</div>
 		{/if}
 	</div>
