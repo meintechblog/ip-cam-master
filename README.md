@@ -92,9 +92,25 @@ Same command for **updates** (detects existing VM, pulls latest, rebuilds) and *
 
 ### Prerequisites
 
-- Proxmox VE 8.x host
-- Intel GPU on Proxmox host for VAAPI hardware transcoding (`/dev/dri/renderD128`)
+- **Proxmox VE 8.x** host (x86_64 only — no ARM support)
+- **Intel GPU with VAAPI** on the Proxmox host (`/dev/dri/renderD128` must exist)
 - Debian 12 LXC template: `pveam download local debian-12-standard_12.12-1_amd64.tar.zst`
+
+### Why Intel VAAPI? Why not Software / ARM / Nvidia?
+
+IP-Cam-Master requires hardware video transcoding (MJPEG → H.264) via Intel VAAPI. This is a deliberate design decision, not a limitation we plan to remove:
+
+| Platform | Supported | Why |
+|----------|-----------|-----|
+| **Intel** (Core 6th+, Atom, N95/N100/N200) | **Yes** | VAAPI via `/dev/dri/renderD128`, passthrough to LXC containers works out of the box |
+| **Software transcoding (CPU)** | No | Too slow for real-time multi-camera transcoding. A single Mobotix stream at 1080p20 would max out a CPU core |
+| **Raspberry Pi 4/5** | No | Proxmox is x86_64 only. RPi uses VideoCore (V4L2), not VAAPI — entirely different ffmpeg pipeline. RPi 5 dropped the H.264 hardware encoder |
+| **Nvidia GPU** | No | Would require NVENC support in go2rtc configs, different device paths, nvidia-container-toolkit in LXC. Possible but not implemented |
+| **AMD GPU** | No | VA-API exists on AMD but untested. LXC device passthrough differs from Intel. May work with community patches |
+
+The entire pipeline (go2rtc config generation, LXC `/dev/dri` passthrough, ffmpeg flags) is built around Intel VAAPI. Supporting other platforms would require a separate transcoding backend per platform — not worth the complexity for a homelab tool.
+
+**Recommended hardware:** Intel N100 or N200 mini PCs (fanless, ~10W TDP, ~€150) handle 6+ camera streams easily.
 
 ### Development
 
