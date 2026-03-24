@@ -19,16 +19,26 @@ export interface Go2rtcConfigParams {
 export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 	const { streamName, cameraIp, username, password, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
-	const vaapiFlags = `#video=h264#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
+	const sourceUrl = `http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength`;
+	const vaapiBase = `#video=h264#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
 
-	// Mobotix: HTTP MJPEG for video + RTSP for audio passthrough (G.711 mulaw)
-	const videoSource = `ffmpeg:http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength${vaapiFlags}`;
+	// HQ: full resolution + audio passthrough
+	const hqVideo = `ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k`;
 	const audioSource = `ffmpeg:rtsp://${username}:${password}@${cameraIp}:554/stream0/mobotix.mjpeg#raw=-vn#audio=copy#raw=-rtsp_transport tcp`;
+
+	// LQ: half resolution, lower bitrate, no audio
+	const lqWidth = Math.round(width / 2);
+	const lqHeight = Math.round(height / 2);
+	const lqBitrate = Math.max(500, Math.round(bitrate / 5));
+	const lqBufsize = lqBitrate * 2;
+	const lqVideo = `ffmpeg:${sourceUrl}${vaapiBase}#width=${lqWidth}#height=${lqHeight}#raw=-maxrate ${lqBitrate}k#raw=-bufsize ${lqBufsize}k`;
 
 	return `streams:
   ${streamName}:
-    - ${videoSource}
+    - ${hqVideo}
     - ${audioSource}
+  ${streamName}-low:
+    - ${lqVideo}
 
 ffmpeg:
   bin: ffmpeg
@@ -80,11 +90,20 @@ export function generateGo2rtcConfigLoxone(params: {
 }): string {
 	const { streamName, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
-	const vaapiFlags = `#video=h264#width=${width}#height=${height}#raw=-r ${fps}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
+	const sourceUrl = `http://localhost:8081/mjpg/video.mjpg`;
+	const vaapiBase = `#video=h264#raw=-r ${fps}#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
+
+	// LQ: half resolution, lower bitrate
+	const lqWidth = Math.round(width / 2);
+	const lqHeight = Math.round(height / 2);
+	const lqBitrate = Math.max(500, Math.round(bitrate / 5));
+	const lqBufsize = lqBitrate * 2;
 
 	return `streams:
   ${streamName}:
-    - ffmpeg:http://localhost:8081/mjpg/video.mjpg${vaapiFlags}
+    - ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k
+  ${streamName}-low:
+    - ffmpeg:${sourceUrl}${vaapiBase}#width=${lqWidth}#height=${lqHeight}#raw=-maxrate ${lqBitrate}k#raw=-bufsize ${lqBufsize}k
 
 ffmpeg:
   bin: ffmpeg
@@ -168,6 +187,10 @@ export function generateOnvifConfig(params: {
 		onvifPort = 8899
 	} = params;
 
+	const lqWidth = Math.round(width / 2);
+	const lqHeight = Math.round(height / 2);
+	const lqBitrate = Math.max(500, Math.round(bitrate / 5));
+
 	return `onvif:
   - mac: ${mac}
     ports:
@@ -185,12 +208,12 @@ export function generateOnvifConfig(params: {
       bitrate: ${bitrate}
       quality: 4
     lowQuality:
-      rtsp: /${streamName}
+      rtsp: /${streamName}-low
       snapshot: /api/frame.jpeg?src=${streamName}
-      width: ${width}
-      height: ${height}
+      width: ${lqWidth}
+      height: ${lqHeight}
       framerate: ${fps}
-      bitrate: ${bitrate}
+      bitrate: ${lqBitrate}
       quality: 1
     target:
       hostname: localhost
