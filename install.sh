@@ -164,6 +164,28 @@ cleanup_on_failure() {
 fresh_install() {
   trap cleanup_on_failure ERR
 
+  # Hardware check: VAAPI required for video transcoding
+  if [ ! -e /dev/dri/renderD128 ]; then
+    echo ""
+    echo "========================================"
+    echo "  FEHLER: Keine VAAPI-Hardware gefunden"
+    echo "========================================"
+    echo ""
+    echo "  /dev/dri/renderD128 existiert nicht."
+    echo ""
+    echo "  IP-Cam-Master benoetigt eine Intel GPU mit VAAPI-Support"
+    echo "  fuer die Hardware-Transcodierung (MJPEG → H.264)."
+    echo "  Ohne passende GPU funktioniert die Kamera-Pipeline nicht."
+    echo ""
+    echo "  Unterstuetzte Plattformen:"
+    echo "    - Intel Core (6. Generation+) / Xeon E3 v5+"
+    echo "    - Intel Atom (Apollo Lake, Gemini Lake, Jasper Lake)"
+    echo "    - Intel N-Series (N95, N100, N200, N305)"
+    echo ""
+    error_exit "Installation abgebrochen. Bitte nutze einen Host mit Intel GPU."
+  fi
+  step "VAAPI-Hardware erkannt: /dev/dri/renderD128"
+
   # Security warning (D-07, D-09)
   echo "WARNUNG: Dieses Skript wird:"
   echo "  - Eine VM auf diesem Proxmox-Host erstellen"
