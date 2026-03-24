@@ -61,13 +61,13 @@
 	// Step log
 	let stepLog = $state<{ step: number; label: string; detail: string; status: 'done' | 'active' | 'pending' }[]>([]);
 
-	// Long-running fetch with 5 min timeout
+	// Long-running fetch with 10 min timeout (ONVIF install can take 5-8 min on first run)
 	function longFetch(url: string, body: any): Promise<Response> {
 		return fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
-			signal: AbortSignal.timeout(300000)
+			signal: AbortSignal.timeout(600000)
 		});
 	}
 
