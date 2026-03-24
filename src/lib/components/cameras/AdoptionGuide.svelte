@@ -42,7 +42,7 @@
 				result = await res.json();
 			} else {
 				const data = await res.json().catch(() => ({}));
-				error = data.error || 'Fehler beim Pruefen des ONVIF-Servers';
+				error = data.error || 'Fehler beim Prüfen des ONVIF-Servers';
 			}
 		} catch {
 			error = 'Verbindung fehlgeschlagen';
@@ -67,21 +67,21 @@
 			Protect Adoption -- {cameraName}
 		</h3>
 		<p class="text-text-secondary text-xs mb-5">
-			{targetIp ? `${isNativeOnvif ? 'Kamera' : 'Container'} IP: ${targetIp}` : 'Kamera wird geprueft...'}
+			{targetIp ? `${isNativeOnvif ? 'Kamera' : 'Container'} IP: ${targetIp}` : 'Kamera wird geprüft...'}
 		</p>
 
 		{#if loading}
 			<!-- Loading state -->
 			<div class="flex items-center gap-3 text-text-secondary py-8 justify-center">
 				<Loader2 class="w-5 h-5 animate-spin" />
-				<span>ONVIF-Server wird geprueft...</span>
+				<span>ONVIF-Server wird geprüft...</span>
 			</div>
 		{:else if result && result.onvifRunning}
 			<!-- Success state -->
 			<div class="space-y-4">
 				<div class="flex items-center gap-2 text-success">
 					<CheckCircle class="w-5 h-5" />
-					<span class="font-medium text-sm">ONVIF-Server laeuft</span>
+					<span class="font-medium text-sm">ONVIF-Server läuft</span>
 				</div>
 
 				{#if result.instructions.length > 0}
@@ -105,13 +105,13 @@
 						class="flex items-center gap-2 px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-accent/90"
 					>
 						<ExternalLink class="w-4 h-4" />
-						UniFi Protect oeffnen
+						UniFi Protect öffnen
 					</a>
 					<button
 						onclick={onClose}
 						class="px-4 py-2 text-sm bg-bg-input text-text-secondary rounded-lg hover:bg-bg-primary cursor-pointer"
 					>
-						Schliessen
+						Schließen
 					</button>
 				</div>
 			</div>
@@ -137,13 +137,13 @@
 						onclick={checkAdoption}
 						class="flex items-center gap-2 px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-accent/90 cursor-pointer"
 					>
-						Erneut pruefen
+						Erneut prüfen
 					</button>
 					<button
 						onclick={onClose}
 						class="px-4 py-2 text-sm bg-bg-input text-text-secondary rounded-lg hover:bg-bg-primary cursor-pointer"
 					>
-						Schliessen
+						Schließen
 					</button>
 				</div>
 			</div>

@@ -67,7 +67,7 @@
 				</div>
 
 				<div class="bg-bg-card rounded-lg border border-border p-6">
-					<h2 class="text-lg font-semibold text-text-primary mb-4">Passwort aendern</h2>
+					<h2 class="text-lg font-semibold text-text-primary mb-4">Passwort ändern</h2>
 					<form method="POST" action="?/changePassword" use:enhance class="space-y-4">
 						<div>
 							<label for="currentPassword" class="block text-sm font-medium text-text-secondary mb-1">
@@ -101,7 +101,7 @@
 							class="px-4 py-2 bg-accent text-white rounded font-medium
 								hover:bg-accent/90 transition-colors"
 						>
-							Passwort aendern
+							Passwort ändern
 						</button>
 					</form>
 				</div>

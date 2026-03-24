@@ -156,7 +156,7 @@
 			<Monitor class="w-12 h-12 text-text-secondary mx-auto mb-4 opacity-40" />
 			<p class="text-lg text-text-secondary mb-2">Keine Kameras eingerichtet</p>
 			<a href="/kameras/onboarding" class="text-accent hover:underline text-sm">
-				Erste Kamera hinzufuegen
+				Erste Kamera hinzufügen
 			</a>
 		</div>
 	{:else}
@@ -172,7 +172,7 @@
 						<CheckCircle class="w-5 h-5 text-success" />
 					</div>
 					<div>
-						<p class="text-text-primary font-semibold">Alles laeuft</p>
+						<p class="text-text-primary font-semibold">Alles läuft</p>
 						<p class="text-text-secondary text-sm">{total} Kamera{total !== 1 ? 's' : ''} online — keine Probleme</p>
 					</div>
 				{:else if healthStatus === 'warn'}
@@ -358,7 +358,7 @@
 		<!-- Camera Status Table -->
 		<div class="bg-bg-card rounded-xl border border-border overflow-hidden">
 			<div class="px-5 py-4 border-b border-border flex items-center justify-between">
-				<span class="text-text-secondary text-xs font-medium uppercase tracking-wider">Kamera-Uebersicht</span>
+				<span class="text-text-secondary text-xs font-medium uppercase tracking-wider">Kamera-Übersicht</span>
 				<a href="/kameras" class="text-xs text-accent hover:underline flex items-center gap-1">
 					Alle Kameras <ArrowRight class="w-3 h-3" />
 				</a>

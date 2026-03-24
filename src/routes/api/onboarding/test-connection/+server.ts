@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					streamPath: '/mjpg/video.mjpg'
 				});
 			} else if (code === '401') {
-				return json({ success: false, error: 'Authentifizierung fehlgeschlagen — Passwort pruefen' });
+				return json({ success: false, error: 'Authentifizierung fehlgeschlagen — Passwort prüfen' });
 			}
 			return json({ success: false, error: `Intercom nicht erreichbar (HTTP ${code})` });
 		}

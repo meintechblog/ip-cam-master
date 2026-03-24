@@ -11,7 +11,7 @@
 		if (password && password.length < 6) {
 			clientError = 'Passwort muss mindestens 6 Zeichen lang sein.';
 		} else if (confirmPassword && password !== confirmPassword) {
-			clientError = 'Passwoerter stimmen nicht ueberein.';
+			clientError = 'Passwörter stimmen nicht überein.';
 		} else {
 			clientError = '';
 		}
@@ -22,7 +22,7 @@
 	<div class="w-full max-w-md">
 		<div class="bg-bg-secondary rounded-lg border border-border p-8">
 			<h1 class="text-2xl font-bold text-text-primary mb-2">IP-Cam-Master einrichten</h1>
-			<p class="text-text-secondary mb-6">Erstelle einen Benutzer fuer den Zugangsschutz.</p>
+			<p class="text-text-secondary mb-6">Erstelle einen Benutzer für den Zugangsschutz.</p>
 
 			{#if form?.error}
 				<div class="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded mb-4">
@@ -69,7 +69,7 @@
 					</div>
 					<div>
 						<label for="confirmPassword" class="block text-sm font-medium text-text-secondary mb-1">
-							Passwort bestaetigen
+							Passwort bestätigen
 						</label>
 						<input
 							type="password"
@@ -99,7 +99,7 @@
 			<div class="mt-8 pt-6 border-t border-border">
 				<h2 class="text-lg font-semibold text-text-primary mb-2">YOLO-Modus</h2>
 				<p class="text-sm text-text-secondary mb-4">
-					Kein Login, sofort nutzbar. Du kannst den Zugangsschutz spaeter in den Einstellungen aktivieren.
+					Kein Login, sofort nutzbar. Du kannst den Zugangsschutz später in den Einstellungen aktivieren.
 				</p>
 				<form method="POST" action="?/yolo" use:enhance>
 					<button

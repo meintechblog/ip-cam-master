@@ -127,7 +127,7 @@
 
 	async function submitRegister() {
 		if (!registerName || !registerUser || !registerPass || !registeringIp) {
-			registerError = 'Bitte alle Felder ausfuellen';
+			registerError = 'Bitte alle Felder ausfüllen';
 			return;
 		}
 		registerLoading = true;
@@ -159,12 +159,12 @@
 	function makePipelineSteps(type: string): BatchStep[] {
 		const steps: BatchStep[] = [
 			{ label: 'Zugangsdaten', status: 'pending', subs: [
-				{ label: 'Gespeicherte Credentials pruefen', status: 'pending' },
+				{ label: 'Gespeicherte Credentials prüfen', status: 'pending' },
 				{ label: 'Login testen', status: 'pending' },
 			]},
 			{ label: 'Verbindungstest', status: 'pending', subs: [
 				{ label: 'RTSP-Stream proben (ffprobe)', status: 'pending' },
-				{ label: 'Aufloesung + FPS erkennen', status: 'pending' },
+				{ label: 'Auflösung + FPS erkennen', status: 'pending' },
 				{ label: 'Vorschaubild laden', status: 'pending' },
 			]},
 			{ label: 'Container erstellen', status: 'pending', subs: [
@@ -188,11 +188,11 @@
 			{ label: 'git clone onvif-server', status: 'pending' },
 			{ label: 'npm install', status: 'pending' },
 			{ label: 'MAC + UUID auslesen', status: 'pending' },
-			{ label: 'Geraetename patchen', status: 'pending' },
+			{ label: 'Gerätename patchen', status: 'pending' },
 			{ label: 'config.yaml generieren', status: 'pending' },
 			{ label: 'systemd Service starten', status: 'pending' },
 		]});
-		steps.push({ label: 'Stream pruefen', status: 'pending', subs: [
+		steps.push({ label: 'Stream prüfen', status: 'pending', subs: [
 			{ label: 'go2rtc API abfragen', status: 'pending' },
 			{ label: 'RTSP-Stream verifizieren', status: 'pending' },
 		]});
@@ -202,11 +202,11 @@
 	function makeOnvifSteps(): BatchStep[] {
 		return [
 			{ label: 'Zugangsdaten', status: 'pending', subs: [
-				{ label: 'Gespeicherte Credentials pruefen', status: 'pending' },
+				{ label: 'Gespeicherte Credentials prüfen', status: 'pending' },
 			]},
 			{ label: 'Registrieren', status: 'pending', subs: [
 				{ label: 'In Datenbank speichern', status: 'pending' },
-				{ label: 'Nativ ONVIF — kein Container noetig', status: 'pending' },
+				{ label: 'Nativ ONVIF — kein Container nötig', status: 'pending' },
 			]},
 		];
 	}
@@ -629,11 +629,11 @@
 
 {:else if selectedIp}
 	<button onclick={() => { selectedIp = null; prefillUser = ''; prefillPass = ''; prefillCredName = ''; }} class="text-accent hover:text-accent/80 text-sm mb-4 cursor-pointer">
-		&larr; Zurueck zur Auswahl
+		&larr; Zurück zur Auswahl
 	</button>
 	{#if prefillCredName}
 		<div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4 text-green-400 text-sm">
-			Login "{prefillCredName}" automatisch erkannt und vorausgefuellt.
+			Login "{prefillCredName}" automatisch erkannt und vorausgefüllt.
 		</div>
 	{/if}
 	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} />
@@ -665,7 +665,7 @@
 					class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 text-sm font-medium cursor-pointer"
 				>
 					<PlayCircle class="w-4 h-4" />
-					Alle hinzufuegen ({discovered.length})
+					Alle hinzufügen ({discovered.length})
 				</button>
 			</div>
 		{/if}
@@ -685,7 +685,7 @@
 								<span class="text-text-primary font-mono {cam.name ? 'text-text-secondary text-xs' : 'font-medium'}">{cam.ip}</span>
 								{#if cam.type === 'mobotix-onvif'}
 									<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">MOBOTIX ONVIF</span>
-									<span class="text-xs text-text-secondary">Nativ — kein Container noetig</span>
+									<span class="text-xs text-text-secondary">Nativ — kein Container nötig</span>
 								{:else if cam.type === 'mobotix'}
 									<span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">MOBOTIX</span>
 									<span class="text-xs text-text-secondary">Braucht Pipeline (go2rtc + ONVIF)</span>

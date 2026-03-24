@@ -34,10 +34,10 @@
 		></button>
 
 		<div class="relative bg-bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-			<h2 class="text-lg font-semibold text-text-primary mb-2">Container loeschen?</h2>
+			<h2 class="text-lg font-semibold text-text-primary mb-2">Container löschen?</h2>
 			<p class="text-sm text-text-secondary mb-6">
 				Soll Container <strong class="text-text-primary">{containerName}</strong> (VMID {vmid})
-				wirklich geloescht werden? Diese Aktion kann nicht rueckgaengig gemacht werden.
+				wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden.
 			</p>
 
 			<div class="flex justify-end gap-3">
@@ -51,8 +51,8 @@
 					onclick={onConfirm}
 					class="px-4 py-2 text-sm font-medium text-white bg-danger hover:bg-danger/90 rounded-md transition-colors"
 				>
-					Loeschen
-				</button>
+					Löschen
+</button>
 			</div>
 		</div>
 	</div>

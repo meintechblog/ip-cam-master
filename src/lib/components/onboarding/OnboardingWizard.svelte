@@ -158,7 +158,7 @@
 			name = cameraType === 'loxone' ? `Intercom` : `Kamera-${lastOctet}`;
 		}
 		if (!name || !ip || !username || !password) {
-			error = 'Bitte alle Pflichtfelder ausfuellen';
+			error = 'Bitte alle Pflichtfelder ausfüllen';
 			return;
 		}
 		loading = true;
@@ -188,9 +188,9 @@
 
 	async function skipConnectionTest() {
 		canSkipTest = false;
-		addSubLog(`Verbindungstest uebersprungen — verwende Standardwerte`);
+		addSubLog(`Verbindungstest übersprungen — verwende Standardwerte`);
 		connectionInfo = `${width}x${height} @ ${fps}fps, ${bitrate} kbit/s (Standard)`;
-		addLog(1, 'Verbindung testen', `Uebersprungen — ${connectionInfo}`, 'done');
+		addLog(1, 'Verbindung testen', `Übersprungen — ${connectionInfo}`, 'done');
 		error = null;
 		loading = true;
 		await runStep2_CreateContainer();
@@ -218,7 +218,7 @@
 			if (data.resolution) {
 				const parts = data.resolution.split('x');
 				if (parts.length === 2) { width = parseInt(parts[0]) || width; height = parseInt(parts[1]) || height; }
-				addSubLog(`Kamera-Aufloesung erkannt: ${data.resolution}`);
+				addSubLog(`Kamera-Auflösung erkannt: ${data.resolution}`);
 			}
 			if (data.fps) {
 				fps = data.fps;
@@ -295,7 +295,7 @@
 		addSubLog(`  listen 127.0.0.1:8081`);
 		addSubLog(`  proxy_pass http://${ip}/mjpg/`);
 		addSubLog(`  Authorization: Basic header einbetten (${username}:***)`);
-		addSubLog(`  proxy_buffering off (wichtig fuer MJPEG-Streams)`);
+		addSubLog(`  proxy_buffering off (wichtig für MJPEG-Streams)`);
 		addSubLog(`  proxy_http_version 1.1`);
 		addSubLog(`Config schreiben: /etc/nginx/nginx.conf`);
 		addSubLog(`systemctl restart nginx`);
@@ -307,8 +307,8 @@
 			if (!data.success) throw new Error(data.error || 'nginx Konfiguration fehlgeschlagen');
 
 			flushSubLog();
-			addSubLog(`nginx laeuft auf Port 8081 — Auth-Stripping aktiv`);
-			addLog(3, 'nginx Reverse Proxy', `nginx laeuft — strippt Auth fuer ${ip}`, 'done');
+			addSubLog(`nginx läuft auf Port 8081 — Auth-Stripping aktiv`);
+			addLog(3, 'nginx Reverse Proxy', `nginx läuft — strippt Auth für ${ip}`, 'done');
 			await runStep4_ConfigureGo2rtcLoxone();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -341,8 +341,8 @@
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
 			flushSubLog();
-			addSubLog(`go2rtc Service laeuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
-			addLog(4, 'go2rtc konfigurieren', `go2rtc laeuft — liest von nginx @ localhost:8081`, 'done');
+			addSubLog(`go2rtc Service läuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
+			addLog(4, 'go2rtc konfigurieren', `go2rtc läuft — liest von nginx @ localhost:8081`, 'done');
 			await runStep5_ConfigureOnvifLoxone();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -372,8 +372,8 @@
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
 			flushSubLog();
-			addSubLog(`ONVIF Server laeuft auf Port 8899`);
-			addLog(5, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899`, 'done');
+			addSubLog(`ONVIF Server läuft auf Port 8899`);
+			addLog(5, 'ONVIF Server', `ONVIF läuft — "${safeName}" @ ${containerIp}:8899`, 'done');
 			await runStep6_VerifyStreamLoxone();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -387,10 +387,10 @@
 		currentStep = 6;
 		error = null;
 		clearSubLog();
-		addLog(6, 'Stream verifizieren', 'Pruefe ob alles laeuft...', 'active');
+		addLog(6, 'Stream verifizieren', 'Prüfe ob alles läuft...', 'active');
 		startSubLogDrip();
 		addSubLog(`GET http://${containerIp}:1984/api/streams`);
-		addSubLog(`Pruefe Stream "${streamName}" ...`);
+		addSubLog(`Prüfe Stream "${streamName}" ...`);
 
 		try {
 			const res = await fetch('/api/onboarding/verify-stream', {
@@ -405,8 +405,8 @@
 			flushSubLog();
 			addSubLog(`Stream aktiv: Intercom → nginx → go2rtc → RTSP`);
 			addSubLog(`RTSP-Output: ${rtspUrl}`);
-			addSubLog(`ONVIF-Discovery aktiv fuer UniFi Protect`);
-			addLog(6, 'Stream verifizieren', `Alles laeuft — ${rtspUrl}`, 'done');
+			addSubLog(`ONVIF-Discovery aktiv für UniFi Protect`);
+			addLog(6, 'Stream verifizieren', `Alles läuft — ${rtspUrl}`, 'done');
 			loading = false;
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -426,7 +426,7 @@
 		addSubLog(`go2rtc Binary von github.com/AlexxIT/go2rtc herunterladen...`);
 		addSubLog(`/usr/local/bin/go2rtc installiert`);
 		if (cameraType === 'loxone') {
-			addSubLog(`nginx installieren (Reverse Proxy fuer Auth-Stripping)...`);
+			addSubLog(`nginx installieren (Reverse Proxy für Auth-Stripping)...`);
 			addSubLog(`nginx.conf generieren:`);
 			addSubLog(`  listen 127.0.0.1:8081`);
 			addSubLog(`  proxy_pass http://${ip}/mjpg/`);
@@ -447,7 +447,7 @@
 		if (cameraType !== 'loxone') {
 			addSubLog(`  Audio: pcm_mulaw passthrough (kein Transcoding)`);
 		} else {
-			addSubLog(`  Audio: nicht verfuegbar (Intercom hat keinen Audio-Stream)`);
+			addSubLog(`  Audio: nicht verfügbar (Intercom hat keinen Audio-Stream)`);
 		}
 		addSubLog(`  Hardware: VAAPI (Intel /dev/dri/renderD128)`);
 		addSubLog(`Config schreiben: /etc/go2rtc/go2rtc.yaml`);
@@ -459,8 +459,8 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
-			addSubLog(`go2rtc Service laeuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
-			addLog(3, 'go2rtc konfigurieren', `go2rtc laeuft — MJPEG → H.264 VAAPI @ ${containerIp}:8554`, 'done');
+			addSubLog(`go2rtc Service läuft auf Port 8554 (RTSP) + 1984 (HTTP/WebRTC)`);
+			addLog(3, 'go2rtc konfigurieren', `go2rtc läuft — MJPEG → H.264 VAAPI @ ${containerIp}:8554`, 'done');
 			await runStep4_ConfigureOnvif();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -487,7 +487,7 @@
 		addSubLog(`  Model: 'Cardinal' → 'Mobotix'`);
 		addSubLog(`  ONVIF-Name: 'Cardinal' → 'MOBOTIXS15'`);
 		if (cameraType !== 'loxone') {
-			addSubLog(`Audio-Profil patchen (G.711 mulaw fuer UniFi Protect)`);
+			addSubLog(`Audio-Profil patchen (G.711 mulaw für UniFi Protect)`);
 		}
 		addSubLog(`config.yaml generieren:`);
 		addSubLog(`  Stream: /${streamName} → localhost:8554`);
@@ -504,8 +504,8 @@
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
-			addSubLog(`ONVIF Server laeuft auf Port 8899 — Discovery + Audio aktiv`);
-			addLog(4, 'ONVIF Server', `ONVIF laeuft — "${safeName}" @ ${containerIp}:8899 (mit Audio)`, 'done');
+			addSubLog(`ONVIF Server läuft auf Port 8899 — Discovery + Audio aktiv`);
+			addLog(4, 'ONVIF Server', `ONVIF läuft — "${safeName}" @ ${containerIp}:8899 (mit Audio)`, 'done');
 			await runStep5_VerifyStream();
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : String(err);
@@ -519,10 +519,10 @@
 		currentStep = 5;
 		error = null;
 		clearSubLog();
-		addLog(5, 'Stream verifizieren', 'Pruefe ob alles laeuft...', 'active');
+		addLog(5, 'Stream verifizieren', 'Prüfe ob alles läuft...', 'active');
 		startSubLogDrip();
 		addSubLog(`GET http://${containerIp}:1984/api/streams`);
-		addSubLog(`Pruefe Stream "${streamName}" ...`);
+		addSubLog(`Prüfe Stream "${streamName}" ...`);
 		addSubLog(`Erwarte: mindestens 1 Producer (ffmpeg/go2rtc)`);
 
 		try {
@@ -543,7 +543,7 @@
 				addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar (mit Audio)`);
 				addLog(5, 'Stream verifizieren', `H.264 + Audio — ${rtspUrl}`, 'done');
 			} else {
-				addSubLog(`Audio: nicht verfuegbar`);
+				addSubLog(`Audio: nicht verfügbar`);
 				addSubLog(`RTSP-Output: ${rtspUrl}`);
 				addSubLog(`Kamera ist per ONVIF-Discovery in UniFi Protect auffindbar`);
 				addLog(5, 'Stream verifizieren', `H.264 (Video only) — ${rtspUrl}`, 'done');
@@ -626,7 +626,7 @@
 							</button>
 							{#if canSkipTest}
 								<button onclick={skipConnectionTest} class="bg-bg-input text-text-secondary rounded-lg px-4 py-2 text-sm hover:bg-bg-card cursor-pointer">
-									Ueberspringen (Standardwerte)
+									Überspringen (Standardwerte)
 								</button>
 							{/if}
 						</div>
@@ -705,7 +705,7 @@
 							</div>
 							<p class="text-xs text-text-secondary mb-4">Die Kamera ist jetzt per ONVIF in UniFi Protect auffindbar.</p>
 							<button onclick={() => goto('/kameras')} class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium cursor-pointer">
-								Zur Kamerauebersicht
+								Zur Kameraübersicht
 							</button>
 						</div>
 					{/if}

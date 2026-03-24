@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		if (!targetIp) {
 			return json({
-				error: 'Keine IP fuer diese Kamera konfiguriert',
+				error: 'Keine IP für diese Kamera konfiguriert',
 				onvifRunning: false,
 				containerReachable: false,
 				instructions: []
@@ -39,11 +39,11 @@ export const POST: RequestHandler = async ({ request }) => {
 				onvifRunning: true,
 				containerReachable: true,
 				instructions: [
-					`Oeffne UniFi Protect auf https://${unifiHost || '<UniFi-Host>'}`,
-					'Navigiere zu Geraete \u2192 Uebernehmen',
-					`Kamera '${cam.name}' sollte als ONVIF-Geraet erscheinen (IP: ${targetIp})`,
-					"Klicke auf 'Uebernehmen' (Adopt)",
-					'Die Kamera wird direkt per ONVIF eingebunden — kein Container noetig'
+					`Öffne UniFi Protect auf https://${unifiHost || '<UniFi-Host>'}`,
+					'Navigiere zu Geräte \u2192 Übernehmen',
+					`Kamera '${cam.name}' sollte als ONVIF-Gerät erscheinen (IP: ${targetIp})`,
+					"Klicke auf 'Übernehmen' (Adopt)",
+					'Die Kamera wird direkt per ONVIF eingebunden — kein Container nötig'
 				],
 				protectUrl: unifiHost ? `https://${unifiHost}/protect/devices` : null
 			});
@@ -56,7 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				onvifRunning: false,
 				containerReachable: onvifCheck.reachable,
 				instructions: [
-					`ONVIF-Server laeuft nicht auf Container ${targetIp}. Bitte Container neu starten.`
+					`ONVIF-Server läuft nicht auf Container ${targetIp}. Bitte Container neu starten.`
 				],
 				protectUrl: unifiHost ? `https://${unifiHost}/protect/devices` : null
 			});
@@ -66,10 +66,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			onvifRunning: true,
 			containerReachable: true,
 			instructions: [
-				`Oeffne UniFi Protect auf https://${unifiHost || '<UniFi-Host>'}`,
-				'Navigiere zu Geraete \u2192 Uebernehmen',
+				`Öffne UniFi Protect auf https://${unifiHost || '<UniFi-Host>'}`,
+				'Navigiere zu Geräte \u2192 Übernehmen',
 				`Kamera '${cam.name}' sollte in der Liste erscheinen (IP: ${targetIp})`,
-				"Klicke auf 'Uebernehmen' (Adopt)"
+				"Klicke auf 'Übernehmen' (Adopt)"
 			],
 			protectUrl: unifiHost ? `https://${unifiHost}/protect/devices` : null
 		});

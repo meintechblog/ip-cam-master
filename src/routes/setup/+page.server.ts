@@ -32,7 +32,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'Passwort muss mindestens 6 Zeichen lang sein.', username });
 		}
 		if (password !== confirmPassword) {
-			return fail(400, { error: 'Passwoerter stimmen nicht ueberein.', username });
+			return fail(400, { error: 'Passwörter stimmen nicht überein.', username });
 		}
 
 		createUser(username, password);

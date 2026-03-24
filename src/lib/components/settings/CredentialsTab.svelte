@@ -66,7 +66,7 @@
 
 <div class="space-y-6">
 	<div class="bg-bg-primary/50 rounded-lg p-4 text-sm text-text-secondary">
-		<p>Standard-Logins werden beim Hinzufuegen neuer Kameras automatisch der Reihe nach durchprobiert. Die Reihenfolge bestimmt die Prioritaet.</p>
+		<p>Standard-Logins werden beim Hinzufügen neuer Kameras automatisch der Reihe nach durchprobiert. Die Reihenfolge bestimmt die Priorität.</p>
 	</div>
 
 	<!-- Saved credentials list -->
@@ -92,7 +92,7 @@
 						<button
 							onclick={() => handleDelete(cred.id)}
 							class="text-text-secondary hover:text-red-400 transition-colors cursor-pointer shrink-0"
-							title="Loeschen"
+							title="Löschen"
 						>
 							<Trash2 class="w-4 h-4" />
 						</button>
@@ -106,7 +106,7 @@
 
 	<!-- Add new credential -->
 	<div>
-		<h3 class="text-sm font-medium text-text-secondary mb-2">Neues Login hinzufuegen</h3>
+		<h3 class="text-sm font-medium text-text-secondary mb-2">Neues Login hinzufügen</h3>
 		<div class="bg-bg-input border border-border rounded-lg p-4 space-y-3">
 			<div class="grid grid-cols-3 gap-3">
 				<div>
@@ -159,7 +159,7 @@
 				{:else}
 					<Plus class="w-4 h-4" />
 				{/if}
-				Hinzufuegen
+				Hinzufügen
 			</button>
 		</div>
 	</div>

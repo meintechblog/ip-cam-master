@@ -208,10 +208,10 @@
 					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Umbenennen">
 						<Pencil class="w-3.5 h-3.5" />
 					</button>
-					<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten aendern">
+					<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten ändern">
 						<KeyRound class="w-3.5 h-3.5" />
 					</button>
-					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface oeffnen">
+					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface öffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
 					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif' || camera.cameraType === 'loxone'}
@@ -303,7 +303,7 @@
 					<RotateCw class="w-3 h-3" /> Restart
 				</button>
 				<button onclick={() => showDeleteConfirm = true} disabled={actionLoading}
-					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ml-auto" title="Loeschen">
+					class="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ml-auto" title="Löschen">
 					<Trash2 class="w-3 h-3" />
 				</button>
 			</div>
@@ -311,9 +311,9 @@
 			<!-- Delete Confirm -->
 			{#if showDeleteConfirm}
 				<div class="mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-					<p class="text-xs text-red-400 mb-2">"{camera.name}" (LXC {camera.vmid}) wirklich loeschen?</p>
+					<p class="text-xs text-red-400 mb-2">"{camera.name}" (LXC {camera.vmid}) wirklich löschen?</p>
 					<div class="flex gap-2">
-						<button onclick={deleteCamera} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Loeschen</button>
+						<button onclick={deleteCamera} class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">Löschen</button>
 						<button onclick={() => showDeleteConfirm = false} class="px-3 py-1 text-xs bg-bg-input text-text-secondary rounded hover:bg-bg-card cursor-pointer">Abbrechen</button>
 					</div>
 				</div>
@@ -326,7 +326,7 @@
 				<span class="w-2.5 h-2.5 rounded-full {rebooting ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}"></span>
 				<span class="text-sm font-bold text-text-primary">{rebooting ? 'Neustart...' : 'Nativ ONVIF'}</span>
 				{#if camera.cameraWebUrl}
-					<a href={camera.cameraWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface oeffnen">
+					<a href={camera.cameraWebUrl} target="_blank" class="text-accent hover:text-accent/80 ml-auto" title="Kamera-Webinterface öffnen">
 						<ExternalLink class="w-3.5 h-3.5" />
 					</a>
 				{/if}
@@ -462,7 +462,7 @@
 				</div>
 				<div class="space-y-0.5 text-xs text-text-secondary">
 					<div class="flex justify-between"><span>Port</span><span class="font-mono text-text-primary">8899</span></div>
-					<div class="flex justify-between"><span>Geraet</span><span class="text-text-primary">{camera.name}</span></div>
+					<div class="flex justify-between"><span>Gerät</span><span class="text-text-primary">{camera.name}</span></div>
 					<div class="flex justify-between"><span>Discovery</span><span class="{camera.onvifRunning ? 'text-green-400' : 'text-red-400'}">{camera.onvifRunning ? 'aktiv' : 'aus'}</span></div>
 				</div>
 			</div>
@@ -519,7 +519,7 @@
 							target="_blank"
 							class="mt-2 text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium cursor-pointer w-full block text-center"
 						>
-							Jetzt in Protect uebernehmen ↗
+							Jetzt in Protect übernehmen ↗
 						</a>
 					{:else}
 						<!-- Not yet discovered by Protect -->

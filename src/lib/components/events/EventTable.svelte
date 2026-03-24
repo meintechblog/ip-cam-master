@@ -109,7 +109,7 @@
 					disabled={offset === 0}
 					class="px-3 py-1 text-xs rounded-lg bg-bg-input text-text-secondary hover:bg-bg-primary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
 				>
-					Zurueck
+					Zurück
 				</button>
 				<button
 					onclick={() => onPageChange(offset + limit)}

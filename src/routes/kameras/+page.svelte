@@ -35,11 +35,11 @@
 	<h1 class="text-2xl font-bold text-text-primary">Kameras</h1>
 	{#if data.proxmoxConfigured}
 		<a href="/kameras/onboarding" class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
-			+ Kamera hinzufuegen
+			+ Kamera hinzufügen
 		</a>
 	{:else}
 		<span class="inline-flex items-center gap-2 px-4 py-2 bg-bg-input text-text-secondary rounded-lg cursor-not-allowed" title="Proxmox muss zuerst in den Einstellungen konfiguriert werden">
-			+ Kamera hinzufuegen
+			+ Kamera hinzufügen
 		</span>
 	{/if}
 </div>
@@ -58,7 +58,7 @@
 {:else if cameras.length === 0}
 	<div class="text-text-secondary text-center py-12">
 		<p class="text-lg mb-2">Keine Kameras eingerichtet</p>
-		<p class="text-sm">Klicke "+ Kamera hinzufuegen" um loszulegen</p>
+		<p class="text-sm">Klicke "+ Kamera hinzufügen" um loszulegen</p>
 	</div>
 {:else}
 	<div class="space-y-4">
