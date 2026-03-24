@@ -15,10 +15,23 @@ export async function testMobotixConnection(
 	ip: string,
 	username: string,
 	password: string
-): Promise<{ success: boolean; resolution?: string; fps?: number; streamPath?: string; error?: string }> {
+): Promise<{ success: boolean; resolution?: string; fps?: number; streamPath?: string; cameraModel?: string; error?: string }> {
 	const ssh = await connectToProxmox();
 
 	try {
+		// Detect camera model from /admin/version (e.g. "MOBOTIX S15D-Sec")
+		let cameraModel: string | undefined;
+		try {
+			const versionResult = await ssh.execCommand(
+				`curl -s --basic -u "${username}:${password}" "http://${ip}/admin/version" --max-time 3`
+			);
+			const tdMatches = (versionResult.stdout || '').match(/<td[^>]*>(.*?)<\/td>/gs) || [];
+			const tdTexts = tdMatches.map((td: string) => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+			if (tdTexts.length > 0 && tdTexts[0].includes('MOBOTIX')) {
+				cameraModel = tdTexts[0]; // e.g. "MOBOTIX S15D-Sec"
+			}
+		} catch { /* optional */ }
+
 		// Try primary stream path
 		const primaryPath = '/stream0/mobotix.mjpeg';
 		const probeCmd = `ffprobe -v quiet -print_format json -show_streams -timeout 5000000 rtsp://${username}:${password}@${ip}:554${primaryPath} 2>&1 || echo PROBE_FAILED`;
@@ -28,7 +41,7 @@ export async function testMobotixConnection(
 		if (result.stdout && !result.stdout.includes('PROBE_FAILED')) {
 			const parsed = parseProbeResult(result.stdout);
 			if (parsed) {
-				return { success: true, ...parsed, streamPath: primaryPath };
+				return { success: true, ...parsed, streamPath: primaryPath, cameraModel };
 			}
 		}
 
@@ -41,7 +54,7 @@ export async function testMobotixConnection(
 		if (altResult.stdout && !altResult.stdout.includes('PROBE_FAILED')) {
 			const parsed = parseProbeResult(altResult.stdout);
 			if (parsed) {
-				return { success: true, ...parsed, streamPath: altPath };
+				return { success: true, ...parsed, streamPath: altPath, cameraModel };
 			}
 		}
 
@@ -68,7 +81,8 @@ export async function testMobotixConnection(
 				success: true,
 				resolution,
 				fps,
-				streamPath: primaryPath
+				streamPath: primaryPath,
+				cameraModel
 			};
 		}
 
@@ -308,13 +322,34 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 		//   Protect "Model" (device info) = ONVIF URI name (onvif://.../<VALUE>)
 		//   Protect "type" / "marketName" = ONVIF URI name
 		//
-		// Goal: Name="Terrasse", Model="MobotixS15" in Protect UI
-		//   → Manufacturer="Terrasse", Model="" (empty), URI="MobotixS15"
+		// Goal: Name="Terrasse", Model="MobotixS15D" in Protect UI
+		//   → Manufacturer="Terrasse", Model="" (empty), URI="MobotixS15D"
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
 		const isLoxone = camera.cameraType === 'loxone';
 		const manufacturer = safeName; // Becomes the display name in Protect
 		const model = ''; // Empty — otherwise appended to display name
-		const onvifName = isLoxone ? 'LoxoneIntercom' : 'MobotixS15'; // Becomes "Model" in Protect UI
+
+		// Detect real camera model (e.g. "MOBOTIX S15D-Sec" → "MobotixS15D")
+		let onvifName = isLoxone ? 'LoxoneIntercom' : 'MobotixS15'; // Fallback
+		if (!isLoxone) {
+			try {
+				const pw = decrypt(camera.password);
+				const versionResult = await ssh.execCommand(
+					`curl -s --basic -u "${camera.username}:${pw}" "http://${camera.ip}/admin/version" --max-time 3`
+				);
+				const tdMatches = (versionResult.stdout || '').match(/<td[^>]*>(.*?)<\/td>/gs) || [];
+				const tdTexts = tdMatches.map((td: string) => td.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+				if (tdTexts.length > 0 && tdTexts[0].includes('MOBOTIX')) {
+					// "MOBOTIX S15D-Sec" → "MobotixS15D"
+					const rawModel = tdTexts[0]; // e.g. "MOBOTIX S15D-Sec"
+					const modelMatch = rawModel.match(/MOBOTIX\s+(\S+)/);
+					if (modelMatch) {
+						const shortModel = modelMatch[1].replace(/-.*$/, ''); // "S15D-Sec" → "S15D"
+						onvifName = `Mobotix${shortModel}`; // "MobotixS15D" — no spaces!
+					}
+				}
+			} catch { /* fallback to MobotixS15 */ }
+		}
 		await executeOnContainer(ssh, camera.vmid,
 			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${manufacturer}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
 		);
