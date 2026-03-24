@@ -48,51 +48,84 @@
 		};
 	});
 
-	// Derived stats
-	let total = $derived(cameras.length);
-	let nativeOnvif = $derived(cameras.filter((c) => c.status === 'native-onvif' || c.cameraType === 'mobotix-onvif').length);
-	let pipeline = $derived(total - nativeOnvif);
+	// Single-pass stats computation over cameras array
+	let stats = $derived(() => {
+		let nativeOnvif = 0;
+		let containersRunning = 0;
+		let containersStopped = 0;
+		let containersError = 0;
+		let streamsActive = 0;
+		let protectAdopted = 0;
+		let protectConnected = 0;
+		let unifiIndirect = 0;
+		let totalClients = 0;
+		let cpuSum = 0;
+		let cpuCount = 0;
+		let ramUsed = 0;
+		let ramTotal = 0;
+		const pipelineCameras: CameraCardData[] = [];
+		const problems: CameraCardData[] = [];
 
-	let containersRunning = $derived(cameras.filter((c) => c.containerStatus === 'running').length);
-	let containersStopped = $derived(cameras.filter((c) => c.containerStatus === 'stopped').length);
-	let containersError = $derived(cameras.filter((c) => c.containerStatus === 'error').length);
+		for (const c of cameras) {
+			const isNative = c.status === 'native-onvif' || c.cameraType === 'mobotix-onvif';
+			if (isNative) nativeOnvif++;
 
-	let streamsActive = $derived(cameras.filter((c) => c.streamInfo?.active).length);
-	let go2rtcUp = $derived(cameras.filter((c) => c.go2rtcRunning).length);
-	let onvifUp = $derived(cameras.filter((c) => c.onvifRunning).length);
+			if (c.containerStatus === 'running') containersRunning++;
+			else if (c.containerStatus === 'stopped') containersStopped++;
+			else if (c.containerStatus === 'error') containersError++;
 
-	let protectAdopted = $derived(cameras.filter((c) => c.protectStatus?.isAdopted).length);
-	let protectConnected = $derived(cameras.filter((c) => c.protectStatus?.state === 'CONNECTED').length);
-	// Fallback to old indirect detection if no protectStatus available
-	let unifiConnected = $derived(protectAdopted > 0 ? protectAdopted : cameras.filter((c) => c.streamInfo?.unifiConnected).length);
-	let totalClients = $derived(cameras.reduce((sum, c) => sum + c.connectedClients, 0));
+			if (c.streamInfo?.active) streamsActive++;
+			if (c.protectStatus?.isAdopted) protectAdopted++;
+			if (c.protectStatus?.state === 'CONNECTED') protectConnected++;
+			if (c.streamInfo?.unifiConnected) unifiIndirect++;
+			totalClients += c.connectedClients;
 
-	// Pipeline cameras only (have containers)
-	let pipelineCameras = $derived(cameras.filter((c) => c.vmid > 0));
+			if (c.vmid > 0) {
+				pipelineCameras.push(c);
+				if (c.lxcCpu !== null) { cpuSum += c.lxcCpu; cpuCount++; }
+				ramUsed += c.lxcMemory?.used ?? 0;
+				ramTotal += c.lxcMemory?.total ?? 0;
 
-	// Overall health
-	let problems = $derived(cameras.filter((c) => {
-		if (c.vmid === 0) return false; // native ONVIF — no container to check
-		return c.containerStatus !== 'running' || !c.go2rtcRunning || !c.streamInfo?.active;
-	}));
-	let healthStatus = $derived<'good' | 'warn' | 'bad'>(
-		problems.length === 0 && total > 0 ? 'good' : problems.length <= 1 ? 'warn' : 'bad'
-	);
+				if (c.containerStatus !== 'running' || !c.go2rtcRunning || !c.streamInfo?.active) {
+					problems.push(c);
+				}
+			}
+		}
 
-	// CPU/RAM aggregates for pipeline cameras
-	let avgCpu = $derived(() => {
-		const withCpu = pipelineCameras.filter((c) => c.lxcCpu !== null);
-		if (withCpu.length === 0) return null;
-		return withCpu.reduce((sum, c) => sum + (c.lxcCpu ?? 0), 0) / withCpu.length;
+		const total = cameras.length;
+		const pipeline = total - nativeOnvif;
+		const avgCpu = cpuCount > 0 ? cpuSum / cpuCount : null;
+		const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
+		const unifiConnected = protectAdopted > 0 ? protectAdopted : unifiIndirect;
+		const healthStatus: 'good' | 'warn' | 'bad' =
+			problems.length === 0 && total > 0 ? 'good' : problems.length <= 1 ? 'warn' : 'bad';
+
+		return {
+			total, nativeOnvif, pipeline,
+			containersRunning, containersStopped, containersError,
+			streamsActive, protectAdopted, protectConnected, unifiConnected,
+			totalClients, pipelineCameras, problems,
+			avgCpu, ramUsed, ramTotal, ramPct, healthStatus
+		};
 	});
-	let totalRamUsed = $derived(() => {
-		return pipelineCameras.reduce((sum, c) => sum + (c.lxcMemory?.used ?? 0), 0);
-	});
-	let totalRamTotal = $derived(() => {
-		return pipelineCameras.reduce((sum, c) => sum + (c.lxcMemory?.total ?? 0), 0);
-	});
 
-	let ramPct = $derived(totalRamTotal() > 0 ? (totalRamUsed() / totalRamTotal()) * 100 : 0);
+	let total = $derived(stats().total);
+	let nativeOnvif = $derived(stats().nativeOnvif);
+	let pipeline = $derived(stats().pipeline);
+	let containersRunning = $derived(stats().containersRunning);
+	let containersStopped = $derived(stats().containersStopped);
+	let containersError = $derived(stats().containersError);
+	let streamsActive = $derived(stats().streamsActive);
+	let protectAdopted = $derived(stats().protectAdopted);
+	let protectConnected = $derived(stats().protectConnected);
+	let totalClients = $derived(stats().totalClients);
+	let pipelineCameras = $derived(stats().pipelineCameras);
+	let problems = $derived(stats().problems);
+	let healthStatus = $derived(stats().healthStatus);
+	let avgCpu = $derived(stats().avgCpu);
+	let totalRamUsed = $derived(stats().ramUsed);
+	let totalRamTotal = $derived(stats().ramTotal);
+	let ramPct = $derived(stats().ramPct);
 
 	function formatBytes(bytes: number): string {
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -254,13 +287,13 @@
 						<div class="flex justify-between text-sm mb-2">
 							<span class="text-text-secondary">CPU Durchschnitt</span>
 							<span class="text-text-primary font-medium">
-								{avgCpu() !== null ? `${(avgCpu()! * 100).toFixed(1)}%` : '—'}
+								{avgCpu !== null ? `${(avgCpu * 100).toFixed(1)}%` : '—'}
 							</span>
 						</div>
 						<div class="h-2 bg-bg-input rounded-full overflow-hidden">
 							<div
-								class="h-full rounded-full transition-all duration-500 {(avgCpu() ?? 0) > 0.8 ? 'bg-danger' : (avgCpu() ?? 0) > 0.5 ? 'bg-warning' : 'bg-accent'}"
-								style="width: {((avgCpu() ?? 0) * 100).toFixed(1)}%"
+								class="h-full rounded-full transition-all duration-500 {(avgCpu ?? 0) > 0.8 ? 'bg-danger' : (avgCpu ?? 0) > 0.5 ? 'bg-warning' : 'bg-accent'}"
+								style="width: {((avgCpu ?? 0) * 100).toFixed(1)}%"
 							></div>
 						</div>
 					</div>
@@ -269,8 +302,8 @@
 						<div class="flex justify-between text-sm mb-2">
 							<span class="text-text-secondary">RAM Gesamt</span>
 							<span class="text-text-primary font-medium">
-								{totalRamTotal() > 0
-									? `${formatBytes(totalRamUsed())} / ${formatBytes(totalRamTotal())}`
+								{totalRamTotal > 0
+									? `${formatBytes(totalRamUsed)} / ${formatBytes(totalRamTotal)}`
 									: '—'}
 							</span>
 						</div>
