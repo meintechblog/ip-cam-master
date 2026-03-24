@@ -2,6 +2,8 @@
 	import { page } from '$app/stores';
 	import { Camera, LayoutDashboard, Monitor, Settings, ScrollText } from 'lucide-svelte';
 
+	let { onNavigate = () => {} }: { onNavigate?: () => void } = $props();
+
 	const links = [
 		{ href: '/', label: 'Dashboard', icon: LayoutDashboard },
 		{ href: '/kameras', label: 'Kameras', icon: Monitor },
@@ -26,6 +28,7 @@
 			{@const active = isActive($page.url.pathname, link.href)}
 			<a
 				href={link.href}
+				onclick={onNavigate}
 				class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors
 					{active
 					? 'bg-accent/10 text-accent border-l-2 border-accent'
