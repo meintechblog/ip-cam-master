@@ -394,6 +394,17 @@ export async function getNextVmid(): Promise<number> {
 			if (r.vmid > 0) allVmids.push(r.vmid);
 		}
 
+		// Also get VMs (not just LXC) to avoid conflicts with any Proxmox resource
+		try {
+			const { getProxmoxClient, getNodeName } = await import('./proxmox');
+			const proxmox = getProxmoxClient();
+			const node = await getNodeName();
+			const vms = await proxmox.nodes.$(node).qemu.$get() as any[];
+			for (const vm of vms) {
+				if (vm.vmid) allVmids.push(vm.vmid);
+			}
+		} catch { /* ignore — LXC list is enough */ }
+
 		if (allVmids.length === 0) return 2000;
 
 		const maxVmid = Math.max(...allVmids);

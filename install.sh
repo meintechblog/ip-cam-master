@@ -339,10 +339,11 @@ PROVISION_SCRIPT
   fi
   TOKEN_ID="${PVE_USER}!${PVE_TOKEN_NAME}"
 
-  # Set ACLs
+  # Set ACLs (token needs / for listing, /nodes for container ops, /storage for disk allocation)
   pveum acl modify / --user "$PVE_USER" --role "$PVE_ROLE"
-  pveum acl modify "/nodes/$NODE" --tokens "$TOKEN_ID" --role "$PVE_ROLE"
-  pveum acl modify /storage --tokens "$TOKEN_ID" --role "$PVE_ROLE"
+  pvesh set /access/acl --path / --tokens "$TOKEN_ID" --roles "$PVE_ROLE"
+  pvesh set /access/acl --path "/nodes/$NODE" --tokens "$TOKEN_ID" --roles "$PVE_ROLE"
+  pvesh set /access/acl --path /storage --tokens "$TOKEN_ID" --roles "$PVE_ROLE"
 
   # Start service and inject settings via app API (D-08)
   step "Starte App und uebertrage Proxmox-Konfiguration..."
