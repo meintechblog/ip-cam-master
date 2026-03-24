@@ -79,23 +79,46 @@ detect_existing_vm() {
 
 get_vm_ip() {
   local vmid="$1"
-  local max=30
+  local max=60
   local i=0
 
+  # Get VM's MAC address from config
+  local mac
+  mac=$(qm config "$vmid" | grep -oP 'virtio=\K[A-Fa-f0-9:]+' | head -1)
+  if [ -z "$mac" ]; then
+    error_exit "Konnte MAC-Adresse fuer VM $vmid nicht ermitteln."
+  fi
+  mac=$(echo "$mac" | tr '[:upper:]' '[:lower:]')
+
   while [ $i -lt $max ]; do
+    # Method 1: Try qm guest agent (if running)
     local ip
     ip=$(qm agent "$vmid" network-get-interfaces 2>/dev/null \
       | jq -r '.[] | select(.name != "lo") | .["ip-addresses"][]? | select(.["ip-address-type"] == "ipv4") | .["ip-address"]' \
       | head -1) || true
-
     if [ -n "$ip" ] && [ "$ip" != "null" ]; then
       echo "$ip"
       return 0
     fi
+
+    # Method 2: ARP table lookup by MAC
+    ip=$(ip neigh show 2>/dev/null | grep -i "$mac" | awk '{print $1}' | head -1) || true
+    if [ -n "$ip" ]; then
+      echo "$ip"
+      return 0
+    fi
+
+    # Method 3: arp command fallback
+    ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\((\K[0-9.]+)' | head -1) || true
+    if [ -n "$ip" ]; then
+      echo "$ip"
+      return 0
+    fi
+
     i=$((i + 1))
     sleep 5
   done
-  error_exit "Konnte keine IP-Adresse fuer VM $vmid ermitteln (Timeout nach $((max * 5))s)."
+  error_exit "Konnte keine IP-Adresse fuer VM $vmid ermitteln (Timeout nach $((max * 5))s). MAC: $mac"
 }
 
 wait_for_ssh() {
