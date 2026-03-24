@@ -37,6 +37,7 @@
 		error?: string;
 		steps: BatchStep[];
 		expanded: boolean;
+		snapshotUrl?: string | null;
 	}
 	let batchMode = $state(false);
 	let batchCancelled = $state(false);
@@ -375,6 +376,20 @@
 		setStep(idx, stepNum, 'done', `${testData.width || 1280}x${testData.height || 720} @ ${testData.fps || 20}fps`);
 		stepNum++;
 
+		// Load snapshot (non-blocking — don't fail if it doesn't work)
+		try {
+			const snapRes = await fetch('/api/onboarding/snapshot', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ip: cam.ip, username, password }),
+				signal: AbortSignal.timeout(10000)
+			});
+			if (snapRes.ok) {
+				const blob = await snapRes.blob();
+				if (blob.size > 500) batchResults[idx].snapshotUrl = URL.createObjectURL(blob);
+			}
+		} catch { /* optional */ }
+
 		// Save camera
 		const saveRes = await fetch('/api/onboarding/save-camera', {
 			method: 'POST',
@@ -563,6 +578,12 @@
 					<!-- Live step details (always visible for active, stays visible for done/error) -->
 					{#if cam.status === 'active' || cam.expanded || cam.status === 'error'}
 						<div class="px-4 pb-3 border-t border-border/50">
+							<!-- Snapshot thumbnail -->
+							{#if cam.snapshotUrl}
+								<div class="mt-2.5 mb-2 rounded-lg overflow-hidden bg-black" style="max-height: 160px;">
+									<img src={cam.snapshotUrl} alt={cam.name} class="w-full object-contain" style="max-height: 160px;" />
+								</div>
+							{/if}
 							<div class="space-y-1.5 pt-2.5">
 								{#each cam.steps as step, si}
 									<div>
