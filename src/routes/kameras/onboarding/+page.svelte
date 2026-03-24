@@ -274,7 +274,7 @@
 					const res = await fetch('/api/onboarding/snapshot', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ ip: cam.ip, username: cred.username, password: cred.password }),
+						body: JSON.stringify({ ip: cam.ip, username: cred.username, password: cred.password, cameraType: cam.type }),
 						signal: AbortSignal.timeout(15000)
 					});
 					if (res.ok) {

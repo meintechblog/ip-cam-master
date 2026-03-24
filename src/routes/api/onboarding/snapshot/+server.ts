@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { ip, username, password } = await request.json();
+	const { ip, username, password, cameraType } = await request.json();
 
 	if (!ip || !username || !password) {
 		return new Response(JSON.stringify({ error: 'IP, username and password required' }), {
@@ -11,9 +11,22 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	try {
-		const url = `http://${ip}/record/current.jpg`;
 		const auth = Buffer.from(`${username}:${password}`).toString('base64');
 
+		if (cameraType === 'loxone') {
+			// Loxone Intercom: grab single frame from MJPEG stream via ffmpeg
+			const { execSync } = await import('node:child_process');
+			const jpegBuffer = execSync(
+				`ffmpeg -y -i "http://${username}:${password}@${ip}/mjpg/video.mjpg" -frames:v 1 -f image2 -q:v 5 pipe:1 2>/dev/null`,
+				{ timeout: 8000, maxBuffer: 2 * 1024 * 1024 }
+			);
+			return new Response(jpegBuffer, {
+				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' }
+			});
+		}
+
+		// Mobotix: direct JPEG snapshot URL
+		const url = `http://${ip}/record/current.jpg`;
 		const res = await fetch(url, {
 			headers: { Authorization: `Basic ${auth}` },
 			signal: AbortSignal.timeout(5000)
@@ -28,10 +41,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const imageBuffer = await res.arrayBuffer();
 		return new Response(imageBuffer, {
-			headers: {
-				'Content-Type': 'image/jpeg',
-				'Cache-Control': 'no-cache'
-			}
+			headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' }
 		});
 	} catch (err) {
 		return new Response(

@@ -141,7 +141,7 @@
 				const res = await fetch('/api/onboarding/snapshot', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ ip, username, password })
+					body: JSON.stringify({ ip, username, password, cameraType })
 				});
 				if (res.ok) {
 					const blob = await res.blob();
