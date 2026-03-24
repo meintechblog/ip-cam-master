@@ -303,13 +303,18 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 		//   - Model → "Modell" field in Protect device info
 		//   - After adoption, Protect uses Manufacturer as display name prefix
 		//
-		// Goal: Name="Terrasse", Manufacturer="Mobotix", Model="MobotixS15"
-		//   → Protect discovery shows "Terrasse", device info shows Mobotix / MobotixS15
+		// How Protect maps ONVIF fields (verified empirically):
+		//   Protect "Name" (display) = Manufacturer + " " + Model
+		//   Protect "Model" (device info) = ONVIF URI name (onvif://.../<VALUE>)
+		//   Protect "type" / "marketName" = ONVIF URI name
+		//
+		// Goal: Name="Terrasse", Model="MobotixS15" in Protect UI
+		//   → Manufacturer="Terrasse", Model="" (empty), URI="MobotixS15"
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
 		const isLoxone = camera.cameraType === 'loxone';
-		const manufacturer = isLoxone ? 'Loxone' : 'Mobotix';
-		const model = isLoxone ? 'LoxoneIntercom' : 'MobotixS15';
-		const onvifName = safeName; // Discovery name = camera name (no spaces)
+		const manufacturer = safeName; // Becomes the display name in Protect
+		const model = ''; // Empty — otherwise appended to display name
+		const onvifName = isLoxone ? 'LoxoneIntercom' : 'MobotixS15'; // Becomes "Model" in Protect UI
 		await executeOnContainer(ssh, camera.vmid,
 			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${manufacturer}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
 		);
