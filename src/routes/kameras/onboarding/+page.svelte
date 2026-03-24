@@ -398,7 +398,8 @@
 		});
 		const createData = await createRes.json();
 		if (!createData.success) throw new Error(createData.error || 'Container fehlgeschlagen');
-		setStep(idx, stepNum, 'done', `LXC ${createData.vmid} @ ${createData.containerIp}`);
+		const skipInstall = createData.fromTemplate === true;
+		setStep(idx, stepNum, 'done', `LXC ${createData.vmid} @ ${createData.containerIp}${skipInstall ? ' (Template)' : ''}`);
 		stepNum++;
 
 		// Step 3: go2rtc
@@ -406,8 +407,8 @@
 		const g2rRes = await fetch('/api/onboarding/configure-go2rtc', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ cameraId }),
-			signal: AbortSignal.timeout(120000)
+			body: JSON.stringify({ cameraId, skipInstall }),
+			signal: AbortSignal.timeout(skipInstall ? 30000 : 120000)
 		});
 		const g2rData = await g2rRes.json();
 		if (!g2rData.success) throw new Error(g2rData.error || 'go2rtc fehlgeschlagen');
@@ -434,8 +435,8 @@
 		const onvifRes = await fetch('/api/onboarding/configure-onvif', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ cameraId }),
-			signal: AbortSignal.timeout(600000)
+			body: JSON.stringify({ cameraId, skipInstall }),
+			signal: AbortSignal.timeout(skipInstall ? 30000 : 600000)
 		});
 		const onvifData = await onvifRes.json();
 		if (!onvifData.success) throw new Error(onvifData.error || 'ONVIF fehlgeschlagen');

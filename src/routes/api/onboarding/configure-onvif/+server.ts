@@ -3,11 +3,11 @@ import type { RequestHandler } from './$types';
 import { configureOnvif } from '$lib/server/services/onboarding';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { cameraId } = await request.json();
+	const { cameraId, skipInstall } = await request.json();
 	if (!cameraId) return json({ success: false, error: 'cameraId erforderlich' }, { status: 400 });
 
 	try {
-		await configureOnvif(cameraId);
+		await configureOnvif(cameraId, skipInstall === true);
 		return json({ success: true });
 	} catch (err) {
 		return json(

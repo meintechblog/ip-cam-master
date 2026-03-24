@@ -55,6 +55,7 @@
 	let connectionInfo = $state<string | null>(null);
 	let containerIp = $state<string | null>(null);
 	let containerVmid = $state<number | null>(null);
+	let fromTemplate = $state(false);
 	let rtspUrl = $state<string | null>(null);
 	let streamName = $derived(`cam-${nextVmid}`);
 
@@ -267,8 +268,11 @@
 			if (!data.success) throw new Error(data.error || 'Container konnte nicht erstellt werden');
 			containerIp = data.containerIp;
 			containerVmid = data.vmid;
+			fromTemplate = data.fromTemplate === true;
 
 			addSubLog(`Container gestartet, DHCP-IP erhalten: ${containerIp}`);
+			if (fromTemplate) addSubLog(`Erstellt aus Template (Schnellmodus)`);
+
 			addLog(2, 'Container erstellen', `LXC ${data.vmid} erstellt — ${hostname} @ ${containerIp}`, 'done');
 
 			if (cameraType === 'loxone') {
@@ -336,7 +340,7 @@
 		addSubLog(`systemctl daemon-reload && enable && restart go2rtc`);
 
 		try {
-			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId });
+			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId, skipInstall: fromTemplate });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
@@ -367,7 +371,7 @@
 		addSubLog(`systemd Unit anlegen + starten`);
 
 		try {
-			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId });
+			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId, skipInstall: fromTemplate });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 
@@ -455,7 +459,7 @@
 		addSubLog(`systemctl daemon-reload && enable && restart go2rtc`);
 
 		try {
-			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId });
+			const res = await longFetch('/api/onboarding/configure-go2rtc', { cameraId, skipInstall: fromTemplate });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'go2rtc Konfiguration fehlgeschlagen');
 
@@ -500,7 +504,7 @@
 		addSubLog(`systemctl daemon-reload && enable && restart onvif-server`);
 
 		try {
-			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId });
+			const res = await longFetch('/api/onboarding/configure-onvif', { cameraId, skipInstall: fromTemplate });
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error || 'ONVIF Konfiguration fehlgeschlagen');
 

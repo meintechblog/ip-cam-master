@@ -1,6 +1,6 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
 import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
-import { createContainer, startContainer } from './proxmox';
+import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
@@ -162,19 +162,36 @@ export async function saveCameraRecord(params: {
  */
 export async function createCameraContainer(
 	cameraId: number
-): Promise<{ vmid: number; containerIp: string }> {
+): Promise<{ vmid: number; containerIp: string; fromTemplate: boolean }> {
 	const camera = getCameraById(cameraId);
 
 	// Hostname from camera name: lowercase, no spaces/special chars
 	const hostname = `cam-${camera.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-	await createContainer({
-		vmid: camera.vmid,
-		hostname,
-		ostemplate: 'local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst',
-		cameraName: camera.name,
-		cameraIp: camera.ip,
-		cameraType: camera.cameraType
-	});
+
+	// Try to clone from template (fast path: ~10s instead of 3-5min)
+	let fromTemplate = false;
+	const templateVmid = await getTemplateVmid();
+	if (templateVmid) {
+		await cloneFromTemplate({
+			templateVmid,
+			vmid: camera.vmid,
+			hostname,
+			cameraName: camera.name,
+			cameraIp: camera.ip,
+			cameraType: camera.cameraType
+		});
+		fromTemplate = true;
+	} else {
+		// No template yet — fresh install (first camera)
+		await createContainer({
+			vmid: camera.vmid,
+			hostname,
+			ostemplate: 'local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst',
+			cameraName: camera.name,
+			cameraIp: camera.ip,
+			cameraType: camera.cameraType
+		});
+	}
 
 	await startContainer(camera.vmid);
 
@@ -204,7 +221,7 @@ export async function createCameraContainer(
 			.where(eq(cameras.id, cameraId))
 			.run();
 
-		return { vmid: camera.vmid, containerIp };
+		return { vmid: camera.vmid, containerIp, fromTemplate };
 	} finally {
 		ssh.dispose();
 	}
@@ -235,14 +252,17 @@ export async function configureNginx(cameraId: number): Promise<void> {
 /**
  * Installs go2rtc in the container, deploys config and systemd unit, starts the service.
  */
-export async function configureGo2rtc(cameraId: number): Promise<void> {
+export async function configureGo2rtc(cameraId: number, skipInstall = false): Promise<void> {
 	const camera = getCameraById(cameraId);
 	const ssh = await connectToProxmox();
 
 	try {
-		const installCmds = getInstallCommands();
-		for (const cmd of installCmds) {
-			await executeOnContainer(ssh, camera.vmid, cmd);
+		// Skip package installation if cloned from template (already has ffmpeg + go2rtc)
+		if (!skipInstall) {
+			const installCmds = getInstallCommands();
+			for (const cmd of installCmds) {
+				await executeOnContainer(ssh, camera.vmid, cmd);
+			}
 		}
 
 		const decryptedPassword = decrypt(camera.password);
@@ -291,15 +311,17 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 /**
  * Installs ONVIF server in the container, generates config, patches device naming, starts service.
  */
-export async function configureOnvif(cameraId: number): Promise<void> {
+export async function configureOnvif(cameraId: number, skipInstall = false): Promise<void> {
 	const camera = getCameraById(cameraId);
 	const ssh = await connectToProxmox();
 
 	try {
-		// Install Node.js + ONVIF server
-		const onvifCmds = getOnvifInstallCommands();
-		for (const cmd of onvifCmds) {
-			await executeOnContainer(ssh, camera.vmid, cmd);
+		// Skip package installation if cloned from template (already has Node.js + onvif-server)
+		if (!skipInstall) {
+			const onvifCmds = getOnvifInstallCommands();
+			for (const cmd of onvifCmds) {
+				await executeOnContainer(ssh, camera.vmid, cmd);
+			}
 		}
 
 		// Get container MAC address and generate UUID
@@ -386,6 +408,19 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 			.set({ status: CAMERA_STATUS.CONFIGURED, updatedAt: new Date().toISOString() })
 			.where(eq(cameras.id, cameraId))
 			.run();
+
+		// Create template from this container if none exists yet (first onboarding)
+		// Only after fresh install (not cloned from template)
+		if (!skipInstall) {
+			const existingTemplate = await getTemplateVmid();
+			if (!existingTemplate) {
+				console.log(`[template] Creating base template from container ${camera.vmid}...`);
+				// Fire-and-forget — don't block the onboarding response
+				createTemplateFromContainer(camera.vmid).catch(err =>
+					console.error('[template] Failed to create template:', err)
+				);
+			}
+		}
 	} finally {
 		ssh.dispose();
 	}

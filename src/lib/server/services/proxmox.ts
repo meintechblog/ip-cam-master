@@ -190,6 +190,138 @@ export async function configureVaapi(node: string, vmid: number): Promise<void> 
 	}
 }
 
+// ── Container Template Management ─────────────────────
+// After first full onboarding (go2rtc + onvif installed), the container is
+// cloned as a template. Subsequent containers clone from this template,
+// skipping the 3-5 minute package installation.
+
+const TEMPLATE_TAG = 'ipcm-base';
+
+/**
+ * Checks if a pre-built camera template exists on Proxmox.
+ */
+export async function getTemplateVmid(): Promise<number | null> {
+	const { connectToProxmox: connectSSH } = await import('./ssh');
+	const ssh = await connectSSH();
+	try {
+		const node = await getNodeName();
+		const result = await ssh.execCommand(
+			`pct list | grep "${TEMPLATE_TAG}" | awk '{print $1}' | head -1`
+		);
+		const vmid = parseInt(result.stdout.trim());
+		return vmid > 0 ? vmid : null;
+	} catch {
+		return null;
+	} finally {
+		ssh.dispose();
+	}
+}
+
+/**
+ * Creates a reusable template from a fully provisioned container.
+ * Called after the first successful onboarding.
+ */
+export async function createTemplateFromContainer(sourceVmid: number): Promise<number | null> {
+	const { connectToProxmox: connectSSH } = await import('./ssh');
+	const ssh = await connectSSH();
+	try {
+		const node = await getNodeName();
+
+		// Get next VMID for the template
+		const proxmox = await getProxmoxClient();
+		const templateVmid = await proxmox.cluster.nextid.$get() as unknown as number;
+
+		// Stop source container
+		await ssh.execCommand(`pct stop ${sourceVmid} 2>/dev/null; sleep 2`);
+
+		// Clean camera-specific configs from the source before cloning
+		await ssh.execCommand(`pct exec ${sourceVmid} -- bash -c "rm -f /etc/go2rtc/go2rtc.yaml /root/onvif-server/config.yaml /etc/nginx/nginx.conf 2>/dev/null"`);
+
+		// Clone the container
+		const cloneResult = await ssh.execCommand(
+			`pct clone ${sourceVmid} ${templateVmid} --hostname ${TEMPLATE_TAG} --full`
+		);
+		if (cloneResult.code && cloneResult.code !== 0) {
+			console.error('[template] Clone failed:', cloneResult.stderr);
+			// Restart source
+			await ssh.execCommand(`pct start ${sourceVmid}`);
+			return null;
+		}
+
+		// Convert clone to template
+		await ssh.execCommand(`pct template ${templateVmid}`);
+
+		// Restart the source container
+		await ssh.execCommand(`pct start ${sourceVmid}`);
+
+		console.log(`[template] Created template VMID ${templateVmid} from ${sourceVmid}`);
+		return templateVmid;
+	} catch (err) {
+		console.error('[template] Error:', err);
+		return null;
+	} finally {
+		ssh.dispose();
+	}
+}
+
+/**
+ * Creates a container by cloning from the template.
+ * Much faster than fresh install (~10s vs 3-5min).
+ */
+export async function cloneFromTemplate(params: {
+	templateVmid: number;
+	vmid: number;
+	hostname: string;
+	cameraName?: string;
+	cameraIp?: string;
+	cameraType?: string;
+}): Promise<{ status: 'cloned'; vmid: number }> {
+	const { connectToProxmox: connectSSH } = await import('./ssh');
+	const ssh = await connectSSH();
+	const node = await getNodeName();
+	const settings = await getSettings('proxmox_');
+	const storage = settings.proxmox_storage || 'local-lvm';
+
+	try {
+		const cloneResult = await ssh.execCommand(
+			`pct clone ${params.templateVmid} ${params.vmid} --hostname ${params.hostname} --storage ${storage} --full`
+		);
+		if (cloneResult.code && cloneResult.code !== 0) {
+			throw new Error(`Clone failed: ${cloneResult.stderr}`);
+		}
+
+		// Configure VAAPI passthrough
+		await configureVaapi(node, params.vmid);
+
+		// Insert DB record
+		db.insert(containers)
+			.values({
+				vmid: params.vmid,
+				hostname: params.hostname,
+				cameraName: params.cameraName || null,
+				cameraIp: params.cameraIp || null,
+				cameraType: params.cameraType || null,
+				status: 'stopped',
+				updatedAt: new Date().toISOString()
+			})
+			.onConflictDoUpdate({
+				target: containers.vmid,
+				set: {
+					hostname: params.hostname,
+					cameraName: params.cameraName || null,
+					cameraIp: params.cameraIp || null,
+					cameraType: params.cameraType || null,
+					updatedAt: new Date().toISOString()
+				}
+			})
+			.run();
+
+		return { status: 'cloned', vmid: params.vmid };
+	} finally {
+		ssh.dispose();
+	}
+}
+
 /**
  * Starts an LXC container.
  */
