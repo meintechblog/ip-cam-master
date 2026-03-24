@@ -2,9 +2,11 @@ import { scanUdmLogs } from './udm-logs';
 import { storeEvents, cleanupOldEvents } from './events';
 import { getSettings } from './settings';
 import { cleanupExpiredSessions } from './auth';
+import { getProtectStatus } from './protect';
 
 let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+let protectPollInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(): void {
 	// SSH log scan every 60s — only if UDM/UniFi is configured
@@ -48,7 +50,18 @@ export function startScheduler(): void {
 		}, 3600_000);
 	}
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s, if configured)');
+	// Pre-load Protect status every 30s (fills the 30s cache in protect.ts)
+	if (!protectPollInterval) {
+		protectPollInterval = setInterval(async () => {
+			try {
+				const settings = await getSettings('unifi_');
+				if (!settings.unifi_host) return;
+				await getProtectStatus(); // fills the cache
+			} catch { /* ignore — will retry next cycle */ }
+		}, 30_000);
+	}
+
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s, if configured)');
 }
 
 export function stopScheduler(): void {
@@ -59,5 +72,9 @@ export function stopScheduler(): void {
 	if (cleanupInterval) {
 		clearInterval(cleanupInterval);
 		cleanupInterval = null;
+	}
+	if (protectPollInterval) {
+		clearInterval(protectPollInterval);
+		protectPollInterval = null;
 	}
 }
