@@ -129,6 +129,18 @@ export function getFlappingCameras(): number[] {
 	return result.map((r) => r.camera_id);
 }
 
+export function storeHealthEvent(cameraId: number | null, cameraName: string, message: string, severity: EventSeverity): void {
+	storeEvent({
+		cameraId,
+		cameraName,
+		eventType: 'stream_failed',
+		severity,
+		message,
+		source: 'app',
+		timestamp: new Date().toISOString()
+	});
+}
+
 export function cleanupOldEvents(): void {
 	db.run(sql`DELETE FROM events WHERE timestamp < datetime('now', '-30 days')`);
 }

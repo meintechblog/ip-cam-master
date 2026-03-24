@@ -1,12 +1,15 @@
 import { scanUdmLogs } from './udm-logs';
-import { storeEvents, cleanupOldEvents } from './events';
+import { storeEvents, cleanupOldEvents, storeHealthEvent } from './events';
 import { getSettings } from './settings';
 import { cleanupExpiredSessions } from './auth';
 import { getProtectStatus } from './protect';
+import { db } from '$lib/server/db/client';
+import { cameras } from '$lib/server/db/schema';
 
 let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 let protectPollInterval: ReturnType<typeof setInterval> | null = null;
+let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(): void {
 	// SSH log scan every 60s — only if UDM/UniFi is configured
@@ -61,7 +64,62 @@ export function startScheduler(): void {
 		}, 30_000);
 	}
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s, if configured)');
+	// Container health checks every 5 minutes
+	if (!healthCheckInterval) {
+		healthCheckInterval = setInterval(async () => {
+			try {
+				const allCameras = db.select().from(cameras).all();
+				const withContainer = allCameras.filter((c) => c.containerIp);
+
+				for (const cam of withContainer) {
+					// Check go2rtc API
+					try {
+						const controller = new AbortController();
+						const timeout = setTimeout(() => controller.abort(), 3000);
+						await fetch(`http://${cam.containerIp}:1984/api/streams`, {
+							signal: controller.signal
+						});
+						clearTimeout(timeout);
+					} catch {
+						storeHealthEvent(
+							cam.id,
+							cam.name,
+							`go2rtc unreachable on ${cam.containerIp}:1984`,
+							'warning'
+						);
+					}
+
+					// Check ONVIF server
+					try {
+						const controller = new AbortController();
+						const timeout = setTimeout(() => controller.abort(), 2000);
+						await fetch(`http://${cam.containerIp}:8899`, {
+							signal: controller.signal
+						});
+						clearTimeout(timeout);
+					} catch (err: unknown) {
+						// ECONNRESET means server is running (resets HTTP but accepts ONVIF)
+						const isReset =
+							err instanceof Error &&
+							(err.message?.includes('ECONNRESET') ||
+								(('cause' in err) && (err.cause as { code?: string })?.code === 'ECONNRESET'));
+						if (!isReset) {
+							storeHealthEvent(
+								cam.id,
+								cam.name,
+								`ONVIF server unreachable on ${cam.containerIp}:8899`,
+								'warning'
+							);
+						}
+					}
+				}
+			} catch (err) {
+				console.error('[scheduler] Health check failed:', err);
+			}
+		}, 5 * 60_000);
+	}
+
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m)');
 }
 
 export function stopScheduler(): void {
@@ -76,5 +134,9 @@ export function stopScheduler(): void {
 	if (protectPollInterval) {
 		clearInterval(protectPollInterval);
 		protectPollInterval = null;
+	}
+	if (healthCheckInterval) {
+		clearInterval(healthCheckInterval);
+		healthCheckInterval = null;
 	}
 }
