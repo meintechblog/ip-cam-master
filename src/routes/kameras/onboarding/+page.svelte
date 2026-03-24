@@ -548,20 +548,16 @@
 							{/if}
 						</div>
 
-						<!-- Compact step indicators for done/pending cameras -->
-						{#if cam.status === 'done'}
-							<div class="flex items-center gap-1">
-								{#each cam.steps as step}
-									<div class="w-2 h-2 rounded-full bg-green-400"></div>
-								{/each}
-							</div>
-						{:else if cam.status === 'pending'}
-							<div class="flex items-center gap-1">
-								{#each cam.steps as step}
-									<div class="w-2 h-2 rounded-full bg-border"></div>
-								{/each}
-							</div>
-						{/if}
+						<!-- Step dots — always visible, light up as steps complete -->
+						<div class="flex items-center gap-1">
+							{#each cam.steps as step}
+								<div class="w-2 h-2 rounded-full transition-all duration-500
+									{step.status === 'done' ? 'bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.5)]'
+									: step.status === 'active' ? 'bg-accent animate-pulse'
+									: step.status === 'error' ? 'bg-red-400'
+									: 'bg-border'}"></div>
+							{/each}
+						</div>
 					</div>
 
 					<!-- Live step details (always visible for active, stays visible for done/error) -->
