@@ -68,31 +68,45 @@
 
 	let prefillName = $state('');
 	let selectedCameraType = $state('mobotix');
+	let prefillUser = $state('');
+	let prefillPass = $state('');
+	let prefillCredName = $state('');
 
-	async function selectCamera(ip: string, name?: string | null, type?: string) {
-		prefillName = name || '';
-		selectedCameraType = type || 'mobotix';
+	async function fetchCredentials(ip: string, cameraType: string): Promise<{ success: boolean; username: string; password: string; name: string }> {
 		try {
 			const res = await fetch('/api/credentials/test', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip, cameraType: selectedCameraType })
+				body: JSON.stringify({ ip, cameraType })
 			});
 			if (res.ok) {
 				const data = await res.json();
-				if (data.success) {
-					prefillUser = data.username;
-					prefillPass = data.password;
-					prefillCredName = data.name;
-				}
+				if (data.success) return data;
 			}
 		} catch { /* ignore */ }
-		selectedIp = ip;
+		return { success: false, username: '', password: '', name: '' };
 	}
 
-	let prefillUser = $state('');
-	let prefillPass = $state('');
-	let prefillCredName = $state('');
+	function resetRegisterForm() {
+		registeringIp = null;
+		registerName = '';
+		registerUser = '';
+		registerPass = '';
+		registerError = null;
+		registerLoading = false;
+	}
+
+	async function selectCamera(ip: string, name?: string | null, type?: string) {
+		prefillName = name || '';
+		selectedCameraType = type || 'mobotix';
+		const cred = await fetchCredentials(ip, selectedCameraType);
+		if (cred.success) {
+			prefillUser = cred.username;
+			prefillPass = cred.password;
+			prefillCredName = cred.name;
+		}
+		selectedIp = ip;
+	}
 
 	async function startRegister(ip: string, name?: string | null) {
 		registeringIp = ip;
@@ -100,24 +114,15 @@
 		registerUser = '';
 		registerPass = '';
 		registerError = null;
-		try {
-			const res = await fetch('/api/credentials/test', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip, cameraType: 'mobotix-onvif' })
-			});
-			if (res.ok) {
-				const data = await res.json();
-				if (data.success) {
-					registerUser = data.username;
-					registerPass = data.password;
-					if (registerName) {
-						await submitRegister();
-						return;
-					}
-				}
+		const cred = await fetchCredentials(ip, 'mobotix-onvif');
+		if (cred.success) {
+			registerUser = cred.username;
+			registerPass = cred.password;
+			if (registerName) {
+				await submitRegister();
+				return;
 			}
-		} catch { /* ignore */ }
+		}
 	}
 
 	async function submitRegister() {
@@ -312,20 +317,9 @@
 	async function batchRegisterOnvif(idx: number, cam: { ip: string; name: string | null; type: string }) {
 		// Step 0: Credentials
 		setStep(idx, 0, 'active');
-		let username = '';
-		let password = '';
-		try {
-			const res = await fetch('/api/credentials/test', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip: cam.ip, cameraType: 'mobotix-onvif' })
-			});
-			if (res.ok) {
-				const d = await res.json();
-				if (d.success) { username = d.username; password = d.password; }
-			}
-		} catch { /* ignore */ }
-		if (!username || !password) throw new Error('Keine passenden Zugangsdaten');
+		const cred = await fetchCredentials(cam.ip, 'mobotix-onvif');
+		if (!cred.success) throw new Error('Keine passenden Zugangsdaten');
+		const { username, password } = cred;
 		setStep(idx, 0, 'done', username);
 
 		// Step 1: Register
@@ -346,20 +340,9 @@
 
 		// Step 0: Credentials
 		setStep(idx, stepNum, 'active');
-		let username = '';
-		let password = '';
-		try {
-			const res = await fetch('/api/credentials/test', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip: cam.ip, cameraType: cam.type })
-			});
-			if (res.ok) {
-				const d = await res.json();
-				if (d.success) { username = d.username; password = d.password; }
-			}
-		} catch { /* ignore */ }
-		if (!username || !password) throw new Error('Keine passenden Zugangsdaten');
+		const cred = await fetchCredentials(cam.ip, cam.type);
+		if (!cred.success) throw new Error('Keine passenden Zugangsdaten');
+		const { username, password } = cred;
 		setStep(idx, stepNum, 'done', username);
 		stepNum++;
 
@@ -769,7 +752,7 @@
 										{/if}
 									</button>
 									<button
-										onclick={() => registeringIp = null}
+										onclick={resetRegisterForm}
 										class="bg-bg-input text-text-secondary rounded-lg px-4 py-2 hover:bg-bg-card text-sm cursor-pointer"
 									>
 										Abbrechen
