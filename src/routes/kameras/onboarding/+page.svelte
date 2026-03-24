@@ -265,6 +265,26 @@
 			...pipelineCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makePipelineSteps(c.type), expanded: false }))
 		];
 
+		// Pre-load all snapshots in parallel (fire-and-forget, fills thumbnails while queue runs)
+		for (let i = 0; i < batchResults.length; i++) {
+			const cam = batchResults[i];
+			fetchCredentials(cam.ip, cam.type === 'mobotix-onvif' ? 'mobotix-onvif' : cam.type).then(async (cred) => {
+				if (!cred.success) return;
+				try {
+					const res = await fetch('/api/onboarding/snapshot', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ ip: cam.ip, username: cred.username, password: cred.password }),
+						signal: AbortSignal.timeout(15000)
+					});
+					if (res.ok) {
+						const blob = await res.blob();
+						if (blob.size > 500) batchResults[i].snapshotUrl = URL.createObjectURL(blob);
+					}
+				} catch { /* optional */ }
+			});
+		}
+
 		for (let i = 0; i < batchResults.length; i++) {
 			if (batchCancelled) {
 				for (let j = i; j < batchResults.length; j++) batchResults[j].status = 'skipped';
@@ -322,20 +342,6 @@
 		const { username, password } = cred;
 		setStep(idx, 0, 'done', username);
 
-		// Load snapshot
-		try {
-			const snapRes = await fetch('/api/onboarding/snapshot', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip: cam.ip, username, password }),
-				signal: AbortSignal.timeout(10000)
-			});
-			if (snapRes.ok) {
-				const blob = await snapRes.blob();
-				if (blob.size > 500) batchResults[idx].snapshotUrl = URL.createObjectURL(blob);
-			}
-		} catch { /* optional */ }
-
 		// Step 1: Register
 		setStep(idx, 1, 'active');
 		const res = await fetch('/api/cameras/register', {
@@ -373,19 +379,7 @@
 		setStep(idx, stepNum, 'done', `${testData.width || 1280}x${testData.height || 720} @ ${testData.fps || 20}fps`);
 		stepNum++;
 
-		// Load snapshot (non-blocking — don't fail if it doesn't work)
-		try {
-			const snapRes = await fetch('/api/onboarding/snapshot', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip: cam.ip, username, password }),
-				signal: AbortSignal.timeout(10000)
-			});
-			if (snapRes.ok) {
-				const blob = await snapRes.blob();
-				if (blob.size > 500) batchResults[idx].snapshotUrl = URL.createObjectURL(blob);
-			}
-		} catch { /* optional */ }
+		// Snapshot already pre-loaded in parallel at batch start
 
 		// Save camera
 		const saveRes = await fetch('/api/onboarding/save-camera', {
