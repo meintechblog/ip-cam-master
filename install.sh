@@ -101,18 +101,27 @@ get_vm_ip() {
       return 0
     fi
 
-    # Method 2: ARP table lookup by MAC
-    ip=$(ip neigh show 2>/dev/null | grep -i "$mac" | awk '{print $1}' | head -1) || true
+    # Method 2: ARP table lookup by MAC (IPv4 only — skip fe80:: link-local)
+    ip=$(ip neigh show 2>/dev/null | grep -i "$mac" | awk '{print $1}' | grep -v '^fe80' | grep '\.' | head -1) || true
     if [ -n "$ip" ]; then
       echo "$ip"
       return 0
     fi
 
     # Method 3: arp command fallback
-    ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\((\K[0-9.]+)' | head -1) || true
+    ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\(\K[0-9.]+' | head -1) || true
     if [ -n "$ip" ]; then
       echo "$ip"
       return 0
+    fi
+
+    # Ping broadcast to populate ARP table
+    if [ $((i % 6)) -eq 5 ]; then
+      local subnet
+      subnet=$(ip -4 addr show vmbr0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1)
+      if [ -n "$subnet" ]; then
+        ping -c 1 -b "${subnet%.*}.255" >/dev/null 2>&1 || true
+      fi
     fi
 
     i=$((i + 1))
@@ -210,21 +219,38 @@ fresh_install() {
     ssh-keygen -t ed25519 -f "$INSTALLER_KEY" -N "" -q
   fi
 
-  # Cloud-init config
+  # Determine network config
+  HOST_IP=$(hostname -I | awk '{print $1}')
+  GATEWAY=$(ip route | grep default | awk '{print $3}' | head -1)
+  SUBNET_PREFIX="${HOST_IP%.*}"
+  NAMESERVER=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+
+  # Find a free IP in the same subnet (start from .250 downward)
+  VM_IP=""
+  for last_octet in $(seq 250 -1 230); do
+    candidate="${SUBNET_PREFIX}.${last_octet}"
+    if ! ping -c 1 -W 1 "$candidate" >/dev/null 2>&1; then
+      VM_IP="$candidate"
+      break
+    fi
+  done
+  if [ -z "$VM_IP" ]; then
+    error_exit "Keine freie IP-Adresse im Bereich ${SUBNET_PREFIX}.230-250 gefunden."
+  fi
+  step "VM bekommt statische IP: $VM_IP"
+
+  # Cloud-init config with static IP
   qm set "$VMID" --ciuser root
   qm set "$VMID" --sshkeys "${INSTALLER_KEY}.pub"
-  qm set "$VMID" --ipconfig0 ip=dhcp
-  NAMESERVER=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+  qm set "$VMID" --ipconfig0 "ip=${VM_IP}/24,gw=${GATEWAY}"
   if [ -n "$NAMESERVER" ]; then
     qm set "$VMID" --nameserver "$NAMESERVER"
   fi
 
-  # Start VM + wait for IP + wait for SSH
+  # Start VM + wait for SSH
   step "Starte VM..."
   qm start "$VMID"
-  step "Warte auf VM-Start..."
-  VM_IP=$(get_vm_ip "$VMID")
-  step "VM-IP: $VM_IP"
+  step "VM-IP: $VM_IP — warte auf SSH..."
   step "Warte auf SSH-Zugriff..."
   wait_for_ssh "$VM_IP"
 
