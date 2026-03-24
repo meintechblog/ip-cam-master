@@ -151,8 +151,16 @@
 	}
 
 	$effect(() => {
-		if (isRunning) refreshSnapshot();
+		if (!isRunning || rebooting) return;
+		refreshSnapshot();
 		const timer = setInterval(refreshSnapshot, 10000);
+		return () => clearInterval(timer);
+	});
+
+	$effect(() => {
+		if (!isRunning || rebooting) return;
+		fetchProbe();
+		const timer = setInterval(fetchProbe, 30000);
 		return () => clearInterval(timer);
 	});
 
@@ -162,12 +170,6 @@
 			if (res.ok) probeData = await res.json();
 		} catch { /* ignore */ }
 	}
-
-	$effect(() => {
-		fetchProbe();
-		const timer = setInterval(fetchProbe, 30000);
-		return () => clearInterval(timer);
-	});
 
 	function formatBytes(bytes: number): string {
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
