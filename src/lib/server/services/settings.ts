@@ -5,6 +5,13 @@ import { eq, like } from 'drizzle-orm';
 
 const SENSITIVE_KEYS = ['proxmox_token_secret', 'unifi_password', 'proxmox_ssh_password', 'credential_password'];
 
+// In-memory cache for getSettings() — avoids DB query on every call (30s TTL)
+let settingsCache: { data: Record<string, string>; prefix: string; expiresAt: number } | null = null;
+
+function invalidateSettingsCache(): void {
+	settingsCache = null;
+}
+
 function isSensitive(key: string): boolean {
 	return SENSITIVE_KEYS.includes(key);
 }
@@ -24,6 +31,10 @@ export async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function getSettings(prefix: string): Promise<Record<string, string>> {
+	if (settingsCache && settingsCache.prefix === prefix && Date.now() < settingsCache.expiresAt) {
+		return settingsCache.data;
+	}
+
 	const rows = db
 		.select()
 		.from(settings)
@@ -42,10 +53,12 @@ export async function getSettings(prefix: string): Promise<Record<string, string
 			result[row.key] = row.value;
 		}
 	}
+	settingsCache = { data: result, prefix, expiresAt: Date.now() + 30_000 };
 	return result;
 }
 
 export async function saveSetting(key: string, value: string): Promise<void> {
+	invalidateSettingsCache();
 	const sensitive = isSensitive(key);
 	const storedValue = sensitive ? encrypt(value) : value;
 
@@ -68,6 +81,7 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 }
 
 export async function saveSettings(data: Record<string, string>): Promise<void> {
+	invalidateSettingsCache();
 	for (const [key, value] of Object.entries(data)) {
 		await saveSetting(key, value);
 	}
