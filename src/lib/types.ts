@@ -39,7 +39,15 @@ export interface SettingRecord {
 	encrypted: boolean;
 }
 
-export type CameraStatus = 'pending' | 'container_created' | 'configured' | 'verified';
+export type CameraStatus = 'pending' | 'container_created' | 'go2rtc_configured' | 'configured' | 'verified';
+
+export const CAMERA_STATUS = {
+	PENDING: 'pending',
+	CONTAINER_CREATED: 'container_created',
+	GO2RTC_CONFIGURED: 'go2rtc_configured',
+	CONFIGURED: 'configured',
+	VERIFIED: 'verified'
+} as const satisfies Record<string, CameraStatus>;
 
 export interface TranscodeParams {
 	width: number;

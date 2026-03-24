@@ -6,7 +6,8 @@ import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import type { StreamInfo } from '$lib/types';
+import type { Camera, StreamInfo } from '$lib/types';
+import { CAMERA_STATUS } from '$lib/types';
 
 /**
  * Tests connectivity to a Mobotix camera by probing its RTSP stream via ffprobe over SSH.
@@ -134,7 +135,7 @@ export async function saveCameraRecord(params: {
 			fps: params.fps || 20,
 			bitrate: params.bitrate || 5000,
 			streamName,
-			status: 'pending'
+			status: CAMERA_STATUS.PENDING
 		})
 		.run();
 
@@ -184,7 +185,7 @@ export async function createCameraContainer(
 		db.update(cameras)
 			.set({
 				containerIp,
-				status: 'container_created',
+				status: CAMERA_STATUS.CONTAINER_CREATED,
 				updatedAt: new Date().toISOString()
 			})
 			.where(eq(cameras.id, cameraId))
@@ -266,7 +267,7 @@ export async function configureGo2rtc(cameraId: number): Promise<void> {
 		await executeOnContainer(ssh, camera.vmid, 'systemctl daemon-reload && systemctl enable go2rtc && systemctl restart go2rtc');
 
 		db.update(cameras)
-			.set({ status: 'go2rtc_configured', updatedAt: new Date().toISOString() })
+			.set({ status: CAMERA_STATUS.GO2RTC_CONFIGURED, updatedAt: new Date().toISOString() })
 			.where(eq(cameras.id, cameraId))
 			.run();
 	} finally {
@@ -335,7 +336,7 @@ export async function configureOnvif(cameraId: number): Promise<void> {
 
 		// Update status
 		db.update(cameras)
-			.set({ status: 'configured', updatedAt: new Date().toISOString() })
+			.set({ status: CAMERA_STATUS.CONFIGURED, updatedAt: new Date().toISOString() })
 			.where(eq(cameras.id, cameraId))
 			.run();
 	} finally {
@@ -366,7 +367,7 @@ export async function verifyStream(
 		db.update(cameras)
 			.set({
 				rtspUrl,
-				status: 'verified',
+				status: CAMERA_STATUS.VERIFIED,
 				updatedAt: new Date().toISOString()
 			})
 			.where(eq(cameras.id, cameraId))
@@ -434,10 +435,10 @@ export async function getNextVmid(): Promise<number> {
 /**
  * Helper to get a camera record by ID.
  */
-function getCameraById(cameraId: number): any {
-	const rows = db.select().from(cameras).where(eq(cameras.id, cameraId)).all();
-	if (rows.length === 0) {
+function getCameraById(cameraId: number): Camera {
+	const row = db.select().from(cameras).where(eq(cameras.id, cameraId)).get();
+	if (!row) {
 		throw new Error(`Camera with id ${cameraId} not found`);
 	}
-	return rows[0];
+	return row as Camera;
 }
