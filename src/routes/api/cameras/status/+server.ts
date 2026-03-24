@@ -7,7 +7,7 @@ import { getSettings } from '$lib/server/services/settings';
 import { decrypt } from '$lib/server/services/crypto';
 import { getProtectStatus } from '$lib/server/services/protect';
 import { getFlappingCameras } from '$lib/server/services/events';
-import type { CameraCardData, ContainerStatus, ProtectCameraMatch } from '$lib/types';
+import type { CameraCardData, ProtectCameraMatch } from '$lib/types';
 
 export const GET: RequestHandler = async () => {
 	try {
@@ -133,9 +133,9 @@ export const GET: RequestHandler = async () => {
 					go2rtcWebUrl: containerIp
 						? `http://${containerIp}:1984`
 						: null,
-					lxcCpu: lxcCpu,
-					lxcMemory: lxcMemory,
-					lxcMac: lxcMac
+					lxcCpu,
+					lxcMemory,
+					lxcMac
 				} satisfies CameraCardData;
 			})
 		);

@@ -1,4 +1,4 @@
-import { getSettings, getSetting } from './settings';
+import { getSettings } from './settings';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import type { ProtectCamera, ProtectCameraMatch, ProtectStatus } from '$lib/types';
@@ -177,7 +177,7 @@ export async function verifyOnvifServer(
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), 3000);
 
-		const res = await fetch(`http://${containerIp}:8899`, {
+		await fetch(`http://${containerIp}:8899`, {
 			signal: controller.signal
 		});
 		clearTimeout(timeout);

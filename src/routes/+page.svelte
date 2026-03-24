@@ -57,7 +57,6 @@
 		let streamsActive = 0;
 		let protectAdopted = 0;
 		let protectConnected = 0;
-		let unifiIndirect = 0;
 		let totalClients = 0;
 		let cpuSum = 0;
 		let cpuCount = 0;
@@ -77,7 +76,6 @@
 			if (c.streamInfo?.active) streamsActive++;
 			if (c.protectStatus?.isAdopted) protectAdopted++;
 			if (c.protectStatus?.state === 'CONNECTED') protectConnected++;
-			if (c.streamInfo?.unifiConnected) unifiIndirect++;
 			totalClients += c.connectedClients;
 
 			if (c.vmid > 0) {
@@ -96,14 +94,13 @@
 		const pipeline = total - nativeOnvif;
 		const avgCpu = cpuCount > 0 ? cpuSum / cpuCount : null;
 		const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
-		const unifiConnected = protectAdopted > 0 ? protectAdopted : unifiIndirect;
 		const healthStatus: 'good' | 'warn' | 'bad' =
 			problems.length === 0 && total > 0 ? 'good' : problems.length <= 1 ? 'warn' : 'bad';
 
 		return {
 			total, nativeOnvif, pipeline,
 			containersRunning, containersStopped, containersError,
-			streamsActive, protectAdopted, protectConnected, unifiConnected,
+			streamsActive, protectAdopted, protectConnected,
 			totalClients, pipelineCameras, problems,
 			avgCpu, ramUsed, ramTotal, ramPct, healthStatus
 		};

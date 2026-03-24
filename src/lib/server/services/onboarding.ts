@@ -1,7 +1,6 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
 import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
 import { createContainer, startContainer } from './proxmox';
-import { getSettings } from './settings';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';

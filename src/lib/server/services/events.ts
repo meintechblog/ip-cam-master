@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db/client';
 import { events } from '$lib/server/db/schema';
-import { eq, and, gt, desc, sql, like } from 'drizzle-orm';
-import type { CameraEvent, EventType, EventSeverity, EventSource } from '$lib/types';
+import { eq, and, gt, desc, sql } from 'drizzle-orm';
+import type { CameraEvent, EventType, EventSeverity } from '$lib/types';
 
 export function storeEvent(
 	event: Omit<CameraEvent, 'id'>
