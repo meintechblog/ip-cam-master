@@ -143,12 +143,9 @@ export function getNginxInstallCommands(): string[] {
  * Returns shell commands to install the ONVIF server in an LXC container.
  */
 export function getOnvifInstallCommands(): string[] {
+	// Single combined command to minimize SSH roundtrips (saves ~2 min)
 	return [
-		'apt-get install -y -qq git curl',
-		'curl -fsSL https://deb.nodesource.com/setup_22.x | bash -',
-		'apt-get install -y -qq nodejs',
-		'cd /root && git clone https://github.com/daniela-hase/onvif-server.git',
-		'cd /root/onvif-server && npm install --production'
+		'apt-get install -y -qq git curl && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y -qq nodejs && cd /root && git clone https://github.com/daniela-hase/onvif-server.git && cd /root/onvif-server && npm install --production'
 	];
 }
 
