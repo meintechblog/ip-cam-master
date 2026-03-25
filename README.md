@@ -6,14 +6,20 @@ Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone 
 
 ## Features
 
-- **Auto-Discovery** — Scans the network for Mobotix cameras and Loxone Intercoms, shows them with name and type
+- **Auto-Discovery** — Scans the network for Mobotix cameras and Loxone Intercoms, shows them with name, type, and live snapshot thumbnail
 - **Credential Presets** — Store standard logins once, cameras are auto-matched during onboarding
 - **5-Step Onboarding Wizard** — From credential entry to verified stream in UniFi Protect
+- **Batch Onboarding** — "Alle hinzufügen" button processes all discovered cameras sequentially with live step-by-step progress, sub-steps, and snapshot thumbnails
+- **Container Templates** — First onboarding creates a reusable LXC template; subsequent cameras clone from it (~30s instead of 3-5min)
+- **Dual-Stream Output** — Each camera outputs HQ (full resolution + audio) and LQ (half resolution, lower bitrate) streams for UniFi Protect timeline/thumbnails
 - **Native ONVIF Support** — Cameras with built-in ONVIF are registered without containers
-- **Live Dashboard** — Snapshot preview, service pipeline status, LXC resources, UniFi Protect connection
+- **Live Dashboard** — Snapshot preview, service pipeline status, LXC resources, UniFi Protect connection with real-time event logging
 - **Camera Probing** — Live FPS, model (e.g., MOBOTIX S15D-Sec), firmware version, codec directly from camera
 - **Container Management** — Start, stop, restart, delete LXC containers from the UI
+- **Container Health Checks** — Automatic monitoring of go2rtc and ONVIF server status every 5 minutes with event logging on failure
 - **Dynamic Proxmox Config** — Storage and bridge dropdowns loaded from Proxmox API with disk space info
+- **Access Control** — Session-based login with setup wizard, or YOLO mode for homelab simplicity
+- **Responsive UI** — Hamburger menu on mobile, full sidebar on desktop
 
 ## How It Works
 
