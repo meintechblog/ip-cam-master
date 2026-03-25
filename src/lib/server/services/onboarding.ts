@@ -449,7 +449,13 @@ export async function verifyStream(
 		};
 	}
 
-	const streamInfo = await checkStreamHealth(camera.containerIp, camera.streamName);
+	// Retry up to 6 times (30s total) — go2rtc/ONVIF may still be starting
+	let streamInfo: StreamInfo = { active: false, codec: null, producers: 0, resolution: null };
+	for (let attempt = 0; attempt < 6; attempt++) {
+		streamInfo = await checkStreamHealth(camera.containerIp, camera.streamName);
+		if (streamInfo.active) break;
+		await new Promise(r => setTimeout(r, 5000));
+	}
 
 	if (streamInfo.active) {
 		const rtspUrl = `rtsp://${camera.containerIp}:8554/${camera.streamName}`;
