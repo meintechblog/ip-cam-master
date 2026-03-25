@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getEvents } from '$lib/server/services/events';
+import { db } from '$lib/server/db/client';
+import { events } from '$lib/server/db/schema';
 import type { EventSeverity, EventType } from '$lib/types';
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -28,5 +30,15 @@ export const GET: RequestHandler = async ({ url }) => {
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error';
 		return json({ events: [], total: 0, error: message }, { status: 500 });
+	}
+};
+
+export const DELETE: RequestHandler = async () => {
+	try {
+		db.delete(events).run();
+		return json({ success: true });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		return json({ success: false, error: message }, { status: 500 });
 	}
 };

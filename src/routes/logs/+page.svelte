@@ -3,9 +3,10 @@
 	import type { EventFilterState } from '$lib/components/events/EventFilters.svelte';
 	import EventFilters from '$lib/components/events/EventFilters.svelte';
 	import EventTable from '$lib/components/events/EventTable.svelte';
-	import { Loader2 } from 'lucide-svelte';
+	import { Loader2, Trash2 } from 'lucide-svelte';
 
 	let activeTab = $state<'events' | 'protect'>('events');
+	let deleting = $state(false);
 
 	// Events tab state
 	let events = $state<CameraEvent[]>([]);
@@ -90,6 +91,19 @@
 		fetchEvents();
 	}
 
+	async function deleteAllEvents() {
+		if (!confirm('Alle Events löschen?')) return;
+		deleting = true;
+		try {
+			await fetch('/api/protect/events', { method: 'DELETE' });
+			await fetchEvents();
+		} catch {
+			// ignore
+		} finally {
+			deleting = false;
+		}
+	}
+
 	// Auto-refresh events every 10s
 	let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -134,7 +148,17 @@
 	<!-- Events Tab -->
 	{#if activeTab === 'events'}
 		<div class="space-y-4">
-			<EventFilters {cameras} onFilter={handleFilter} />
+			<div class="flex items-center justify-between">
+				<EventFilters {cameras} onFilter={handleFilter} />
+				<button
+					onclick={deleteAllEvents}
+					disabled={deleting}
+					class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+				>
+					<Trash2 class="w-4 h-4" />
+					{deleting ? 'Löschen...' : 'Löschen'}
+				</button>
+			</div>
 
 			{#if loading}
 				<div class="flex items-center gap-3 text-text-secondary py-12 justify-center">
