@@ -9,6 +9,26 @@ import { writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// Fix common German umlaut replacements (Mobotix camera titles lack UTF-8)
+// Uses word-boundary-aware replacement to avoid false positives
+function fixGermanUmlauts(name: string): string {
+	const replacements: [RegExp, string][] = [
+		[/(?<=[A-Z])ue(?=[a-z])/g, 'ü'],    // Haustuer → Haustür
+		[/(?<=[a-z])ue(?=[a-z]|$)/g, 'ü'],   // haustuer → haustür
+		[/^Ue(?=[a-z])/g, 'Ü'],              // Uebersicht → Übersicht
+		[/(?<=[A-Z])ae(?=[a-z])/g, 'ä'],      // Gaeste → Gäste
+		[/(?<=[a-z])ae(?=[a-z]|$)/g, 'ä'],
+		[/^Ae(?=[a-z])/g, 'Ä'],
+		[/(?<=[A-Z])oe(?=[a-z])/g, 'ö'],      // Hoehe → Höhe
+		[/(?<=[a-z])oe(?=[a-z]|$)/g, 'ö'],
+		[/^Oe(?=[a-z])/g, 'Ö'],
+	];
+	for (const [pattern, replacement] of replacements) {
+		name = name.replace(pattern, replacement);
+	}
+	return name;
+}
+
 const execAsync = promisify(exec);
 
 export interface DiscoveredCamera {
@@ -104,6 +124,8 @@ wait
 							const titleMatch = html.match(/<title>([^<]+)<\/title>/);
 							if (titleMatch) {
 								let name = titleMatch[1].replace(/ Live$/, '').replace(/Error.*/, '').trim();
+								// Fix German umlaut replacements from Mobotix (camera title has no UTF-8)
+								name = fixGermanUmlauts(name);
 								if (name && !name.includes('Error') && !name.includes('Unauthorized')) {
 									cam.name = name;
 									break;
