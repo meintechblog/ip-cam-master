@@ -48,6 +48,8 @@
 	let batchDoneCount = $derived(batchResults.filter(r => r.status === 'done').length);
 	let batchErrorCount = $derived(batchResults.filter(r => r.status === 'error').length);
 	let batchRunning = $derived(batchResults.some(r => r.status === 'active'));
+	let autoRedirectSeconds = $state(0);
+	let autoRedirectTimer: ReturnType<typeof setInterval> | null = null;
 
 	// Pipeline cameras that need the wizard
 	let pipelineCameras = $derived(discovered.filter(c => c.type === 'mobotix' || c.type === 'loxone'));
@@ -342,10 +344,22 @@
 		}
 
 		batchCurrentIp = null;
+
+		// Auto-redirect countdown (10s)
+		autoRedirectSeconds = 10;
+		autoRedirectTimer = setInterval(() => {
+			autoRedirectSeconds--;
+			if (autoRedirectSeconds <= 0) {
+				if (autoRedirectTimer) clearInterval(autoRedirectTimer);
+				goto('/kameras');
+			}
+		}, 1000);
 	}
 
 	function cancelBatch() {
 		batchCancelled = true;
+		if (autoRedirectTimer) { clearInterval(autoRedirectTimer); autoRedirectTimer = null; }
+		autoRedirectSeconds = 0;
 	}
 
 	async function scrollToCamera(idx: number) {
@@ -521,9 +535,12 @@
 			{:else}
 				<button
 					onclick={() => goto('/kameras')}
-					class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 text-sm font-medium cursor-pointer"
+					class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 text-sm font-medium cursor-pointer flex items-center gap-2"
 				>
 					Fertig — zu den Kameras
+					{#if autoRedirectSeconds > 0}
+						<span class="text-xs opacity-70">({autoRedirectSeconds}s)</span>
+					{/if}
 				</button>
 			{/if}
 		</div>
