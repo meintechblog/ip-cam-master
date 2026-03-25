@@ -1,15 +1,17 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { getSettings, saveSetting } from '$lib/server/services/settings';
+import { getSettings, getSetting, saveSetting } from '$lib/server/services/settings';
 import { getUser, createUser, deleteUser, verifyPassword, isYoloMode } from '$lib/server/services/auth';
 
 export const load: PageServerLoad = async () => {
 	const proxmox = await getSettings('proxmox_');
 	const unifi = await getSettings('unifi_');
+	const udmSshKeyPath = await getSetting('udm_ssh_key_path');
 	const user = getUser();
 	return {
 		proxmox,
 		unifi,
+		udmSshKeyPath: udmSshKeyPath ?? '/opt/ip-cam-master/data/udm_key',
 		hasUser: user !== null,
 		authUsername: user?.username ?? null,
 		isYolo: isYoloMode()

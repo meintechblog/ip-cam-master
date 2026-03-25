@@ -2,7 +2,10 @@
 	import InlineAlert from '$lib/components/ui/InlineAlert.svelte';
 	import type { UnifiSettings } from '$lib/types';
 
-	let { initialValues = {} }: { initialValues: Partial<UnifiSettings> } = $props();
+	let {
+		initialValues = {},
+		udmSshKeyPath: initialKeyPath = '/opt/ip-cam-master/data/udm_key'
+	}: { initialValues: Partial<UnifiSettings>; udmSshKeyPath?: string } = $props();
 
 	let unifi_host = $state(initialValues.unifi_host ?? '');
 	let unifi_username = $state(initialValues.unifi_username ?? '');
@@ -10,6 +13,14 @@
 
 	let saving = $state(false);
 	let feedback: { type: 'success' | 'error'; message: string } | null = $state(null);
+
+	// SSH state
+	let udm_ssh_key_path = $state(initialKeyPath);
+	let sshGenerating = $state(false);
+	let sshTesting = $state(false);
+	let sshPublicKey = $state('');
+	let sshFeedback: { type: 'success' | 'error'; message: string } | null = $state(null);
+	let savingKeyPath = $state(false);
 
 	async function handleSave() {
 		saving = true;
@@ -37,6 +48,70 @@
 			feedback = { type: 'error', message: 'Fehler beim Speichern.' };
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function saveKeyPath() {
+		savingKeyPath = true;
+		try {
+			const res = await fetch('/api/settings', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ udm_ssh_key_path })
+			});
+			const data = await res.json();
+			if (!data.saved) {
+				sshFeedback = { type: 'error', message: 'Fehler beim Speichern des Key-Pfads.' };
+			}
+		} catch {
+			sshFeedback = { type: 'error', message: 'Fehler beim Speichern des Key-Pfads.' };
+		} finally {
+			savingKeyPath = false;
+		}
+	}
+
+	async function generateKey() {
+		sshGenerating = true;
+		sshFeedback = null;
+		sshPublicKey = '';
+
+		// Save key path first
+		await saveKeyPath();
+
+		try {
+			const res = await fetch('/api/settings/udm-ssh', { method: 'POST' });
+			const data = await res.json();
+
+			if (data.success) {
+				sshPublicKey = data.publicKey;
+				sshFeedback = { type: 'success', message: 'SSH-Key wurde generiert.' };
+			} else {
+				sshFeedback = { type: 'error', message: data.error || 'Fehler beim Generieren.' };
+			}
+		} catch {
+			sshFeedback = { type: 'error', message: 'Fehler beim Generieren.' };
+		} finally {
+			sshGenerating = false;
+		}
+	}
+
+	async function testConnection() {
+		sshTesting = true;
+		sshFeedback = null;
+
+		try {
+			const res = await fetch('/api/settings/udm-ssh', { method: 'PUT' });
+			const data = await res.json();
+
+			if (data.success) {
+				sshFeedback = { type: 'success', message: 'SSH-Verbindung erfolgreich' };
+			} else {
+				sshFeedback = { type: 'error', message: `SSH-Verbindung fehlgeschlagen: ${data.error || 'Unbekannter Fehler'}` };
+			}
+		} catch {
+			sshFeedback = { type: 'error', message: 'SSH-Verbindung fehlgeschlagen' };
+		} finally {
+			sshTesting = false;
 		}
 	}
 </script>
@@ -93,3 +168,62 @@
 		{saving ? 'Speichern...' : 'Speichern'}
 	</button>
 </form>
+
+<!-- SSH Section -->
+<div class="mt-8 pt-6 border-t border-border max-w-lg">
+	<h3 class="text-lg font-semibold text-text-primary mb-4">SSH-Zugang zum UDM</h3>
+
+	<div class="space-y-4">
+		<div>
+			<label for="udm_ssh_key_path" class="block text-sm font-medium text-text-secondary mb-1"
+				>SSH-Key Pfad</label
+			>
+			<input
+				id="udm_ssh_key_path"
+				type="text"
+				bind:value={udm_ssh_key_path}
+				placeholder="/opt/ip-cam-master/data/udm_key"
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			/>
+		</div>
+
+		<div class="flex gap-3">
+			<button
+				type="button"
+				onclick={generateKey}
+				disabled={sshGenerating}
+				class="bg-accent hover:bg-accent/90 text-white font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors cursor-pointer"
+			>
+				{sshGenerating ? 'Generieren...' : 'Key generieren'}
+			</button>
+
+			<button
+				type="button"
+				onclick={testConnection}
+				disabled={sshTesting}
+				class="border border-border text-text-secondary hover:text-text-primary hover:bg-bg-input font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors cursor-pointer"
+			>
+				{sshTesting ? 'Teste...' : 'Verbindung testen'}
+			</button>
+		</div>
+
+		{#if sshFeedback}
+			<InlineAlert type={sshFeedback.type} message={sshFeedback.message} />
+		{/if}
+
+		{#if sshPublicKey}
+			<div class="space-y-2">
+				<label class="block text-sm font-medium text-text-secondary">
+					Öffentlicher Schlüssel (auf dem UDM in ~/.ssh/authorized_keys eintragen)
+				</label>
+				<textarea
+					readonly
+					value={sshPublicKey}
+					rows="3"
+					class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-xs font-mono focus:outline-none select-all"
+					onclick={(e) => { const t = e.currentTarget; t.select(); }}
+				></textarea>
+			</div>
+		{/if}
+	</div>
+</div>

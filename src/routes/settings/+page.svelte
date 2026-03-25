@@ -36,7 +36,7 @@
 	{#if activeTab === 'Proxmox'}
 		<ProxmoxTab initialValues={data.proxmox} />
 	{:else if activeTab === 'UniFi'}
-		<UnifiTab initialValues={data.unifi} />
+		<UnifiTab initialValues={data.unifi} udmSshKeyPath={data.udmSshKeyPath} />
 	{:else if activeTab === 'Credentials'}
 		<CredentialsTab />
 	{:else if activeTab === 'Zugangsschutz'}
