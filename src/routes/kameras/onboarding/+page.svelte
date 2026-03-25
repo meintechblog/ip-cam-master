@@ -9,6 +9,7 @@
 	let selectedIp = $state<string | null>(null);
 	let discovered = $state<{ ip: string; type: string; alreadyOnboarded: boolean; name: string | null }[]>([]);
 	let scanning = $state(true);
+	let discoveryThumbnails = $state<Map<string, string>>(new Map());
 
 	// For ONVIF registration
 	let registeringIp = $state<string | null>(null);
@@ -54,14 +55,39 @@
 
 	async function runDiscovery() {
 		scanning = true;
+		discoveryThumbnails = new Map();
 		try {
 			const res = await fetch('/api/discovery?start=1&end=50');
 			if (res.ok) {
 				const data = await res.json();
 				discovered = data.cameras.filter((c: any) => !c.alreadyOnboarded);
+				// Fire-and-forget: load thumbnails in parallel after list renders
+				loadDiscoveryThumbnails();
 			}
 		} catch { /* ignore */ }
 		finally { scanning = false; }
+	}
+
+	function loadDiscoveryThumbnails() {
+		for (const cam of discovered) {
+			fetchCredentials(cam.ip, cam.type === 'mobotix-onvif' ? 'mobotix-onvif' : cam.type).then(async (cred) => {
+				if (!cred.success) return;
+				try {
+					const res = await fetch('/api/onboarding/snapshot', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ ip: cam.ip, username: cred.username, password: cred.password, cameraType: cam.type }),
+						signal: AbortSignal.timeout(15000)
+					});
+					if (res.ok) {
+						const blob = await res.blob();
+						if (blob.size > 500) {
+							discoveryThumbnails = new Map(discoveryThumbnails).set(cam.ip, URL.createObjectURL(blob));
+						}
+					}
+				} catch { /* optional */ }
+			});
+		}
 	}
 
 	$effect(() => { runDiscovery(); });
@@ -698,8 +724,14 @@
 				{#each discovered as cam (cam.ip)}
 					<div class="bg-bg-card border border-border rounded-lg p-4">
 						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								<span class="w-2 h-2 rounded-full bg-green-400"></span>
+							<div class="flex items-center gap-3">
+								{#if discoveryThumbnails.get(cam.ip)}
+									<div class="w-14 h-10 rounded overflow-hidden bg-black shrink-0">
+										<img src={discoveryThumbnails.get(cam.ip)} alt={cam.name || cam.ip} class="w-full h-full object-cover" />
+									</div>
+								{:else}
+									<span class="w-2 h-2 rounded-full bg-green-400 shrink-0"></span>
+								{/if}
 								{#if cam.name}
 									<span class="text-text-primary font-medium">{cam.name}</span>
 								{/if}
