@@ -396,6 +396,14 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 		});
 		await pushFileToContainer(ssh, camera.vmid, onvifConfig, '/root/onvif-server/config.yaml');
 
+		// Push MAC auto-update script (runs before ONVIF server starts)
+		const updateMacScript = `#!/bin/bash
+MAC=$(ip link show eth0 | grep ether | awk '{print $2}')
+sed -i "s/mac: .*/mac: $MAC/" /root/onvif-server/config.yaml
+`;
+		await pushFileToContainer(ssh, camera.vmid, updateMacScript, '/root/onvif-server/update-mac.sh');
+		await executeOnContainer(ssh, camera.vmid, 'chmod +x /root/onvif-server/update-mac.sh');
+
 		// Generate and push ONVIF systemd unit
 		const onvifUnit = generateOnvifSystemdUnit();
 		await pushFileToContainer(ssh, camera.vmid, onvifUnit, '/etc/systemd/system/onvif-server.service');

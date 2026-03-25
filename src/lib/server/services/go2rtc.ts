@@ -235,6 +235,7 @@ After=go2rtc.service network-online.target
 Type=simple
 WorkingDirectory=/root/onvif-server
 ExecStartPre=/bin/sleep 12
+ExecStartPre=/root/onvif-server/update-mac.sh
 ExecStart=/usr/bin/node /root/onvif-server/main.js /root/onvif-server/config.yaml
 Restart=always
 RestartSec=5
