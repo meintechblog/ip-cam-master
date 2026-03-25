@@ -158,7 +158,11 @@ export async function getProtectStatus(): Promise<ProtectStatus> {
 		statusCache = { data: status, expiresAt: Date.now() + 30_000 };
 		return status;
 	} catch (err) {
-		console.error('[protect] Status fetch failed:', (err as Error).message);
+		const msg = (err as Error).message;
+		// Don't spam logs when Protect is simply not configured
+		if (!msg.includes('not configured')) {
+			console.error('[protect] Status fetch failed:', msg);
+		}
 		// Do NOT cache failures
 		return {
 			connected: false,
