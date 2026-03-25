@@ -15,10 +15,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		if (cameraType === 'loxone') {
 			// Loxone Intercom: grab single frame from MJPEG stream via ffmpeg
+			// Must use -headers with pre-built Basic Auth (Loxone drops connection on challenge-based auth)
 			const { execSync } = await import('node:child_process');
+			const authHeader = `Authorization: Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
 			const jpegBuffer = execSync(
-				`ffmpeg -y -i "http://${username}:${password}@${ip}/mjpg/video.mjpg" -frames:v 1 -f image2 -q:v 5 pipe:1 2>/dev/null`,
-				{ timeout: 8000, maxBuffer: 2 * 1024 * 1024 }
+				`ffmpeg -y -headers "${authHeader}\r\n" -i "http://${ip}/mjpg/video.mjpg" -frames:v 1 -f image2 -q:v 5 pipe:1 2>/dev/null`,
+				{ timeout: 10000, maxBuffer: 2 * 1024 * 1024 }
 			);
 			return new Response(jpegBuffer, {
 				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' }
