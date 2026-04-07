@@ -372,8 +372,10 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 				}
 			} catch { /* fallback to MobotixS15 */ }
 		}
+		// Use regex patterns so sed works on both fresh installs (Cardinal placeholders)
+		// AND cloned templates (which already have the previous camera's values)
 		await executeOnContainer(ssh, camera.vmid,
-			`sed -i "s/CardinalHqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/CardinalLqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: 'Onvif'/Manufacturer: '${manufacturer}'/g; s/Model: 'Cardinal'/Model: '${model}'/g; s|onvif://www.onvif.org/name/Cardinal|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
+			`sed -i "s/[A-Za-z0-9]*HqCameraConfiguration/${safeName}HqCameraConfiguration/g; s/[A-Za-z0-9]*LqCameraConfiguration/${safeName}LqCameraConfiguration/g; s/Manufacturer: '[^']*'/Manufacturer: '${manufacturer}'/g; s/Model: '[^']*'/Model: '${model}'/g; s|onvif://www.onvif.org/name/[A-Za-z0-9]*|onvif://www.onvif.org/name/${onvifName}|g" /root/onvif-server/src/onvif-server.js`
 		);
 
 		// Patch ONVIF server to advertise audio (G.711 mulaw) — only for Mobotix (has audio on RTSP)
