@@ -280,10 +280,16 @@ fresh_install() {
   step "Provisioniere App in der VM..."
   VM_PUBKEY=$(ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "$INSTALLER_KEY" root@"$VM_IP" bash <<'PROVISION_SCRIPT'
 set -euo pipefail
+export LC_ALL=C
+
+# Wait for cloud-init to finish (filesystem resize, network config, etc.)
+if command -v cloud-init &>/dev/null; then
+  cloud-init status --wait 2>/dev/null || true
+fi
 
 # Install system dependencies
 apt-get update -qq
-apt-get install -y -qq curl git ffmpeg qemu-guest-agent > /dev/null 2>&1
+apt-get install -y -qq curl git ffmpeg qemu-guest-agent 2>&1
 
 # Enable and start guest agent
 systemctl enable qemu-guest-agent 2>/dev/null || true
@@ -291,8 +297,8 @@ systemctl start qemu-guest-agent 2>/dev/null || true
 
 # Node.js 22 LTS via NodeSource
 if ! command -v node &>/dev/null || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 22 ]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
-  apt-get install -y -qq nodejs > /dev/null
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - 2>&1
+  apt-get install -y -qq nodejs 2>&1
 fi
 
 # Clone repo
