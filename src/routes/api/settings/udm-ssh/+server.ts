@@ -28,13 +28,14 @@ export const POST: RequestHandler = async () => {
 		const username = settings.unifi_username;
 		const password = settings.unifi_password;
 
-		if (host && username && password) {
+		if (host && password) {
 			const sshHost = host.replace(/:.*$/, '');
 			const ssh = new NodeSSH();
 			try {
+				// UDM/UDM Pro only accepts SSH as root, password is the UniFi OS password
 				await ssh.connect({
 					host: sshHost,
-					username,
+					username: 'root',
 					password,
 					readyTimeout: 10000
 				});
