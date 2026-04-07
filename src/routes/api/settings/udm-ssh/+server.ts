@@ -30,13 +30,15 @@ export const POST: RequestHandler = async () => {
 			const sshHost = host.replace(/:.*$/, '');
 			const ssh = new NodeSSH();
 			try {
-				// UDM/UDM Pro only accepts SSH as root
-				// tryKeyboard handles keyboard-interactive auth (common on UDM firmware)
+				// UDM/UDM Pro requires keyboard-interactive auth (not plain password)
 				await ssh.connect({
 					host: sshHost,
 					username: 'root',
 					password,
 					tryKeyboard: true,
+					onKeyboardInteractive(_name: string, _instructions: string, _instructionsLang: string, _prompts: any[], finish: (responses: string[]) => void) {
+						finish([password]);
+					},
 					readyTimeout: 10000
 				});
 				await ssh.execCommand(`mkdir -p ~/.ssh && chmod 700 ~/.ssh`);
