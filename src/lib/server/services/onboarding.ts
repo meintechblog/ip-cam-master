@@ -352,7 +352,7 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 		const model = ''; // Empty — otherwise appended to display name
 
 		// Detect real camera model (e.g. "MOBOTIX S15D-Sec" → "MobotixS15D")
-		let onvifName = isLoxone ? 'LoxoneIntercom' : 'GenericCamera'; // Fallback if model not detected
+		let onvifName = isLoxone ? `Loxone${safeName}` : 'GenericCamera'; // Unique per camera for Protect discovery
 		if (!isLoxone) {
 			try {
 				const pw = decrypt(camera.password);

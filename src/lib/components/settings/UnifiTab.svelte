@@ -83,8 +83,14 @@
 			const data = await res.json();
 
 			if (data.success) {
-				sshPublicKey = data.publicKey;
-				sshFeedback = { type: 'success', message: 'SSH-Key wurde generiert.' };
+				sshPublicKey = data.deployed ? '' : data.publicKey; // Only show key if manual install needed
+				if (data.deployed) {
+					sshFeedback = { type: 'success', message: 'SSH-Key generiert und auf dem UDM installiert.' };
+				} else if (data.deployError) {
+					sshFeedback = { type: 'error', message: `SSH-Key generiert, aber Installation auf UDM fehlgeschlagen: ${data.deployError}. Key manuell in ~/.ssh/authorized_keys eintragen.` };
+				} else {
+					sshFeedback = { type: 'success', message: 'SSH-Key wurde generiert.' };
+				}
 			} else {
 				sshFeedback = { type: 'error', message: data.error || 'Fehler beim Generieren.' };
 			}
@@ -194,7 +200,7 @@
 				disabled={sshGenerating}
 				class="bg-accent hover:bg-accent/90 text-white font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors cursor-pointer"
 			>
-				{sshGenerating ? 'Generieren...' : 'Key generieren'}
+				{sshGenerating ? 'Generieren...' : 'Key generieren & installieren'}
 			</button>
 
 			<button

@@ -6,7 +6,7 @@ import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { NodeSSH } from 'node-ssh';
 
-/** POST — generate SSH key pair (ed25519) at the configured path */
+/** POST — generate SSH key pair and deploy to UDM via password-based SSH */
 export const POST: RequestHandler = async () => {
 	try {
 		const keyPath =
@@ -22,7 +22,37 @@ export const POST: RequestHandler = async () => {
 
 		const publicKey = readFileSync(`${keyPath}.pub`, 'utf-8').trim();
 
-		return json({ success: true, publicKey });
+		// Try to deploy the key to the UDM using the saved username/password
+		const settings = await getSettings('unifi_');
+		const host = settings.unifi_host;
+		const username = settings.unifi_username;
+		const password = settings.unifi_password;
+
+		if (host && username && password) {
+			const sshHost = host.replace(/:.*$/, '');
+			const ssh = new NodeSSH();
+			try {
+				await ssh.connect({
+					host: sshHost,
+					username,
+					password,
+					readyTimeout: 10000
+				});
+				await ssh.execCommand(`mkdir -p ~/.ssh && chmod 700 ~/.ssh`);
+				// Append public key if not already present
+				await ssh.execCommand(
+					`grep -qF "${publicKey}" ~/.ssh/authorized_keys 2>/dev/null || echo "${publicKey}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`
+				);
+				ssh.dispose();
+				return json({ success: true, publicKey, deployed: true });
+			} catch (deployErr) {
+				// Key was generated but couldn't be deployed — return key for manual install
+				const msg = deployErr instanceof Error ? deployErr.message : 'Unknown error';
+				return json({ success: true, publicKey, deployed: false, deployError: msg });
+			}
+		}
+
+		return json({ success: true, publicKey, deployed: false, deployError: 'UDM-Zugangsdaten nicht konfiguriert — Key muss manuell installiert werden.' });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error';
 		return json({ success: false, error: message }, { status: 500 });
