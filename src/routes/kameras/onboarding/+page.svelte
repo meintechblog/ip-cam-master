@@ -1,6 +1,6 @@
 <script lang="ts">
 	import OnboardingWizard from '$lib/components/onboarding/OnboardingWizard.svelte';
-	import { Loader2, Wifi, Check, PlayCircle, XCircle } from 'lucide-svelte';
+	import { Loader2, Wifi, Check, PlayCircle, XCircle, KeyRound } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
 
@@ -50,6 +50,64 @@
 	let batchRunning = $derived(batchResults.some(r => r.status === 'active'));
 	let autoRedirectSeconds = $state(0);
 	let autoRedirectTimer: ReturnType<typeof setInterval> | null = null;
+
+	// Credential prompt during batch (pauses batch until user provides credentials)
+	let credPrompt = $state<{
+		camIdx: number;
+		ip: string;
+		cameraType: string;
+		resolve: (cred: { username: string; password: string } | null) => void;
+	} | null>(null);
+	let credPromptName = $state('');
+	let credPromptUser = $state('');
+	let credPromptPass = $state('');
+	let credPromptSaving = $state(false);
+	let credPromptError = $state<string | null>(null);
+
+	/** Pause the batch and show credential input for a camera. Returns credentials or null (skip). */
+	function promptForCredentials(camIdx: number, ip: string, cameraType: string): Promise<{ username: string; password: string } | null> {
+		return new Promise((resolve) => {
+			credPromptName = '';
+			credPromptUser = '';
+			credPromptPass = '';
+			credPromptError = null;
+			credPromptSaving = false;
+			credPrompt = { camIdx, ip, cameraType, resolve };
+		});
+	}
+
+	async function submitCredPrompt() {
+		if (!credPrompt) return;
+		if (!credPromptUser || !credPromptPass) {
+			credPromptError = 'Benutzername und Passwort erforderlich';
+			return;
+		}
+		credPromptSaving = true;
+		credPromptError = null;
+		try {
+			// Save as new credential if name provided
+			if (credPromptName.trim()) {
+				await fetch('/api/credentials', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ name: credPromptName.trim(), username: credPromptUser, password: credPromptPass })
+				});
+			}
+			const cred = { username: credPromptUser, password: credPromptPass };
+			credPrompt.resolve(cred);
+			credPrompt = null;
+		} catch (err: any) {
+			credPromptError = err.message || 'Fehler beim Speichern';
+		} finally {
+			credPromptSaving = false;
+		}
+	}
+
+	function skipCredPrompt() {
+		if (!credPrompt) return;
+		credPrompt.resolve(null);
+		credPrompt = null;
+	}
 
 	// Pipeline cameras that need the wizard
 	let pipelineCameras = $derived(discovered.filter(c => c.type === 'mobotix' || c.type === 'loxone'));
@@ -377,9 +435,17 @@
 	async function batchRegisterOnvif(idx: number, cam: { ip: string; name: string | null; type: string }) {
 		// Step 0: Credentials
 		setStep(idx, 0, 'active');
-		const cred = await fetchCredentials(cam.ip, 'mobotix-onvif');
-		if (!cred.success) throw new Error('Keine passenden Zugangsdaten');
-		const { username, password } = cred;
+		let cred = await fetchCredentials(cam.ip, 'mobotix-onvif');
+		let username: string, password: string;
+		if (cred.success) {
+			username = cred.username;
+			password = cred.password;
+		} else {
+			const manual = await promptForCredentials(idx, cam.ip, 'mobotix-onvif');
+			if (!manual) throw new Error('Übersprungen — keine Zugangsdaten');
+			username = manual.username;
+			password = manual.password;
+		}
 		setStep(idx, 0, 'done', username);
 
 		// Step 1: Register
@@ -400,9 +466,17 @@
 
 		// Step 0: Credentials
 		setStep(idx, stepNum, 'active');
-		const cred = await fetchCredentials(cam.ip, cam.type);
-		if (!cred.success) throw new Error('Keine passenden Zugangsdaten');
-		const { username, password } = cred;
+		let cred = await fetchCredentials(cam.ip, cam.type);
+		let username: string, password: string;
+		if (cred.success) {
+			username = cred.username;
+			password = cred.password;
+		} else {
+			const manual = await promptForCredentials(idx, cam.ip, cam.type);
+			if (!manual) throw new Error('Übersprungen — keine Zugangsdaten');
+			username = manual.username;
+			password = manual.password;
+		}
 		setStep(idx, stepNum, 'done', username);
 		stepNum++;
 
@@ -552,6 +626,65 @@
 				style="width: {((batchDoneCount + batchErrorCount) / batchResults.length * 100).toFixed(0)}%"
 			></div>
 		</div>
+
+		<!-- Credential prompt (pauses batch) -->
+		{#if credPrompt}
+			<div class="bg-yellow-500/10 border border-yellow-500/40 rounded-lg p-4 space-y-3">
+				<div class="flex items-center gap-2">
+					<KeyRound class="w-5 h-5 text-yellow-400" />
+					<h3 class="text-sm font-bold text-yellow-400">Zugangsdaten benötigt</h3>
+				</div>
+				<p class="text-sm text-text-secondary">
+					Für <span class="text-text-primary font-mono">{credPrompt.ip}</span> wurden keine passenden Zugangsdaten gefunden.
+					Gib Benutzername und Passwort ein. Optional einen Namen vergeben, um die Zugangsdaten für zukünftige Kameras zu speichern.
+				</p>
+				{#if credPromptError}
+					<div class="text-red-400 text-xs">{credPromptError}</div>
+				{/if}
+				<div class="grid grid-cols-3 gap-3">
+					<input
+						type="text"
+						bind:value={credPromptName}
+						placeholder="Name (optional, z.B. Mobotix Standard)"
+						autocomplete="off"
+						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+					/>
+					<input
+						type="text"
+						bind:value={credPromptUser}
+						placeholder="Benutzername"
+						autocomplete="off"
+						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+					/>
+					<input
+						type="password"
+						bind:value={credPromptPass}
+						placeholder="Passwort"
+						autocomplete="off"
+						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+					/>
+				</div>
+				<div class="flex gap-2">
+					<button
+						onclick={submitCredPrompt}
+						disabled={credPromptSaving}
+						class="bg-accent text-white rounded-lg px-4 py-2 hover:bg-accent/90 text-sm font-medium cursor-pointer disabled:opacity-50"
+					>
+						{#if credPromptSaving}
+							<Loader2 class="w-4 h-4 animate-spin inline" />
+						{:else}
+							Weiter
+						{/if}
+					</button>
+					<button
+						onclick={skipCredPrompt}
+						class="bg-bg-input text-text-secondary rounded-lg px-4 py-2 hover:bg-bg-card text-sm cursor-pointer"
+					>
+						Kamera überspringen
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Camera cards -->
 		<div class="space-y-3">
