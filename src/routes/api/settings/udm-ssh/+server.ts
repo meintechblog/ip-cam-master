@@ -30,11 +30,13 @@ export const POST: RequestHandler = async () => {
 			const sshHost = host.replace(/:.*$/, '');
 			const ssh = new NodeSSH();
 			try {
-				// UDM/UDM Pro only accepts SSH as root, password is the UniFi OS password
+				// UDM/UDM Pro only accepts SSH as root
+				// tryKeyboard handles keyboard-interactive auth (common on UDM firmware)
 				await ssh.connect({
 					host: sshHost,
 					username: 'root',
 					password,
+					tryKeyboard: true,
 					readyTimeout: 10000
 				});
 				await ssh.execCommand(`mkdir -p ~/.ssh && chmod 700 ~/.ssh`);
