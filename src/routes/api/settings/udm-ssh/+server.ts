@@ -22,11 +22,9 @@ export const POST: RequestHandler = async () => {
 
 		const publicKey = readFileSync(`${keyPath}.pub`, 'utf-8').trim();
 
-		// Try to deploy the key to the UDM using the saved username/password
-		const settings = await getSettings('unifi_');
-		const host = settings.unifi_host;
-		const username = settings.unifi_username;
-		const password = settings.unifi_password;
+		// Try to deploy the key to the UDM using the saved root password
+		const host = await getSetting('unifi_host');
+		const password = await getSetting('udm_ssh_password');
 
 		if (host && password) {
 			const sshHost = host.replace(/:.*$/, '');

@@ -3,7 +3,7 @@ import { settings } from '$lib/server/db/schema';
 import { encrypt, decrypt } from './crypto';
 import { eq, like } from 'drizzle-orm';
 
-const SENSITIVE_KEYS = ['proxmox_token_secret', 'unifi_password', 'proxmox_ssh_password', 'credential_password'];
+const SENSITIVE_KEYS = ['proxmox_token_secret', 'unifi_password', 'udm_ssh_password', 'proxmox_ssh_password', 'credential_password'];
 
 // In-memory cache for getSettings() — avoids DB query on every call (30s TTL)
 let settingsCache: { data: Record<string, string>; prefix: string; expiresAt: number } | null = null;

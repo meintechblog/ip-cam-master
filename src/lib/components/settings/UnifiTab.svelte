@@ -14,8 +14,13 @@
 	let saving = $state(false);
 	let feedback: { type: 'success' | 'error'; message: string } | null = $state(null);
 
+	// Protect API test
+	let protectTesting = $state(false);
+	let protectFeedback: { type: 'success' | 'error'; message: string } | null = $state(null);
+
 	// SSH state
 	let udm_ssh_key_path = $state(initialKeyPath);
+	let udm_ssh_password = $state('');
 	let sshGenerating = $state(false);
 	let sshTesting = $state(false);
 	let sshPublicKey = $state('');
@@ -51,6 +56,28 @@
 		}
 	}
 
+	async function testProtect() {
+		protectTesting = true;
+		protectFeedback = null;
+		try {
+			const res = await fetch('/api/settings/unifi-test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ host: unifi_host, username: unifi_username, password: unifi_password })
+			});
+			const data = await res.json();
+			if (data.success) {
+				protectFeedback = { type: 'success', message: `Verbindung erfolgreich — ${data.name || 'UniFi Protect'}` };
+			} else {
+				protectFeedback = { type: 'error', message: data.error || 'Verbindung fehlgeschlagen' };
+			}
+		} catch {
+			protectFeedback = { type: 'error', message: 'Verbindung fehlgeschlagen' };
+		} finally {
+			protectTesting = false;
+		}
+	}
+
 	async function saveKeyPath() {
 		savingKeyPath = true;
 		try {
@@ -75,8 +102,15 @@
 		sshFeedback = null;
 		sshPublicKey = '';
 
-		// Save key path first
+		// Save key path and SSH password first
 		await saveKeyPath();
+		if (udm_ssh_password) {
+			await fetch('/api/settings', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ udm_ssh_password })
+			});
+		}
 
 		try {
 			const res = await fetch('/api/settings/udm-ssh', { method: 'POST' });
@@ -166,20 +200,52 @@
 		<InlineAlert type={feedback.type} message={feedback.message} />
 	{/if}
 
-	<button
-		type="submit"
-		disabled={saving}
-		class="bg-accent hover:bg-accent/90 text-white font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors"
-	>
-		{saving ? 'Speichern...' : 'Speichern'}
-	</button>
+	<div class="flex gap-3">
+		<button
+			type="submit"
+			disabled={saving}
+			class="bg-accent hover:bg-accent/90 text-white font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors"
+		>
+			{saving ? 'Speichern...' : 'Speichern'}
+		</button>
+		<button
+			type="button"
+			onclick={testProtect}
+			disabled={protectTesting || !unifi_host}
+			class="border border-border text-text-secondary hover:text-text-primary hover:bg-bg-input font-medium px-4 py-2 rounded-md text-sm disabled:opacity-50 transition-colors cursor-pointer"
+		>
+			{protectTesting ? 'Teste...' : 'Verbindung testen'}
+		</button>
+	</div>
+
+	{#if protectFeedback}
+		<InlineAlert type={protectFeedback.type} message={protectFeedback.message} />
+	{/if}
 </form>
 
 <!-- SSH Section -->
 <div class="mt-8 pt-6 border-t border-border max-w-lg">
 	<h3 class="text-lg font-semibold text-text-primary mb-4">SSH-Zugang zum UDM</h3>
 
+	<p class="text-sm text-text-secondary mb-4">
+		SSH-Zugriff auf den UDM wird für Log-Auswertung und Kamera-Status benötigt. Der UDM akzeptiert SSH nur als <code class="text-text-primary">root</code>.
+	</p>
+
 	<div class="space-y-4">
+		<div>
+			<label for="udm_ssh_password" class="block text-sm font-medium text-text-secondary mb-1"
+				>Root-Passwort</label
+			>
+			<input
+				id="udm_ssh_password"
+				type="password"
+				bind:value={udm_ssh_password}
+				placeholder="UDM Root-Passwort"
+				class="w-full bg-bg-input border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+			/>
+			<p class="text-xs text-text-secondary mt-1">Wird einmalig benötigt, um den SSH-Key auf dem UDM zu installieren.</p>
+		</div>
+
 		<div>
 			<label for="udm_ssh_key_path" class="block text-sm font-medium text-text-secondary mb-1"
 				>SSH-Key Pfad</label
