@@ -72,13 +72,8 @@ WantedBy=multi-user.target
  */
 export function getInstallCommands(): string[] {
 	return [
-		'apt-get update -qq && apt-get install -y -qq ffmpeg wget',
-		// Install newer intel-media-va-driver from Debian Trixie for Arrow Lake+ GPU support
-		// (Debian 12 ships 23.1 which doesn't support Arrow Lake/Lunar Lake GPUs)
-		'echo "deb http://deb.debian.org/debian trixie main non-free" > /etc/apt/sources.list.d/trixie.list && ' +
-		'echo \'APT::Default-Release "bookworm";\' > /etc/apt/apt.conf.d/99default-release && ' +
-		'apt-get update -qq && apt-get install -y -qq -t trixie intel-media-va-driver && ' +
-		'rm -f /etc/apt/sources.list.d/trixie.list && apt-get update -qq',
+		// Debian 13 (Trixie) ships intel-media-va-driver 25.x with Arrow Lake+ support
+		'apt-get update -qq && apt-get install -y -qq ffmpeg intel-media-va-driver wget',
 		'wget -q https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_amd64 -O /usr/local/bin/go2rtc && chmod +x /usr/local/bin/go2rtc',
 		'mkdir -p /etc/go2rtc'
 	];
