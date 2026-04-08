@@ -161,30 +161,34 @@ export async function createContainer(params: {
 }
 
 /**
- * Configures VAAPI device passthrough on an LXC container (LXC-02).
- * Uses dev0 parameter for /dev/dri/renderD128 (PVE 8.1+).
- * Falls back to direct API call if proxmox-api types don't support dev0.
+ * Configures VAAPI device passthrough on an LXC container.
+ * Uses cgroup2 device allow + bind mount of /dev/dri (same method as proven
+ * with Fileflows on Arrow Lake). The PVE dev0 method doesn't work reliably
+ * on newer Intel GPUs (Arrow Lake, Lunar Lake).
  */
 export async function configureVaapi(node: string, vmid: number): Promise<void> {
-	// Device passthrough requires root@pam — API tokens can't do it.
-	// Use SSH to the Proxmox host and modify the LXC config directly.
 	const { connectToProxmox: connectSSH } = await import('./ssh');
 	const ssh = await connectSSH();
 
 	try {
-		// Check if dev0 already configured
-		const { stdout } = await ssh.execCommand(`pct config ${vmid} | grep 'dev0'`);
-		if (stdout && stdout.includes('renderD128')) {
+		const confPath = `/etc/pve/lxc/${vmid}.conf`;
+		// Check if already configured
+		const { stdout } = await ssh.execCommand(`grep 'lxc.mount.entry.*dev/dri' ${confPath}`);
+		if (stdout && stdout.includes('dev/dri')) {
 			return; // Already configured
 		}
 
-		// Add device passthrough via pct set
-		const result = await ssh.execCommand(
-			`pct set ${vmid} -dev0 /dev/dri/renderD128,mode=0666`
+		// Remove old dev0 style passthrough if present
+		await ssh.execCommand(`sed -i '/^dev0:.*renderD128/d' ${confPath}`);
+
+		// Container must be privileged for bind mounts to work
+		await ssh.execCommand(`sed -i '/^unprivileged:/d' ${confPath}`);
+
+		// Add cgroup + bind mount (proven method for all Intel GPU generations)
+		await ssh.execCommand(
+			`echo 'lxc.cgroup2.devices.allow: c 226:* rwm' >> ${confPath} && ` +
+			`echo 'lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir' >> ${confPath}`
 		);
-		if (result.code && result.code !== 0) {
-			throw new Error(result.stderr || 'Failed to configure VAAPI passthrough');
-		}
 	} finally {
 		ssh.dispose();
 	}
