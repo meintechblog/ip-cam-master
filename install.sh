@@ -27,8 +27,8 @@ APP_DIR="/opt/ip-cam-master"
 PVE_USER="ipcm@pve"
 PVE_TOKEN_NAME="ipcm"
 PVE_ROLE="IPCamMaster"
-IMG_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
-IMG_CACHE="/var/lib/vz/template/iso/debian-12-genericcloud-amd64.qcow2"
+IMG_URL="https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+IMG_CACHE="/var/lib/vz/template/iso/debian-13-genericcloud-amd64.qcow2"
 INSTALLER_KEY="/root/.ssh/ipcm_installer"
 SERVICE_NAME="ip-cam-master"
 
@@ -203,12 +203,19 @@ fresh_install() {
   fi
   step "Verwende Storage: $STORAGE"
 
-  # Download Debian 12 cloud image (cached)
+  # Download Debian 13 cloud image for VM (cached)
   if [ ! -f "$IMG_CACHE" ]; then
-    step "Lade Debian 12 Cloud-Image herunter..."
+    step "Lade Debian 13 Cloud-Image herunter..."
     wget -q --show-progress "$IMG_URL" -O "$IMG_CACHE"
   else
-    step "Debian 12 Cloud-Image bereits vorhanden (Cache)."
+    step "Debian 13 Cloud-Image bereits vorhanden (Cache)."
+  fi
+
+  # Pre-download Debian 13 LXC template for camera containers
+  LXC_TEMPLATE="debian-13-standard_13.1-2_amd64.tar.zst"
+  if [ ! -f "/var/lib/vz/template/cache/$LXC_TEMPLATE" ]; then
+    step "Lade Debian 13 LXC-Template herunter..."
+    pveam download local "$LXC_TEMPLATE" || true
   fi
 
   # Get next VMID
