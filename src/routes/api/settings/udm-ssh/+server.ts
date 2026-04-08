@@ -26,11 +26,8 @@ export const POST: RequestHandler = async () => {
 		const host = await getSetting('unifi_host');
 		const password = await getSetting('udm_ssh_password');
 
-		console.log(`[udm-ssh] Deploy attempt: host=${host ? 'set' : 'null'}, password=${password ? `set (${password.length} chars)` : 'null'}`);
-
 		if (host && password) {
 			const sshHost = host.replace(/:.*$/, '');
-			console.log(`[udm-ssh] Connecting to ${sshHost} as root...`);
 			const ssh = new NodeSSH();
 			try {
 				// UDM/UDM Pro requires keyboard-interactive auth (not plain password)
