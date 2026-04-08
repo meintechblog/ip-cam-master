@@ -153,14 +153,35 @@
 
 	// Step 0: Save camera
 	async function handleCredentialsSubmit() {
+		if (!ip) {
+			error = 'Bitte eine Kamera-IP eingeben';
+			return;
+		}
+		// Auto-fetch saved credentials if user left fields empty
+		if (!username || !password) {
+			try {
+				const credRes = await fetch('/api/credentials/test', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ip, cameraType })
+				});
+				if (credRes.ok) {
+					const credData = await credRes.json();
+					if (credData.success) {
+						username = credData.username;
+						password = credData.password;
+					}
+				}
+			} catch { /* ignore */ }
+		}
+		if (!username || !password) {
+			error = 'Keine Zugangsdaten gefunden — bitte Benutzername und Passwort eingeben';
+			return;
+		}
 		// Auto-generate name if empty
 		if (!name && ip) {
 			const lastOctet = ip.split('.').pop();
 			name = cameraType === 'loxone' ? `Intercom` : `Kamera-${lastOctet}`;
-		}
-		if (!name || !ip || !username || !password) {
-			error = 'Bitte alle Pflichtfelder ausfüllen';
-			return;
 		}
 		loading = true;
 		error = null;

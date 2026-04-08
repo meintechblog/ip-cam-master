@@ -156,6 +156,10 @@
 	}
 </script>
 
+<p class="text-sm text-text-secondary mb-4">
+	Verbindung zur UniFi Protect API auf deinem UDM. Damit kann die App Kamera-Status abfragen und Adoption-Events auslesen.
+</p>
+
 <form onsubmit={handleSave} class="space-y-4 max-w-lg">
 	<div>
 		<label for="unifi_host" class="block text-sm font-medium text-text-secondary mb-1"
