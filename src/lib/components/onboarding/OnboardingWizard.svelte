@@ -28,9 +28,10 @@
 	let cameraId = $state<number | null>(null);
 	let credentialsMatched = $derived(!!(prefillUsername && prefillPassword));
 
-	// Auto-start if credentials are pre-filled (matched from presets)
+	// Auto-start if credentials AND name are pre-filled (matched from presets)
+	// Don't auto-submit without a name — let the user enter it first
 	$effect(() => {
-		if (credentialsMatched && prefillIp && currentStep === 0 && !loading && !cameraId) {
+		if (credentialsMatched && prefillName && prefillIp && currentStep === 0 && !loading && !cameraId) {
 			handleCredentialsSubmit();
 		}
 	});

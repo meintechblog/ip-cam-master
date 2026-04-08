@@ -276,6 +276,9 @@ fresh_install() {
     qm set "$VMID" --nameserver "$NAMESERVER"
   fi
 
+  # Clear stale known_hosts entry for this IP (VM was just created, old key is invalid)
+  ssh-keygen -f /root/.ssh/known_hosts -R "$VM_IP" 2>/dev/null || true
+
   # Start VM + wait for SSH
   step "Starte VM..."
   qm start "$VMID"
