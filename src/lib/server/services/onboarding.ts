@@ -183,10 +183,23 @@ export async function createCameraContainer(
 		fromTemplate = true;
 	} else {
 		// No template yet — fresh install (first camera)
+		// Ensure Debian 13 LXC template is available on the Proxmox host
+		const ostemplate = 'local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst';
+		const templateFile = '/var/lib/vz/template/cache/debian-13-standard_13.1-2_amd64.tar.zst';
+		const sshCheck = await connectToProxmox();
+		try {
+			const { stdout } = await sshCheck.execCommand(`test -f ${templateFile} && echo exists`);
+			if (!stdout?.includes('exists')) {
+				await sshCheck.execCommand(`pveam download local debian-13-standard_13.1-2_amd64.tar.zst`);
+			}
+		} finally {
+			sshCheck.dispose();
+		}
+
 		await createContainer({
 			vmid: camera.vmid,
 			hostname,
-			ostemplate: 'local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst',
+			ostemplate,
 			cameraName: camera.name,
 			cameraIp: camera.ip,
 			cameraType: camera.cameraType
