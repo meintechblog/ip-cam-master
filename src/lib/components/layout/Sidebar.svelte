@@ -15,6 +15,16 @@
 		if (href === '/') return pathname === '/';
 		return pathname.startsWith(href);
 	}
+
+	let versionLabel = $state<string | null>(null);
+	$effect(() => {
+		fetch('/api/update/status')
+			.then((r) => (r.ok ? r.json() : null))
+			.then((d) => {
+				if (d?.current?.label) versionLabel = d.current.label;
+			})
+			.catch(() => {});
+	});
 </script>
 
 <aside class="w-56 bg-bg-secondary border-r border-border flex flex-col h-full shrink-0">
@@ -58,5 +68,16 @@
 				</button>
 			</form>
 		</div>
+	{/if}
+
+	{#if versionLabel}
+		<a
+			href="/settings"
+			onclick={onNavigate}
+			class="block px-4 py-2 border-t border-border text-xs font-mono text-text-secondary/60 hover:text-text-primary transition-colors truncate"
+			title="Installierte Version — klicken für Update-Status"
+		>
+			{versionLabel}
+		</a>
 	{/if}
 </aside>
