@@ -4,6 +4,7 @@ import { getSettings } from './settings';
 import { cleanupExpiredSessions } from './auth';
 import { getProtectStatus } from './protect';
 import { checkForUpdate } from './update-check';
+import { cleanupOldUpdateLogs } from './update-history';
 import { getCurrentVersion } from './version';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
@@ -14,6 +15,7 @@ let protectPollInterval: ReturnType<typeof setInterval> | null = null;
 let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
 let updateCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
+let updateLogCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(): void {
 	// SSH log scan every 60s — only if UDM/UniFi is configured
@@ -150,7 +152,27 @@ export function startScheduler(): void {
 		}, 30_000);
 	}
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h)');
+	// Update log cleanup — once per 24h, drop entries + files older than 30 days
+	if (!updateLogCleanupInterval) {
+		const runCleanup = async () => {
+			try {
+				const { entriesDropped, filesRemoved } = await cleanupOldUpdateLogs(30);
+				if (entriesDropped > 0 || filesRemoved > 0) {
+					console.log(
+						`[scheduler] update log cleanup: dropped ${entriesDropped} entries, removed ${filesRemoved} files`
+					);
+				}
+			} catch (err) {
+				console.error('[scheduler] update log cleanup failed:', (err as Error).message);
+			}
+		};
+		// Run shortly after boot so orphans left from previous lifetimes get swept,
+		// then once per 24h.
+		setTimeout(runCleanup, 60_000);
+		updateLogCleanupInterval = setInterval(runCleanup, 86_400_000);
+	}
+
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h), update log cleanup (24h)');
 }
 
 export function stopScheduler(): void {
@@ -177,5 +199,9 @@ export function stopScheduler(): void {
 	if (updateCheckInterval) {
 		clearInterval(updateCheckInterval);
 		updateCheckInterval = null;
+	}
+	if (updateLogCleanupInterval) {
+		clearInterval(updateLogCleanupInterval);
+		updateLogCleanupInterval = null;
 	}
 }

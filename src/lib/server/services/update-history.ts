@@ -1,4 +1,5 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, unlinkSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { getSetting, saveSetting } from './settings';
 
 const HISTORY_KEY = 'update_run_history';
@@ -118,4 +119,76 @@ function readMarkerLine(logPath: string): string | null {
 		return null;
 	}
 	return null;
+}
+
+/**
+ * Remove stale update log/exitcode files + history entries older than
+ * {@link maxAgeDays}. Two-pass cleanup:
+ *
+ *   1. Drop history entries whose `startedAt` is older than the cutoff,
+ *      unlinking their log and exitcode files if still present.
+ *   2. Sweep `/tmp` for orphaned `ip-cam-master-update-*.{log,exitcode}`
+ *      files that are not referenced by any remaining history entry and
+ *      whose mtime is older than the cutoff.
+ *
+ * Never touches files younger than the cutoff (running update is always safe).
+ * Returns a summary for logging.
+ */
+export async function cleanupOldUpdateLogs(maxAgeDays: number = 30): Promise<{
+	entriesDropped: number;
+	filesRemoved: number;
+}> {
+	const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+	const current = await loadHistory();
+
+	const kept: UpdateRunEntry[] = [];
+	const referencedFiles = new Set<string>();
+	let entriesDropped = 0;
+	let filesRemoved = 0;
+
+	for (const entry of current) {
+		const entryMs = Date.parse(entry.startedAt);
+		if (Number.isFinite(entryMs) && entryMs < cutoffMs) {
+			entriesDropped++;
+			const exitcode = entry.logPath.replace(/\.log$/, '.exitcode');
+			for (const p of [entry.logPath, exitcode]) {
+				try {
+					if (existsSync(p)) {
+						unlinkSync(p);
+						filesRemoved++;
+					}
+				} catch {
+					/* tolerate permission / not-found */
+				}
+			}
+			continue;
+		}
+		kept.push(entry);
+		referencedFiles.add(entry.logPath);
+		referencedFiles.add(entry.logPath.replace(/\.log$/, '.exitcode'));
+	}
+
+	if (entriesDropped > 0) await saveHistory(kept);
+
+	try {
+		const tmpFiles = readdirSync('/tmp');
+		for (const name of tmpFiles) {
+			if (!/^ip-cam-master-update-\d+\.(log|exitcode)$/.test(name)) continue;
+			const full = join('/tmp', name);
+			if (referencedFiles.has(full)) continue;
+			try {
+				const stat = statSync(full);
+				if (stat.mtimeMs < cutoffMs) {
+					unlinkSync(full);
+					filesRemoved++;
+				}
+			} catch {
+				/* ignore */
+			}
+		}
+	} catch {
+		/* /tmp unreadable — unusual but survivable */
+	}
+
+	return { entriesDropped, filesRemoved };
 }
