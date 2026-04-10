@@ -460,12 +460,12 @@ export async function verifyStream(
 	if (!camera.containerIp) {
 		return {
 			success: false,
-			streamInfo: { active: false, codec: null, producers: 0, resolution: null }
+			streamInfo: { active: false, codec: null, audioCodec: null, producers: 0, resolution: null }
 		};
 	}
 
 	// Retry up to 6 times (30s total) — go2rtc/ONVIF may still be starting
-	let streamInfo: StreamInfo = { active: false, codec: null, producers: 0, resolution: null };
+	let streamInfo: StreamInfo = { active: false, codec: null, audioCodec: null, producers: 0, resolution: null };
 	for (let attempt = 0; attempt < 6; attempt++) {
 		streamInfo = await checkStreamHealth(camera.containerIp, camera.streamName);
 		if (streamInfo.active) break;
@@ -509,7 +509,7 @@ export async function getNextVmid(): Promise<number> {
 		// Also get VMs (not just LXC) to avoid conflicts with any Proxmox resource
 		try {
 			const { getProxmoxClient, getNodeName } = await import('./proxmox');
-			const proxmox = getProxmoxClient();
+			const proxmox = await getProxmoxClient();
 			const node = await getNodeName();
 			const vms = await proxmox.nodes.$(node).qemu.$get() as any[];
 			for (const vm of vms) {

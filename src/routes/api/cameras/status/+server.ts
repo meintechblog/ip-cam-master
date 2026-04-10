@@ -133,6 +133,9 @@ export const GET: RequestHandler = async () => {
 					go2rtcWebUrl: containerIp
 						? `http://${containerIp}:1984`
 						: null,
+					cameraModel: null,
+					firmwareVersion: null,
+					liveFps: null,
 					lxcCpu,
 					lxcMemory,
 					lxcMac

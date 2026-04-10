@@ -82,7 +82,7 @@
 		const problems: CameraCardData[] = [];
 
 		for (const c of cameras) {
-			const isNative = c.status === 'native-onvif' || c.cameraType === 'mobotix-onvif';
+			const isNative = c.cameraType === 'mobotix-onvif';
 			if (isNative) nativeOnvif++;
 
 			if (c.containerStatus === 'running') containersRunning++;
@@ -398,7 +398,7 @@
 					</thead>
 					<tbody>
 						{#each cameras as cam (cam.id)}
-							{@const isNative = cam.status === 'native-onvif' || cam.cameraType === 'mobotix-onvif'}
+							{@const isNative = cam.cameraType === 'mobotix-onvif'}
 							{@const allGood = isNative || (cam.containerStatus === 'running' && cam.go2rtcRunning && cam.streamInfo?.active)}
 							<tr class="border-b border-border/50 hover:bg-bg-input/30 transition-colors">
 								<!-- Overall status dot -->

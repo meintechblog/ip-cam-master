@@ -132,7 +132,7 @@
 	}
 
 	let showAdoptionGuide = $state(false);
-	let isNativeOnvif = $derived(camera.status === 'native-onvif' || camera.cameraType === 'mobotix-onvif');
+	let isNativeOnvif = $derived(camera.cameraType === 'mobotix-onvif');
 	let isRunning = $derived(isNativeOnvif || camera.containerStatus === 'running');
 	let snapshotSrc = $state('');
 

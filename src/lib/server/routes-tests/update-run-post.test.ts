@@ -124,7 +124,8 @@ describe('POST /api/update/run', () => {
 			logPath: '/tmp/ip-cam-master-update-1234.log',
 			exitcodeFile: '/tmp/ip-cam-master-update-1234.exitcode',
 			unitName: 'ip-cam-master-update-1234',
-			startedAt: '2026-04-10T12:00:00.000Z'
+			startedAt: '2026-04-10T12:00:00.000Z',
+			backupPath: null
 		});
 
 		const res = await POST(buildEvent({ force: true }));
@@ -147,7 +148,8 @@ describe('POST /api/update/run', () => {
 			logPath: '/tmp/ip-cam-master-update-9999.log',
 			exitcodeFile: '/tmp/ip-cam-master-update-9999.exitcode',
 			unitName: 'ip-cam-master-update-9999',
-			startedAt: '2026-04-10T13:00:00.000Z'
+			startedAt: '2026-04-10T13:00:00.000Z',
+			backupPath: '/opt/ip-cam-master/data/backups/ip-cam-master-20260410-1300.db'
 		});
 
 		const res = await POST(buildEvent());
@@ -157,7 +159,8 @@ describe('POST /api/update/run', () => {
 			logPath: '/tmp/ip-cam-master-update-9999.log',
 			exitcodeFile: '/tmp/ip-cam-master-update-9999.exitcode',
 			unitName: 'ip-cam-master-update-9999',
-			startedAt: '2026-04-10T13:00:00.000Z'
+			startedAt: '2026-04-10T13:00:00.000Z',
+			backupPath: '/opt/ip-cam-master/data/backups/ip-cam-master-20260410-1300.db'
 		});
 
 		expect(spawnUpdateRun).toHaveBeenCalledOnce();
@@ -177,7 +180,8 @@ describe('POST /api/update/run', () => {
 			postSha: null,
 			result: 'running',
 			logPath: '/tmp/ip-cam-master-update-9999.log',
-			unitName: 'ip-cam-master-update-9999'
+			unitName: 'ip-cam-master-update-9999',
+			backupPath: '/opt/ip-cam-master/data/backups/ip-cam-master-20260410-1300.db'
 		});
 	});
 

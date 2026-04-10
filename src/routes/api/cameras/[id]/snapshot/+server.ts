@@ -46,7 +46,7 @@ export const GET: RequestHandler = async ({ params }) => {
 				return new Response('Snapshot unavailable', { status: 502 });
 			}
 
-			return new Response(stdout, {
+			return new Response(new Uint8Array(stdout), {
 				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
 			});
 		}
@@ -61,7 +61,7 @@ export const GET: RequestHandler = async ({ params }) => {
 			return new Response('Snapshot unavailable', { status: 502 });
 		}
 
-		return new Response(stdout, {
+		return new Response(new Uint8Array(stdout), {
 			headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
 		});
 	} catch {
