@@ -29,8 +29,9 @@ LOG="${LOG:-/tmp/ip-cam-master-update-$(date +%s).log}"
 EXITCODE_FILE="${EXITCODE_FILE:-${LOG%.log}.exitcode}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/ip-cam-master}"
 
-# Create log file early so the SSE tailer can start watching it
-: > "$LOG"
+# Ensure log file exists without truncating — the Node caller may have
+# written pre-update lines (auto-backup status) that must be preserved.
+touch "$LOG"
 
 log() {
 	local ts
