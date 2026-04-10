@@ -70,24 +70,24 @@ Explicitly not this milestone, with reasons:
 
 ## Traceability
 
-*Filled in by roadmapper after phase breakdown.*
-
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| UPDATE-01 | — | — | Active |
-| UPDATE-02 | — | — | Active |
-| UPDATE-03 | — | — | Active |
-| UPDATE-04 | — | — | Active |
-| UPDATE-05 | — | — | Active |
-| UPDATE-06 | — | — | Active |
-| UPDATE-07 | — | — | Active |
-| UPDATE-08 | — | — | Active |
-| BACKUP-01 | — | — | Active |
-| BACKUP-02 | — | — | Active |
-| BACKUP-03 | — | — | Active |
-| LOGS-01 | — | — | Active |
-| LOGS-02 | — | — | Active |
-| LOGS-03 | — | — | Active |
-| HEALTH-01 | — | — | Active |
-| HEALTH-02 | — | — | Active |
-| HEALTH-03 | — | — | Active |
+| UPDATE-01 | Phase 08 | — | Active |
+| UPDATE-02 | Phase 08 | — | Active |
+| UPDATE-03 | Phase 08 | — | Active |
+| UPDATE-04 | Phase 09 | — | Active |
+| UPDATE-05 | Phase 09 | — | Active |
+| UPDATE-06 | Phase 09 | — | Active |
+| UPDATE-07 | Phase 09 | — | Active |
+| UPDATE-08 | Phase 09 | — | Active |
+| BACKUP-01 | Phase 07 | — | Active |
+| BACKUP-02 | Phase 07 | — | Active |
+| BACKUP-03 | Phase 07 | — | Active |
+| LOGS-01 | Phase 06 | — | Active |
+| LOGS-02 | Phase 06 | — | Active |
+| LOGS-03 | Phase 06 | — | Active |
+| HEALTH-01 | Phase 06 | — | Active |
+| HEALTH-02 | Phase 06 | — | Active |
+| HEALTH-03 | Phase 06 | — | Active |
+
+**Coverage:** 17/17 Active requirements mapped to exactly one phase ✓
