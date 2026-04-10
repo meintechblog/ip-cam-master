@@ -27,7 +27,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 06. Observability Dashboard | 2/2 | Complete   | 2026-04-10 |
-| 07. Backup & Restore | 0/0 | Not started | — |
+| 07. Backup & Restore | 0/1 | Not started | — |
 | 08. Version Awareness & Update Check | 0/0 | Not started | — |
 | 09. Update Runner & Rollback | 0/0 | Not started | — |
 
@@ -52,11 +52,13 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 **Goal**: Users can download a timestamped copy of the SQLite database and restore from an uploaded backup file, giving them a manual safety net before any risky operation.
 **Depends on**: Phase 06 (optional — shares no code, but backup download/restore is a sensible UI addition alongside the observability surface)
 **Requirements**: BACKUP-01, BACKUP-02, BACKUP-03
+**Plans**: 1 plan
 **Success Criteria** (what must be TRUE):
   1. User clicks a download button and receives the current `data/ip-cam-master.db` file as a single download
   2. The downloaded filename contains a human-readable timestamp (e.g. `ip-cam-master-20260410-1430.db`)
   3. User uploads a previously downloaded backup file through the UI and, after an explicit confirmation dialog warning that current data will be replaced, the database is restored
-**Plans**: TBD
+Plans:
+- [ ] 07-01-PLAN.md — Backup service, download/restore API routes, settings Backup tab with confirmation modal
 **UI hint**: yes
 
 **Sequencing rationale**: Backup/restore is the safety prerequisite for in-app self-update. It must ship before Phase 09 so the first time a user clicks "update," they can first grab a backup with one click. Scope is small enough to stand alone without being folded into the update phase.
