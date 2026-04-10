@@ -19,7 +19,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 
 - [x] **Phase 06: Observability Dashboard** — Logs viewer and health vitals reachable from the UI, no SSH required (completed 2026-04-10)
 - [x] **Phase 07: Backup & Restore** — Users can download and restore the SQLite database from the UI as a safety net before risky operations (completed 2026-04-10)
-- [ ] **Phase 08: Version Awareness & Update Check** — Users can see the installed version and discover when a new commit is available on `main`
+- [x] **Phase 08: Version Awareness & Update Check** — Users can see the installed version and discover when a new commit is available on `main` (completed 2026-04-10)
 - [ ] **Phase 09: Update Runner & Rollback** — Users can trigger an in-app update with live progress, safety guards, and automatic rollback on failure
 
 ## Progress
@@ -28,7 +28,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 |-------|----------------|--------|-----------|
 | 06. Observability Dashboard | 2/2 | Complete   | 2026-04-10 |
 | 07. Backup & Restore | 1/1 | Complete   | 2026-04-10 |
-| 08. Version Awareness & Update Check | 0/0 | Not started | — |
+| 08. Version Awareness & Update Check | 1/1 | Complete   | 2026-04-10 |
 | 09. Update Runner & Rollback | 0/0 | Not started | — |
 
 ## Phase Details
