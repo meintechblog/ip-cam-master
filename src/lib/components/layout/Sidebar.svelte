@@ -16,15 +16,7 @@
 		return pathname.startsWith(href);
 	}
 
-	let versionLabel = $state<string | null>(null);
-	$effect(() => {
-		fetch('/api/update/status')
-			.then((r) => (r.ok ? r.json() : null))
-			.then((d) => {
-				if (d?.current?.label) versionLabel = d.current.label;
-			})
-			.catch(() => {});
-	});
+	let versionLabel = $derived($page.data.version?.label ?? null);
 </script>
 
 <aside class="w-56 bg-bg-secondary border-r border-border flex flex-col h-full shrink-0">
