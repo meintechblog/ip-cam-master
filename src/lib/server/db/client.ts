@@ -7,7 +7,9 @@ import { mkdirSync } from 'node:fs';
 const DB_PATH = resolve('data/ip-cam-master.db');
 mkdirSync(resolve('data'), { recursive: true });
 
-const sqlite = new Database(DB_PATH);
+export const DB_ABS_PATH = DB_PATH;
+
+export const sqlite = new Database(DB_PATH);
 sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('foreign_keys = ON');
 
