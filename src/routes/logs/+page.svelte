@@ -3,9 +3,10 @@
 	import type { EventFilterState } from '$lib/components/events/EventFilters.svelte';
 	import EventFilters from '$lib/components/events/EventFilters.svelte';
 	import EventTable from '$lib/components/events/EventTable.svelte';
+	import JournalTab from '$lib/components/logs/JournalTab.svelte';
 	import { Loader2, Trash2 } from 'lucide-svelte';
 
-	let activeTab = $state<'events' | 'protect'>('events');
+	let activeTab = $state<'events' | 'protect' | 'journal'>('events');
 	let deleting = $state(false);
 
 	// Events tab state
@@ -143,6 +144,15 @@
 		>
 			Protect Logs
 		</button>
+		<button
+			onclick={() => activeTab = 'journal'}
+			class="px-4 py-2 text-sm font-medium transition-colors cursor-pointer
+				{activeTab === 'journal'
+				? 'text-accent border-b-2 border-accent -mb-px'
+				: 'text-text-secondary hover:text-text-primary'}"
+		>
+			Systemd Journal
+		</button>
 	</div>
 
 	<!-- Events Tab -->
@@ -217,5 +227,10 @@
 				</div>
 			{/if}
 		</div>
+	{/if}
+
+	<!-- Systemd Journal Tab -->
+	{#if activeTab === 'journal'}
+		<JournalTab />
 	{/if}
 </div>
