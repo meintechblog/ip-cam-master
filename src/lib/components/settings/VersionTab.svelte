@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { RefreshCw, AlertTriangle, CheckCircle2, ArrowUpCircle } from 'lucide-svelte';
+	import UpdateRunPanel from './UpdateRunPanel.svelte';
 
 	type CurrentShape = {
 		label: string;
@@ -225,6 +226,11 @@
 					{/if}
 				</button>
 			</div>
+		</div>
+
+		<!-- Card 3: Update runner -->
+		<div class="bg-bg-card rounded-lg border border-border p-6">
+			<UpdateRunPanel {status} />
 		</div>
 	{/if}
 </div>
