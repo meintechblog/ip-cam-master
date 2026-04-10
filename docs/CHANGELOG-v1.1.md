@@ -7,3 +7,4 @@
 - Automatic rollback on failure
 - SIGTERM handler for fast systemd restarts
 
+// v1.1.1 polish
