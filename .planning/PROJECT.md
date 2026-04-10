@@ -112,13 +112,25 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+## Current Milestone: v1.1 Self-Maintenance & Polish
+
+**Goal:** Make the running app maintainable without SSH — updates, backups, logs, and health monitoring all reachable from the web UI.
+
+**Target features:**
+- In-app self-update via GitHub (version check, update button, auto-check, rollback on failure)
+- SQLite backup and restore from the UI
+- Logs viewer for systemd journal and application events
+- Health dashboard (disk, RAM, service status)
+
 ## Current State
 
 **v1.0 shipped** (2026-03-23) — All 5 phases complete, 11 plans executed, 27k+ lines of code.
 
 The app is fully functional: camera discovery, Mobotix/Loxone onboarding, LXC provisioning, dashboard with UniFi Protect integration, event logging, and one-line installer for Proxmox hosts.
 
-Running in production on 192.168.3.233 with 6+ cameras managed.
+Running in production on 192.168.3.249 with 6+ cameras managed.
+
+**v1.1 started** (2026-04-10) — Focus on operational polish so self-hosters never need to SSH into the VM for routine maintenance.
 
 ---
-*Last updated: 2026-03-23 after v1.0 milestone completion*
+*Last updated: 2026-04-10 — started milestone v1.1 (Self-Maintenance & Polish)*

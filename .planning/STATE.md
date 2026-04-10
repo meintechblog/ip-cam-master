@@ -1,31 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-23T21:42:55.532Z"
-last_activity: 2026-03-23
+milestone: v1.1
+milestone_name: Self-Maintenance & Polish
+status: defining_requirements
+stopped_at: Milestone v1.1 started
+last_updated: "2026-04-10T11:20:00.000Z"
+last_activity: 2026-04-10
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-22)
+See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 05 — installer-and-distribution
+**Current focus:** Milestone v1.1 — Self-Maintenance & Polish (defining requirements)
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1
 
 ## Performance Metrics
 
