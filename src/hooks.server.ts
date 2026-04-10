@@ -1,9 +1,13 @@
 import { startScheduler } from '$lib/server/services/scheduler';
 import { validateSession, isYoloMode, getUser } from '$lib/server/services/auth';
+import { ensureUpdateScriptInstalled } from '$lib/server/services/update-runner';
 import { isPublicPath } from '$lib/config/routes';
 import type { Handle } from '@sveltejs/kit';
 
 startScheduler();
+ensureUpdateScriptInstalled().catch((err) =>
+	console.error('[update] script install failed', err)
+);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (isPublicPath(event.url.pathname)) {
