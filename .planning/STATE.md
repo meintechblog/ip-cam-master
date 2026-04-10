@@ -110,9 +110,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260323-krt | Phase 4 QA sweep — fix Protect status UI and logic | 2026-03-23 | fe32585 | [260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a](./quick/260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a/) |
+| 260410-c36 | Container-IP prominent im Batch-Onboarding + MAC im LXC-Panel | 2026-04-10 | 569062f | [260410-c36-container-ip-prominent-im-batch-onboardi](./quick/260410-c36-container-ip-prominent-im-batch-onboardi/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-23
+Last activity: 2026-04-10 - Completed quick task 260410-c36: Container-IP prominent + MAC im LXC-Panel
 Stopped at: Completed 05-01-PLAN.md
 Resume file: None
