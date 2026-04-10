@@ -9,6 +9,16 @@ ensureUpdateScriptInstalled().catch((err) =>
 	console.error('[update] script install failed', err)
 );
 
+// Respond to SIGTERM so systemd restarts finish in seconds, not 90s (the default
+// TimeoutStopSec before SIGKILL). Without this, `systemctl restart ip-cam-master`
+// triggered from Phase 09's self-update hangs during the stop phase.
+const shutdown = (signal: string) => {
+	console.log(`[shutdown] received ${signal}, exiting`);
+	process.exit(0);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 export const handle: Handle = async ({ event, resolve }) => {
 	if (isPublicPath(event.url.pathname)) {
 		return resolve(event);
