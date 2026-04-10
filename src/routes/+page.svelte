@@ -1,5 +1,11 @@
 <script lang="ts">
 	import type { CameraCardData, CameraEvent } from '$lib/types';
+	import type {
+		DiskUsage,
+		MemoryUsage,
+		ServiceStatus
+	} from '$lib/server/services/host-metrics';
+	import HealthWidgets from '$lib/components/host/HealthWidgets.svelte';
 	import {
 		Loader2,
 		CheckCircle,
@@ -17,13 +23,17 @@
 	let recentEvents = $state<CameraEvent[]>([]);
 	let loading = $state(true);
 	let lastUpdate = $state<Date | null>(null);
+	let disk = $state<DiskUsage | null>(null);
+	let memory = $state<MemoryUsage | null>(null);
+	let service = $state<ServiceStatus | null>(null);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	async function fetchCameras() {
 		try {
-			const [cameraRes, eventsRes] = await Promise.all([
+			const [cameraRes, eventsRes, metricsRes] = await Promise.all([
 				fetch('/api/cameras/status'),
-				fetch('/api/protect/events?limit=10')
+				fetch('/api/protect/events?limit=10'),
+				fetch('/api/host/metrics')
 			]);
 			if (cameraRes.ok) {
 				cameras = await cameraRes.json();
@@ -32,6 +42,12 @@
 			if (eventsRes.ok) {
 				const data = await eventsRes.json();
 				recentEvents = data.events || [];
+			}
+			if (metricsRes.ok) {
+				const data = await metricsRes.json();
+				disk = data.disk ?? null;
+				memory = data.memory ?? null;
+				service = data.service ?? null;
 			}
 		} catch {
 			// retry next poll
@@ -145,6 +161,9 @@
 			</span>
 		{/if}
 	</div>
+
+	<!-- Host Vitals (visible in all states: loading, empty, populated) -->
+	<HealthWidgets {disk} {memory} {service} />
 
 	{#if loading}
 		<div class="flex items-center gap-3 text-text-secondary py-16 justify-center">
