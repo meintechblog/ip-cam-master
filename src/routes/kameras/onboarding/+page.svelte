@@ -1,6 +1,6 @@
 <script lang="ts">
 	import OnboardingWizard from '$lib/components/onboarding/OnboardingWizard.svelte';
-	import { Loader2, Wifi, Check, PlayCircle, XCircle, KeyRound } from 'lucide-svelte';
+	import { Loader2, Wifi, Check, PlayCircle, XCircle, KeyRound, Copy } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
 
@@ -39,6 +39,7 @@
 		steps: BatchStep[];
 		expanded: boolean;
 		snapshotUrl?: string | null;
+		containerIp?: string;
 	}
 	let batchMode = $state(false);
 	let batchCancelled = $state(false);
@@ -50,6 +51,18 @@
 	let batchRunning = $derived(batchResults.some(r => r.status === 'active'));
 	let autoRedirectSeconds = $state(0);
 	let autoRedirectTimer: ReturnType<typeof setInterval> | null = null;
+
+	// Copy-to-clipboard feedback for the prominent Container-IP row
+	let copiedIp = $state<string | null>(null);
+	async function copyContainerIp(ip: string) {
+		try {
+			await navigator.clipboard.writeText(ip);
+			copiedIp = ip;
+			setTimeout(() => { if (copiedIp === ip) copiedIp = null; }, 2000);
+		} catch {
+			// clipboard unavailable — silent fail is acceptable for a nice-to-have
+		}
+	}
 
 	// Credential prompt during batch (pauses batch until user provides credentials)
 	let credPrompt = $state<{
@@ -520,6 +533,7 @@
 		});
 		const createData = await createRes.json();
 		if (!createData.success) throw new Error(createData.error || 'Container fehlgeschlagen');
+		batchResults[idx].containerIp = createData.containerIp;
 		const skipInstall = createData.fromTemplate === true;
 		setStep(idx, stepNum, 'done', `LXC ${createData.vmid} @ ${createData.containerIp}${skipInstall ? ' (Template)' : ''}`);
 		stepNum++;
@@ -744,6 +758,26 @@
 									<span class="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Mobotix</span>
 								{/if}
 							</div>
+							{#if cam.containerIp}
+								<div class="mt-1.5 flex items-center gap-2 px-2 py-1 rounded bg-accent/10 border border-accent/20">
+									<span class="text-xs text-text-secondary">Container-IP:</span>
+									<span class="text-xs font-mono text-text-primary">{cam.containerIp}</span>
+									<button
+										type="button"
+										onclick={() => copyContainerIp(cam.containerIp!)}
+										class="p-0.5 rounded hover:bg-accent/20 cursor-pointer"
+										title="IP kopieren"
+										aria-label="Container-IP kopieren"
+									>
+										{#if copiedIp === cam.containerIp}
+											<Check class="w-3.5 h-3.5 text-green-400" />
+										{:else}
+											<Copy class="w-3.5 h-3.5 text-text-secondary" />
+										{/if}
+									</button>
+									<span class="text-xs text-accent ml-auto">→ Jetzt in UniFi Protect hinzufügbar</span>
+								</div>
+							{/if}
 							{#if cam.status === 'error' && cam.error}
 								<p class="text-xs text-red-400 mt-0.5">{cam.error}</p>
 							{/if}
