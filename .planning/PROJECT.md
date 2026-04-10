@@ -112,25 +112,30 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v1.1 Self-Maintenance & Polish
-
-**Goal:** Make the running app maintainable without SSH — updates, backups, logs, and health monitoring all reachable from the web UI.
-
-**Target features:**
-- In-app self-update via GitHub (version check, update button, auto-check, rollback on failure)
-- SQLite backup and restore from the UI
-- Logs viewer for systemd journal and application events
-- Health dashboard (disk, RAM, service status)
-
 ## Current State
 
-**v1.0 shipped** (2026-03-23) — All 5 phases complete, 11 plans executed, 27k+ lines of code.
+**v1.1 shipped** (2026-04-10) — Self-Maintenance & Polish. 4 phases, 5 plans, 43 commits, +4844 LOC, 78 unit tests, 0 new dependencies.
 
-The app is fully functional: camera discovery, Mobotix/Loxone onboarding, LXC provisioning, dashboard with UniFi Protect integration, event logging, and one-line installer for Proxmox hosts.
+The app is now fully self-maintaining from the web UI:
+- In-app self-update via GitHub (`git pull` + build + `systemd-run --transient` restart + automatic rollback) — verified with 4 real end-to-end update runs on the production VM, one of which was the feature updating itself with its own history-persistence fix
+- SQLite backup download + upload-restore with integrity checks
+- Systemd journal viewer with severity filter and live SSE tail as a third tab on `/logs`
+- Host vitals dashboard (disk/RAM/service uptime) via `/proc/meminfo`, `df`, `systemctl show`
+- Version display (tag + short SHA) with daily background check against GitHub and header badge when updates are available
+
+**v1.0 shipped** (2026-03-23) — Camera orchestration foundation: discovery, Mobotix/Loxone onboarding, LXC provisioning, dashboard with UniFi Protect integration, event logging, one-line installer.
 
 Running in production on 192.168.3.249 with 6+ cameras managed.
 
-**v1.1 started** (2026-04-10) — Focus on operational polish so self-hosters never need to SSH into the VM for routine maintenance.
+## Next Milestone Goals
+
+*TBD — run `/gsd:new-milestone` to scope v1.2 or v2.0.*
+
+Candidates from v1.1's Future Requirements:
+- Real Drizzle migration system (replaces v1.1's schema-hash stopgap)
+- Tag-based release channel (opt-in over rolling `main`)
+- Remote backup targets (S3/WebDAV push of nightly backups)
+- Alert notifications when the service goes down
 
 ---
-*Last updated: 2026-04-10 — started milestone v1.1 (Self-Maintenance & Polish)*
+*Last updated: 2026-04-10 — shipped v1.1 Self-Maintenance & Polish*

@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: "Roadmap complete, ready to run `/gsd:plan-phase 06`"
-last_updated: "2026-04-10T13:21:18.809Z"
+milestone: none
+milestone_name: "between milestones"
+status: idle
+stopped_at: "v1.1 shipped — awaiting next milestone"
+last_updated: "2026-04-10T16:15:00.000Z"
 last_activity: 2026-04-10
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 4
-  percent: 80
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -21,21 +20,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase 09 — Update Runner & Rollback
+**Current focus:** No active milestone. v1.0 and v1.1 shipped. Run `/gsd:new-milestone` to start v1.2 or v2.0.
 
 ## Current Position
 
-Phase: 09 (Update Runner & Rollback) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 09
-Progress: 0/4 phases complete
+Phase: —
+Plan: —
+Status: Idle — v1.1 Self-Maintenance & Polish shipped 2026-04-10
 
-Upcoming phases:
-
-- Phase 06 — Observability Dashboard (LOGS + HEALTH, 6 reqs)
-- Phase 07 — Backup & Restore (BACKUP, 3 reqs)
-- Phase 08 — Version Awareness & Update Check (UPDATE-01/02/03, 3 reqs)
-- Phase 09 — Update Runner & Rollback (UPDATE-04/05/06/07/08, 5 reqs)
+Shipped milestones:
+- v1.0 — One-click camera onboarding (2026-03-23)
+- v1.1 — Self-Maintenance & Polish (2026-04-10)
 
 ## Performance Metrics
 
