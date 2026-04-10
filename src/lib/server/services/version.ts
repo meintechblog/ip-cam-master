@@ -56,12 +56,14 @@ export function parseDescribe(describe: string): ParsedDescribe {
 
 /**
  * Build a human-readable label from a VersionInfo.
+ * Always renders SHAs as 7-char short form regardless of input length.
  */
 export function formatVersionLabel(info: VersionInfo): string {
 	if (info.isDev) return 'dev';
-	if (info.tag && info.sha) return `${info.tag} (${info.sha})`;
-	if (info.tag && !info.sha) return info.tag;
-	return `main @ ${info.sha}`;
+	const shortSha = info.sha ? info.sha.slice(0, 7) : '';
+	if (info.tag && shortSha) return `${info.tag} (${shortSha})`;
+	if (info.tag && !shortSha) return info.tag;
+	return `main @ ${shortSha}`;
 }
 
 /**
