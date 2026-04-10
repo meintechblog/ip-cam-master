@@ -3,11 +3,12 @@
 	import UnifiTab from '$lib/components/settings/UnifiTab.svelte';
 	import CredentialsTab from '$lib/components/settings/CredentialsTab.svelte';
 	import BackupTab from '$lib/components/settings/BackupTab.svelte';
+	import VersionTab from '$lib/components/settings/VersionTab.svelte';
 	import { enhance } from '$app/forms';
 
 	let { data, form } = $props();
 
-	const tabs = ['Proxmox', 'UniFi', 'Credentials', 'Backup', 'Zugangsschutz'] as const;
+	const tabs = ['Proxmox', 'UniFi', 'Credentials', 'Backup', 'Version', 'Zugangsschutz'] as const;
 	let activeTab = $state<(typeof tabs)[number]>('Proxmox');
 
 	let confirmDelete = $state(false);
@@ -42,6 +43,8 @@
 		<CredentialsTab />
 	{:else if activeTab === 'Backup'}
 		<BackupTab />
+	{:else if activeTab === 'Version'}
+		<VersionTab />
 	{:else if activeTab === 'Zugangsschutz'}
 		<div class="max-w-lg space-y-6">
 			{#if form?.authSuccess}
