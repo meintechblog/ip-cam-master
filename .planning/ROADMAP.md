@@ -18,7 +18,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 ## Phases
 
 - [x] **Phase 06: Observability Dashboard** — Logs viewer and health vitals reachable from the UI, no SSH required (completed 2026-04-10)
-- [ ] **Phase 07: Backup & Restore** — Users can download and restore the SQLite database from the UI as a safety net before risky operations
+- [x] **Phase 07: Backup & Restore** — Users can download and restore the SQLite database from the UI as a safety net before risky operations (completed 2026-04-10)
 - [ ] **Phase 08: Version Awareness & Update Check** — Users can see the installed version and discover when a new commit is available on `main`
 - [ ] **Phase 09: Update Runner & Rollback** — Users can trigger an in-app update with live progress, safety guards, and automatic rollback on failure
 
@@ -27,7 +27,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 06. Observability Dashboard | 2/2 | Complete   | 2026-04-10 |
-| 07. Backup & Restore | 0/1 | Not started | — |
+| 07. Backup & Restore | 1/1 | Complete   | 2026-04-10 |
 | 08. Version Awareness & Update Check | 0/0 | Not started | — |
 | 09. Update Runner & Rollback | 0/0 | Not started | — |
 
@@ -58,7 +58,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
   2. The downloaded filename contains a human-readable timestamp (e.g. `ip-cam-master-20260410-1430.db`)
   3. User uploads a previously downloaded backup file through the UI and, after an explicit confirmation dialog warning that current data will be replaced, the database is restored
 Plans:
-- [ ] 07-01-PLAN.md — Backup service, download/restore API routes, settings Backup tab with confirmation modal
+- [x] 07-01-PLAN.md — Backup service, download/restore API routes, settings Backup tab with confirmation modal
 **UI hint**: yes
 
 **Sequencing rationale**: Backup/restore is the safety prerequisite for in-app self-update. It must ship before Phase 09 so the first time a user clicks "update," they can first grab a backup with one click. Scope is small enough to stand alone without being folded into the update phase.
