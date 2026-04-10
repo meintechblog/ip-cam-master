@@ -25,6 +25,7 @@ export interface ContainerInfo {
 	status: ContainerStatus;
 	cpu?: number;
 	memory?: { used: number; total: number };
+	mac?: string | null;
 }
 
 export interface ValidationResult {

@@ -12,6 +12,23 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 let cachedNodeName: string | null = null;
 
 /**
+ * Module-level MAC cache. Keyed by vmid.
+ * Populated lazily by listContainers() for uncached vmids, with a one-off fallback
+ * in getContainerStatus(). Cleanup happens in listContainers() by diffing live vmids.
+ */
+const macCache = new Map<number, string>();
+
+/**
+ * Parses the `hwaddr=...` value out of a Proxmox LXC net0 config string.
+ * Example input: `name=eth0,bridge=vmbr0,hwaddr=BC:24:11:AA:BB:CC,ip=dhcp,type=veth`
+ */
+function parseMacFromNet0(net0?: string): string | null {
+	if (!net0) return null;
+	const match = net0.match(/hwaddr=([0-9A-Fa-f:]{17})/i);
+	return match ? match[1].toUpperCase() : null;
+}
+
+/**
  * Returns a configured proxmox-api client instance.
  */
 export async function getProxmoxClient() {
@@ -417,6 +434,32 @@ export async function listContainers(): Promise<ContainerInfo[]> {
 	// Get containers from Proxmox API
 	const apiContainers = await proxmox.nodes.$(node).lxc.$get();
 
+	// Determine vmids missing from the MAC cache
+	const uncachedVmids = apiContainers
+		.map((c: any) => c.vmid as number)
+		.filter((vmid: number) => !macCache.has(vmid));
+
+	// Fetch configs in parallel; tolerate per-vmid failures
+	if (uncachedVmids.length > 0) {
+		await Promise.all(
+			uncachedVmids.map(async (vmid: number) => {
+				try {
+					const cfg = await proxmox.nodes.$(node).lxc.$(vmid).config.$get() as any;
+					const mac = parseMacFromNet0(cfg?.net0);
+					if (mac) macCache.set(vmid, mac);
+				} catch {
+					// Skip — MAC will resolve to null for this vmid this round
+				}
+			})
+		);
+	}
+
+	// Drop cache entries for vmids that no longer exist
+	const liveVmids = new Set(apiContainers.map((c: any) => c.vmid as number));
+	for (const vmid of macCache.keys()) {
+		if (!liveVmids.has(vmid)) macCache.delete(vmid);
+	}
+
 	// Get local DB records for camera metadata
 	const dbRecords = db.select().from(containers).all();
 	const dbMap = new Map(dbRecords.map((r: any) => [r.vmid, r]));
@@ -433,7 +476,8 @@ export async function listContainers(): Promise<ContainerInfo[]> {
 			cpu: c.cpu,
 			memory: c.maxmem
 				? { used: c.mem || 0, total: c.maxmem }
-				: undefined
+				: undefined,
+			mac: macCache.get(c.vmid) ?? null
 		} satisfies ContainerInfo;
 	});
 
@@ -450,6 +494,17 @@ export async function getContainerStatus(vmid: number): Promise<ContainerInfo> {
 
 	const status = await proxmox.nodes.$(node).lxc.$(vmid).status.current.$get() as any;
 
+	// Populate MAC from cache; fall back to a one-off config fetch if missing
+	if (!macCache.has(vmid)) {
+		try {
+			const cfg = await proxmox.nodes.$(node).lxc.$(vmid).config.$get() as any;
+			const mac = parseMacFromNet0(cfg?.net0);
+			if (mac) macCache.set(vmid, mac);
+		} catch {
+			// Ignore — mac stays null
+		}
+	}
+
 	// Get local DB record for camera metadata
 	const dbRecords = db.select().from(containers).where(eq(containers.vmid, vmid)).all();
 	const dbRecord = dbRecords[0] as any;
@@ -464,7 +519,8 @@ export async function getContainerStatus(vmid: number): Promise<ContainerInfo> {
 		cpu: status.cpu,
 		memory: status.maxmem
 			? { used: status.mem || 0, total: status.maxmem }
-			: undefined
+			: undefined,
+		mac: macCache.get(vmid) ?? null
 	};
 }
 

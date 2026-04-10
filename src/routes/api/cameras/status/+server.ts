@@ -33,7 +33,7 @@ export const GET: RequestHandler = async () => {
 				const containerIp = cam.containerIp;
 				const lxcCpu = containerData?.cpu ?? null;
 				const lxcMemory = containerData?.memory ?? null;
-				const lxcMac: string | null = null; // MAC display-only, not worth per-camera API call
+				const lxcMac: string | null = containerData?.mac ?? null;
 
 				let go2rtcRunning = false;
 				let onvifRunning = false;
