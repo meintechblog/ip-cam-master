@@ -1,6 +1,7 @@
 import { startScheduler } from '$lib/server/services/scheduler';
 import { validateSession, isYoloMode, getUser } from '$lib/server/services/auth';
 import { ensureUpdateScriptInstalled } from '$lib/server/services/update-runner';
+import { reconcileRunningEntries } from '$lib/server/services/update-history';
 import { isPublicPath } from '$lib/config/routes';
 import type { Handle } from '@sveltejs/kit';
 
@@ -8,6 +9,11 @@ startScheduler();
 ensureUpdateScriptInstalled().catch((err) =>
 	console.error('[update] script install failed', err)
 );
+reconcileRunningEntries()
+	.then((n) => {
+		if (n > 0) console.log(`[update] reconciled ${n} orphaned running entries`);
+	})
+	.catch((err) => console.error('[update] reconcile failed', err));
 
 // Respond to SIGTERM so systemd restarts finish in seconds, not 90s (the default
 // TimeoutStopSec before SIGKILL). Without this, `systemctl restart ip-cam-master`

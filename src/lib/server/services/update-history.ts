@@ -1,3 +1,4 @@
+import { readFileSync, existsSync } from 'node:fs';
 import { getSetting, saveSetting } from './settings';
 
 const HISTORY_KEY = 'update_run_history';
@@ -68,4 +69,52 @@ export async function readUpdateRuns(limit: number = MAX_ENTRIES): Promise<Updat
 	// Newest first
 	const reversed = [...current].reverse();
 	return reversed.slice(0, limit);
+}
+
+/**
+ * Reconcile any entries still marked `running` against their exit-code files on
+ * disk. The in-memory SSE watcher that normally patches the entry dies when the
+ * app itself restarts during its own update, leaving the entry stuck as
+ * `running`. On next boot we check the exit-code file the script wrote and
+ * retroactively mark the entry as success / failed / rolled_back.
+ */
+export async function reconcileRunningEntries(): Promise<number> {
+	const current = await loadHistory();
+	let patched = 0;
+	for (const entry of current) {
+		if (entry.result !== 'running') continue;
+		const exitcodePath = entry.logPath.replace(/\.log$/, '.exitcode');
+		if (!existsSync(exitcodePath)) continue;
+		let code: number;
+		try {
+			code = Number.parseInt(readFileSync(exitcodePath, 'utf-8').trim(), 10);
+		} catch {
+			continue;
+		}
+		entry.result = code === 0 ? 'success' : code === 2 ? 'rolled_back' : 'failed';
+		entry.finishedAt = new Date().toISOString();
+		if (code === 0) {
+			const resultLine = readMarkerLine(entry.logPath);
+			if (resultLine) {
+				const match = resultLine.match(/-> ([0-9a-f]{40})/);
+				if (match) entry.postSha = match[1];
+			}
+		}
+		patched++;
+	}
+	if (patched > 0) await saveHistory(current);
+	return patched;
+}
+
+function readMarkerLine(logPath: string): string | null {
+	try {
+		const content = readFileSync(logPath, 'utf-8');
+		const lines = content.trim().split('\n');
+		for (let i = lines.length - 1; i >= 0; i--) {
+			if (lines[i].includes('UPDATE_RESULT')) return lines[i];
+		}
+	} catch {
+		return null;
+	}
+	return null;
 }
