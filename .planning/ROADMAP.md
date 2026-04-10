@@ -20,7 +20,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 - [x] **Phase 06: Observability Dashboard** — Logs viewer and health vitals reachable from the UI, no SSH required (completed 2026-04-10)
 - [x] **Phase 07: Backup & Restore** — Users can download and restore the SQLite database from the UI as a safety net before risky operations (completed 2026-04-10)
 - [x] **Phase 08: Version Awareness & Update Check** — Users can see the installed version and discover when a new commit is available on `main` (completed 2026-04-10)
-- [ ] **Phase 09: Update Runner & Rollback** — Users can trigger an in-app update with live progress, safety guards, and automatic rollback on failure
+- [x] **Phase 09: Update Runner & Rollback** — Users can trigger an in-app update with live progress, safety guards, and automatic rollback on failure (completed 2026-04-10)
 
 ## Progress
 
@@ -29,7 +29,7 @@ Make the running app maintainable without SSH. Every routine operation a self-ho
 | 06. Observability Dashboard | 2/2 | Complete   | 2026-04-10 |
 | 07. Backup & Restore | 1/1 | Complete   | 2026-04-10 |
 | 08. Version Awareness & Update Check | 1/1 | Complete   | 2026-04-10 |
-| 09. Update Runner & Rollback | 0/1 | In progress | — |
+| 09. Update Runner & Rollback | 1/1 | Complete   | 2026-04-10 |
 
 ## Phase Details
 
@@ -89,7 +89,7 @@ Plans:
   5. When `git pull` changes the hash of `src/lib/server/db/schema.ts`, the user sees a schema-change warning before the build+restart step proceeds
 **Plans**: 1 plan
 Plans:
-- [ ] 09-01-PLAN.md — Update runner service, SSE streaming, rollback logic, VersionTab integration
+- [x] 09-01-PLAN.md — Update runner service, SSE streaming, rollback logic, VersionTab integration
 **UI hint**: yes
 
 **Sequencing rationale**: This is the highest-risk phase of the milestone — it executes shell commands against the live installation and can leave the app in a broken state if done wrong. It comes last so it can lean on (a) Phase 06's log-streaming and service-status primitives for live progress and post-restart verification, (b) Phase 07's backup as a user-visible safety net before the first click, and (c) Phase 08's already-validated GitHub integration to find the target commit.
