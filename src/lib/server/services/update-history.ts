@@ -12,6 +12,7 @@ export type UpdateRunEntry = {
 	result: 'running' | 'success' | 'failed' | 'rolled_back';
 	logPath: string;
 	unitName: string;
+	backupPath?: string | null;
 };
 
 async function loadHistory(): Promise<UpdateRunEntry[]> {

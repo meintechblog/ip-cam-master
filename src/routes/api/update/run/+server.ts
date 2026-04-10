@@ -51,7 +51,13 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const preSchemaHash = await computePreSchemaHash();
-	const run = await spawnUpdateRun(current.sha, preSchemaHash);
+	let run;
+	try {
+		run = await spawnUpdateRun(current.sha, preSchemaHash);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'unknown';
+		return json({ error: 'backup_failed', detail: message }, { status: 500 });
+	}
 
 	await appendUpdateRun({
 		startedAt: run.startedAt,
@@ -60,7 +66,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		postSha: null,
 		result: 'running',
 		logPath: run.logPath,
-		unitName: run.unitName
+		unitName: run.unitName,
+		backupPath: run.backupPath
 	});
 
 	return json(run, { status: 202 });

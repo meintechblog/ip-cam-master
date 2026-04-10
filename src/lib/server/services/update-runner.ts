@@ -1,7 +1,8 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { createBackup } from './backup';
 
 const execFileAsync = promisify(execFile);
 
@@ -72,14 +73,22 @@ export type SpawnedRun = {
 	exitcodeFile: string;
 	unitName: string;
 	startedAt: string;
+	backupPath: string | null;
 };
+
+function hhmmss(d: Date = new Date()): string {
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
 /**
  * Spawn a detached systemd-run unit that executes the update script.
  *
- * Returns the log path, exitcode file path, unit name, and startedAt timestamp
- * synchronously once the child has been forked (the unit runs in the background;
- * progress is tailed via the log file).
+ * Before spawning, this writes an initial header to the log file and creates
+ * an auto-backup via the existing createBackup() helper. The backup path is
+ * returned so it can be persisted in the run history. If the backup fails the
+ * update is aborted — we do not start a potentially destructive update without
+ * a known-good rollback target.
  */
 export async function spawnUpdateRun(
 	preSha: string,
@@ -90,6 +99,24 @@ export async function spawnUpdateRun(
 	const exitcodeFile = `/tmp/ip-cam-master-update-${ts}.exitcode`;
 	const unitName = `ip-cam-master-update-${ts}`;
 	const startedAt = new Date(ts).toISOString();
+
+	writeFileSync(logPath, `[${hhmmss()}] Pre-update auto-backup...\n`);
+
+	let backupPath: string | null = null;
+	try {
+		const backup = await createBackup();
+		backupPath = backup.absPath;
+		appendFileSync(logPath, `[${hhmmss()}] Backup created: ${backup.absPath}\n`);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		appendFileSync(
+			logPath,
+			`[${hhmmss()}] BACKUP FAILED — update aborted (no known-good restore point): ${msg}\n`
+		);
+		appendFileSync(logPath, `=== UPDATE_RESULT: failed (backup-aborted) ===\n`);
+		writeFileSync(exitcodeFile, '1\n');
+		throw new Error(`Auto-backup failed: ${msg}`);
+	}
 
 	const args = [
 		`--unit=${unitName}`,
@@ -109,7 +136,7 @@ export async function spawnUpdateRun(
 	});
 	child.unref();
 
-	return { logPath, exitcodeFile, unitName, startedAt };
+	return { logPath, exitcodeFile, unitName, startedAt, backupPath };
 }
 
 export type TailEvent =
