@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Sidebar from './Sidebar.svelte';
+	import UpdateBadge from './UpdateBadge.svelte';
 	import { Menu, X } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
@@ -24,6 +25,11 @@
 	{/if}
 
 	<div class="flex-1 flex flex-col overflow-hidden">
+		<!-- Desktop top bar -->
+		<div class="hidden md:flex items-center justify-end px-6 py-2 border-b border-border bg-bg-secondary">
+			<UpdateBadge />
+		</div>
+
 		<!-- Mobile header -->
 		<div class="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-secondary">
 			<button onclick={() => menuOpen = !menuOpen} class="text-text-secondary hover:text-text-primary cursor-pointer">
@@ -34,6 +40,9 @@
 				{/if}
 			</button>
 			<span class="text-sm font-bold text-text-primary">IP-Cam-Master</span>
+			<div class="ml-auto">
+				<UpdateBadge />
+			</div>
 		</div>
 
 		<main class="flex-1 overflow-auto p-4 md:p-6">

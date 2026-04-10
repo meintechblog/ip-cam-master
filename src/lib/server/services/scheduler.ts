@@ -3,6 +3,8 @@ import { storeEvents, cleanupOldEvents, storeHealthEvent } from './events';
 import { getSettings } from './settings';
 import { cleanupExpiredSessions } from './auth';
 import { getProtectStatus } from './protect';
+import { checkForUpdate } from './update-check';
+import { getCurrentVersion } from './version';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 
@@ -10,6 +12,8 @@ let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 let protectPollInterval: ReturnType<typeof setInterval> | null = null;
 let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+let updateCheckTimeout: ReturnType<typeof setTimeout> | null = null;
+let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(): void {
 	// SSH log scan every 60s — only if UDM/UniFi is configured
@@ -119,7 +123,34 @@ export function startScheduler(): void {
 		}, 5 * 60_000);
 	}
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m)');
+	// Daily update check — first run 30s after boot, then every 24h.
+	// Skip entirely in dev mode (no git repo).
+	if (!updateCheckTimeout && !updateCheckInterval) {
+		updateCheckTimeout = setTimeout(async () => {
+			updateCheckTimeout = null;
+			try {
+				const current = await getCurrentVersion();
+				if (current.isDev) {
+					console.log('[scheduler] Update check skipped — dev mode');
+					return;
+				}
+				await checkForUpdate();
+			} catch (err) {
+				console.error('[scheduler] Update check failed:', (err as Error).message);
+			}
+			updateCheckInterval = setInterval(async () => {
+				try {
+					const current = await getCurrentVersion();
+					if (current.isDev) return;
+					await checkForUpdate();
+				} catch (err) {
+					console.error('[scheduler] Update check failed:', (err as Error).message);
+				}
+			}, 86_400_000);
+		}, 30_000);
+	}
+
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h)');
 }
 
 export function stopScheduler(): void {
@@ -138,5 +169,13 @@ export function stopScheduler(): void {
 	if (healthCheckInterval) {
 		clearInterval(healthCheckInterval);
 		healthCheckInterval = null;
+	}
+	if (updateCheckTimeout) {
+		clearTimeout(updateCheckTimeout);
+		updateCheckTimeout = null;
+	}
+	if (updateCheckInterval) {
+		clearInterval(updateCheckInterval);
+		updateCheckInterval = null;
 	}
 }
