@@ -127,15 +127,24 @@ The app is now fully self-maintaining from the web UI:
 
 Running in production on 192.168.3.249 with 6+ cameras managed.
 
+## Current Milestone: v1.2 Bambu Lab H2C Kamera-Integration
+
+**Goal:** Bambu Lab H2C 3D-Drucker-Kamera im LAN als UniFi-Protect-kompatible Kamera einbinden — analog zum bestehenden Mobotix/Loxone-Pattern mit Auto-Discovery, LXC-Provisioning und go2rtc-Transcoding.
+
+**Target features:**
+- Netzwerk-Discovery erkennt Bambu-Drucker (mDNS `_bambulab._tcp` / Port-Scan) automatisch — gleicher Flow wie Mobotix/Loxone
+- LAN-Mode-Zugriff via Access Code (vom Drucker-Display) + Serial Number — keine Cloud nötig
+- RTSPS-Stream (`rtsps://bblp:<access_code>@<ip>:322/streaming/live/1`) über go2rtc transcodieren und in UniFi Protect adoptieren
+- UI-Credential-Eingabe für Access Code + Serial beim Onboarding (encrypted im SQLite-Store)
+- Cloud-Auth als Fallback, falls LAN Mode am Drucker nicht aktivierbar
+
 ## Next Milestone Goals
 
-*TBD — run `/gsd:new-milestone` to scope v1.2 or v2.0.*
-
-Candidates from v1.1's Future Requirements:
+Candidates from v1.1's Future Requirements (for v1.3+):
 - Real Drizzle migration system (replaces v1.1's schema-hash stopgap)
 - Tag-based release channel (opt-in over rolling `main`)
 - Remote backup targets (S3/WebDAV push of nightly backups)
 - Alert notifications when the service goes down
 
 ---
-*Last updated: 2026-04-10 — shipped v1.1 Self-Maintenance & Polish*
+*Last updated: 2026-04-13 — started v1.2 Bambu Lab H2C Kamera-Integration*

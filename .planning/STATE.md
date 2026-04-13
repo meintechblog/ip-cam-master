@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: "between milestones"
-status: idle
-stopped_at: "v1.1 shipped — awaiting next milestone"
-last_updated: "2026-04-10T16:15:00.000Z"
-last_activity: 2026-04-10
+milestone: v1.2
+milestone_name: "Bambu Lab H2C Kamera-Integration"
+status: defining_requirements
+stopped_at: "milestone v1.2 started — research phase"
+last_updated: "2026-04-13T00:00:00.000Z"
+last_activity: 2026-04-13
 progress:
   total_phases: 0
   completed_phases: 0
@@ -24,9 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: Idle — v1.1 Self-Maintenance & Polish shipped 2026-04-10
+Status: Defining requirements
+Last activity: 2026-04-13 — Milestone v1.2 Bambu Lab H2C Kamera-Integration started
 
 Shipped milestones:
 - v1.0 — One-click camera onboarding (2026-03-23)
