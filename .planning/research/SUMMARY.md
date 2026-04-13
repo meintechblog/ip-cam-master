@@ -1,168 +1,214 @@
 # Project Research Summary
 
-**Project:** IP-Cam-Master
-**Domain:** IP camera orchestration platform (Proxmox LXC + go2rtc + UniFi Protect)
-**Researched:** 2026-03-22
-**Confidence:** MEDIUM-HIGH
+**Project:** IP-Cam-Master v1.2 — Bambu Lab H2C Kamera-Integration
+**Domain:** 3D-printer camera stream ingestion into existing LXC/go2rtc/UniFi Protect pipeline
+**Researched:** 2026-04-13
+**Confidence:** MEDIUM-HIGH (protocol well-documented; H2C-specific behavior partially extrapolated from X1C/P1S field data)
+
+---
 
 ## Executive Summary
 
-IP-Cam-Master is a self-hosted web application that automates the onboarding of non-ONVIF IP cameras (Mobotix, Loxone Intercom) into UniFi Protect via Proxmox LXC containers running go2rtc for MJPEG-to-H.264 transcoding. No existing tool covers this discovery-to-Protect-adoption pipeline. The recommended approach is a single-process SvelteKit application backed by SQLite, deployed as a systemd service on a Proxmox VM. The Node.js ecosystem uniquely provides mature libraries for all three integration points: Proxmox API (`proxmox-api`), UniFi Protect (`unifi-protect`), and SSH-based container management (`node-ssh`). This is a narrow-scope orchestration tool, not an NVR -- recording, AI detection, and multi-site support are explicitly out of scope.
+The Bambu H2C slots into IP-Cam-Master as a third `camera_type` ("bambu") alongside the existing Mobotix and Loxone adapters. The integration delta is smaller than it first appears: ~80% of the existing pipeline (LXC provisioning, VAAPI passthrough, ONVIF wrapper, UniFi Protect adoption, credential encryption, status polling) is reused without modification. The Bambu-specific work concentrates in four places: a SSDP discovery listener on non-standard UDP ports, a two-field credential form (Access Code + Serial), an `rtsps://` go2rtc config template with TLS-verification disabled, and a pre-flight handshake that surfaces three distinct user-facing error states. One new npm dependency (`mqtt@^5.10`) is added for the LAN MQTT status channel. Everything else is either existing code extended via branching or a new function sitting alongside its Mobotix/Loxone sibling.
 
-The architecture follows a "one LXC container per camera" model with a pipeline orchestrator that coordinates multi-step provisioning: create container, install go2rtc, generate configs from templates, configure VAAPI GPU passthrough, start services, and verify the RTSP stream. Each camera type (Mobotix, Loxone) has a distinct workflow -- Loxone requires an additional nginx auth-proxy layer because its Intercom does not accept URL-based credentials. Config files are always generated from templates (never edited in place), and credentials are stored locally, never committed to the public repository.
+The most important architectural decision is that go2rtc must be the **sole RTSPS consumer** of the printer. The H2C's Live555 RTSPS daemon runs on the same control board that drives the toolhead and touchscreen. It enforces a single-connection limit and hangs after ungraceful disconnects — a known failure mode across the entire Bambu lineup, confirmed across multiple independent issue trackers (BambuStudio #4481, ha-bambulab #1627). UniFi Protect must never connect directly to the printer; it always adopts the go2rtc-restreamed RTSP on port 8554. This is already how the Mobotix and Loxone pipelines work, so no architectural change is required — but the rationale must be explicit in both the implementation and the docs.
 
-The primary risks are: (1) VAAPI device passthrough failing silently in LXC containers, causing CPU-bound transcoding that cannot scale past 1-2 cameras; (2) credential leakage into the public GitHub repo; (3) go2rtc losing camera connections without automatic recovery; and (4) UniFi Protect's fragile third-party camera adoption breaking after any configuration change. All four are well-documented with concrete prevention strategies. The `proxmox-api` npm package has not been updated in 2 years and should be validated early -- a thin REST client is the fallback.
+The single biggest scope decision to resolve before planning begins is Cloud-Auth Fallback. PROJECT.md lists it as a v1.2 target feature. Research recommends dropping it from v1.2 scope entirely: cloud streams use TUTK P2P (not RTSPS), the auth flow requires OAuth + 2FA email + JWT refresh with effectively zero TypeScript library coverage, and the product positioning of IP-Cam-Master is self-hosted LAN-first. The correct response when LAN Mode Liveview cannot be enabled is a clear onboarding error, not a fallback to a cloud transport. If cloud mode is ever needed, it belongs in v1.3 behind a `BambuTransport` interface stub added now.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is a single Node.js process running SvelteKit (Svelte 5) with adapter-node, producing one deployment artifact managed by systemd. SQLite via `better-sqlite3` handles persistence (no external database server), and Drizzle ORM provides type-safe schema management. This single-process model -- one systemd unit, one port, one SQLite file -- is ideal for a self-hosted tool that must support one-line installation.
+The v1.2 stack is a minimal delta on the existing v1.1 stack. The only new runtime dependency is `mqtt@^5.10` — the de-facto Node.js MQTT client (8M+ weekly downloads), pure JS, no native bindings, supports `rejectUnauthorized: false` for the printer's self-signed cert on port 8883. All other integration points reuse already-installed binaries and existing npm packages.
 
-**Core technologies:**
-- **SvelteKit 2.x (Svelte 5):** Full-stack framework -- SSR + API routes in one codebase. 50-70% less JS than React. Perfect scale for self-hosted tools.
-- **SQLite (better-sqlite3):** Embedded database, zero external dependencies. Critical for one-line installer. Config + credentials storage only.
-- **proxmox-api:** TypeScript Proxmox client. MEDIUM confidence due to 2-year publish gap. Direct REST calls are the fallback.
-- **unifi-protect:** Complete Node.js UniFi Protect API. Actively maintained. For monitoring, not adoption automation.
-- **node-ssh:** SSH into LXC containers for go2rtc config deployment and service management.
-- **go2rtc:** Runs inside each LXC (not embedded in app). MJPEG-to-H.264 transcoding with VAAPI. Managed via generated YAML configs.
+The `bambu-node` npm package was evaluated and rejected as a direct dependency: last published ~12 months ago, no 1.0 release, handful of dependents. Instead, vendor its TypeScript message-type definitions into `src/lib/bambu/types.ts` and implement the ~5 needed MQTT message handlers directly using plain `mqtt`. This is the same discipline applied to Mobotix/Loxone in v1.0 and avoids introducing an unmaintained library into a production dependency chain.
+
+**Core technology additions:**
+
+- `mqtt@5.10+`: LAN MQTT client over TLS to printer port 8883 — replaces `bambu-node`; plain MQTT protocol is small enough to implement directly with vendored types
+- `rtspx://` URL scheme in go2rtc config: RTSPS with TLS verification skipped — Bambu's self-signed cert has no SAN matching any hostname or IP, so standard `rtsps://` with cert validation always fails at handshake
+- Custom UDP SSDP listener on ports 1990/2021 via `node:dgram`: Bambu's non-standard discovery broadcast — standard `node-ssdp` targets port 1900 and cannot be used without forking
+- `ffmpeg -g 20 -bsf:v h264_metadata=aud=insert`: Force keyframe interval and AUD insertion in go2rtc transcode — required for UniFi Protect to accept the re-muxed H.264 stream without garbled frames
+
+**CORRECTION — PROJECT.MD discovery assumption:** PROJECT.md states discovery will use mDNS `_bambulab._tcp`. Research confirms this service record does not exist on Bambu printers. The actual discovery mechanism is SSDP-variant UDP broadcasts on ports 1990/2021 with service type `urn:bambulab-com:device:3dprinter:1`. Update PROJECT.md, onboarding copy, and implementation accordingly. Do not add a `bonjour-service` or `multicast-dns` dependency.
 
 ### Expected Features
 
-**Must have (table stakes -- v1):**
-- Proxmox host configuration (foundation for everything)
-- Network camera discovery (ONVIF + ARP scan + MAC fingerprinting)
-- Credential management (encrypted at rest, never committed)
-- LXC container creation and lifecycle management
-- go2rtc config generation (Mobotix and Loxone templates)
-- Camera status dashboard (container health + stream health)
-- One-line install script
+**Must have (table stakes) — ship in v1.2:**
 
-**Should have (differentiators -- v1.x):**
-- Stream validation/preview (go2rtc WebRTC preview before adoption)
-- UniFi Protect adoption trigger (currently semi-manual)
-- VAAPI auto-detection and passthrough configuration
-- Guided setup wizard (multi-step with back/retry)
+- SSDP discovery on UDP 2021 with manual-IP fallback for cross-VLAN setups
+- Onboarding form: Access Code (8-digit, masked) + Serial Number — both required, both encrypted via existing AES-256-GCM store
+- Pre-flight RTSPS handshake before LXC provisioning with three distinct error states: "Wrong Access Code", "Enable LAN Mode Liveview on printer", "Check IP/network"
+- go2rtc YAML template with `rtspx://` or `-tls_verify 0`, `-rtsp_transport tcp`, `-reconnect 1`, keyframe forcing (`-g 20`) and AUD insertion
+- `#video=copy` passthrough for HQ stream (H.264 already — saves CPU/VAAPI); VAAPI re-encode only for LQ downscale if Protect rejects the passthrough
+- TCP probe to port 322 for health polling — never open the RTSPS stream for health checks (steals the connection slot from go2rtc)
+- Documentation: how to find the Access Code on the H2C screen, how to enable LAN Mode Liveview, Bambu Studio trade-off warning
 
-**Defer (v2+):**
-- UniFi Protect health monitoring via SSH to UDM
-- Additional camera type plugins
-- Bulk operations, backup/restore
-- AI detection, NVR features, multi-site (anti-features -- never build)
+**Should have (differentiators) — cheap enough to include in v1.2:**
+
+- Auto-detect H2C model name from SSDP payload (one-line lookup table) — surfaces "Bambu Lab H2C" in the dashboard instead of "Unknown printer"
+- **Adaptive Stream Mode** (user-proposed): Connect go2rtc to the printer's RTSPS only during active print; fall back to TCP port-322 probe + one snapshot per minute (via ffmpeg single-frame grab) during idle. This directly addresses the Live555 stability concern: 24/7 Protect pulls become safe by design because go2rtc disconnects when the printer is idle. The same LXC and go2rtc instance handles both modes — only the stream source URL is toggled via go2rtc's API. Implement as a toggleable option per camera, off by default. Requires MQTT status subscription to know print state. **Flagged as recommended differentiator for the roadmap.**
+- Polish on the "LAN Mode Liveview is OFF" error state: link to the printer's web UI and display step-by-step screenshot in the onboarding wizard
+
+**Defer to v1.3+:**
+
+- Bird's Eye Camera as a second adoptable stream (`/streaming/live/2` — unconfirmed on H2C)
+- "Test Stream" preview button (ffmpeg single-frame grab served to browser)
+- P1S/A1/X1C support (protocol identical, test matrix different)
+- Cloud-Auth Fallback — see scope decision below
+
+**SCOPE DECISION — Cloud-Auth Fallback:** PROJECT.md v1.2 target includes "Cloud-Auth als Fallback". Research recommendation: **drop from v1.2 scope.** Cloud mode requires (a) Bambu account REST auth + 2FA email code + JWT refresh, (b) TUTK P2P transport (not RTSPS — entirely different video path), (c) TypeScript library coverage is effectively zero. This is a 5-10x complexity multiplier for a use-case that contradicts the product's LAN-first value proposition. If the user's printer cannot have LAN Mode Liveview enabled, it cannot be supported in v1.2. Add a `BambuTransport: 'lan' | 'cloud'` stub to the schema now so the door is open for v1.3 without a migration.
 
 ### Architecture Approach
 
-The system is a monolithic SvelteKit app with clearly separated backend services (Proxmox, Camera Pipeline, Network Scanner, UniFi Protect, Status Monitor, Config Store). The Camera Pipeline Service is the core orchestrator -- it coordinates a sequential, idempotent, step-by-step provisioning workflow with rollback support. Config files (go2rtc.yaml, nginx.conf) are generated from templates and deployed to containers via SSH. Health monitoring uses tiered polling: Proxmox container status, go2rtc API reachability, and RTSP frame production.
+The Bambu integration is purely additive to the existing type-branching architecture. `camera_type` is already a first-class column in the `cameras` table and is branched in `onboarding.ts` and `go2rtc.ts`. Adding `'bambu'` means: extending the type union in `src/lib/types.ts`, adding SSDP detection to the discovery bash script, adding `testBambuConnection` alongside `testMobotixConnection`, adding `generateGo2rtcConfigBambu` alongside `generateGo2rtcConfigLoxone`, skipping `configureNginx` for the Bambu branch (go2rtc speaks RTSPS natively — no auth-stripping proxy needed), and adding a Bambu credential step component to the wizard router. No new service layer modules are strictly required, though a `src/lib/server/services/bambu.ts` extraction is recommended if Bambu-specific logic crosses ~50 LOC across files.
 
-**Major components:**
-1. **Camera Pipeline Service** -- Orchestrates end-to-end provisioning (LXC creation through stream verification)
-2. **Proxmox Service** -- REST client for container CRUD, device passthrough, exec
-3. **Config Generator** -- Template engine for go2rtc.yaml and nginx.conf per camera type
-4. **Status Monitor** -- Tiered health polling every 30 seconds across all managed cameras
-5. **Network Scanner** -- ARP scan + port probe + ONVIF discovery + MAC OUI fingerprinting
+**Schema decision (open):** Option A (zero-migration) — store Access Code as `password`, hardcode `username='bblp'`, store Serial in a `settings` row. Option B (clean) — add nullable `serialNumber`, `accessCode`, `authMode` columns via Drizzle migration. Since Cloud-Auth is deferred, Option A is acceptable for v1.2. Lock this in Phase 1 plan.
+
+**Major components touched:**
+
+1. `src/routes/api/discovery/+server.ts` — add SSDP probe (bash or `node:dgram`) + `'bambu'` to type enum
+2. `src/lib/server/services/go2rtc.ts` — add `generateGo2rtcConfigBambu()` with `rtspx://` template, `-g 20`, AUD insertion, TCP transport
+3. `src/lib/server/services/onboarding.ts` — add `testBambuConnection()`, branch in `configureGo2rtc`, skip `configureNginx` for Bambu, reuse `configureOnvif` with no-audio flag
+4. `src/routes/kameras/onboarding/` — new Bambu credential step component (Access Code + optional Serial)
+5. `src/lib/bambu/` (new module) — `lan-client.ts` (MQTT over TLS), `types.ts` (vendored from bambu-node), `go2rtc-template.ts`
 
 ### Critical Pitfalls
 
-1. **VAAPI passthrough fails silently in LXC** -- Must configure device nodes, cgroup rules, UID mapping, AND install VAAPI drivers inside the container. Verify with `vainfo` post-provision. Address in Phase 1.
-2. **Credentials leaked to public repo** -- Set up `.gitignore` and credential architecture before writing any code. Pre-commit hooks to block secrets. Address in Phase 0.
-3. **go2rtc loses connections without recovery** -- MJPEG sources lack reconnection semantics. Use ffmpeg source prefix with reconnect flags. External health-check restarts stale streams. Address in Phase 2.
-4. **UniFi Protect adoption breaks on any config change** -- Use fixed IPs, fixed ports, fixed stream names. Provide both HQ and LQ streams. Document re-adoption prominently. Address in Phase 3.
-5. **Proxmox API token permission errors** -- Privilege separation is on by default. Use dedicated user with explicit permissions. Test with API tokens from day one, never root tickets. Address in Phase 1.
+1. **Live555 hang + single-connection limit (USER-FLAGGED: "Can H2C handle 24/7 Protect pulls?")** — Answer: probably, but fragile. Long-lived RTSPS connections that disconnect ungracefully cause the Live555 server to hang and refuse all further connections, including Bambu Studio, requiring a printer power-cycle (BambuStudio #4481). Mitigation: go2rtc must be the sole RTSPS consumer; Protect adopts go2rtc's restream at port 8554, never the printer directly. Configure generous reconnect backoff. Optionally implement Adaptive Stream Mode to disconnect go2rtc during idle. Surface "RTSPS server unresponsive — power-cycle printer" as a distinct dashboard error.
+
+2. **TLS certificate validation breaks stream** — Bambu's self-signed cert has no SAN matching any hostname or IP. `rtsps://h2c.local:322` always fails at TLS handshake. Always resolve to IP before writing the go2rtc config; use `rtspx://` scheme or `-tls_verify 0`. Never store a hostname in the saved config.
+
+3. **Firmware updates silently disable LAN access** — January 2025 "Authorization Control" firmware broke every third-party tool for weeks. Mitigations: checklist in onboarding wizard (LAN Mode ON, Developer Mode ON, Access Code visible), detect "stream stopped / printer still pingable" as probable firmware regression, recommend users disable auto-update on adopted printers.
+
+4. **Access Code rotation = silent stream death** — Code can be rotated at any time; rotates on Bambu account sign-out. Distinguish "TCP :322 unreachable (LAN Mode off)" from "TCP :322 reachable but auth fails (code rotated)". Provide inline "Update Access Code" action that re-encrypts and re-deploys go2rtc config in one click — no re-onboarding.
+
+5. **H2C is newer than the ecosystem** — ha-bambulab #1705 tracks H2C support as incomplete; H2D has open camera bug #1378. RTSPS path, TLS behavior, and SSDP service type all need verification on the user's actual H2C before implementation is locked. Phase 0 validation spike is mandatory.
+
+6. **go2rtc passthrough causes garbled frames in Protect** — Protect's parser requires keyframes at predictable intervals and AUD NAL units. Force `-g 20 -bsf:v h264_metadata=aud=insert` in the ffmpeg transcode. Start with `#video=copy` and treat Protect rejection as the signal to switch to VAAPI re-encode.
+
+---
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on combined research, the dependency graph dictates a 5-phase structure with an explicit Phase 0 validation spike.
 
-### Phase 1: Foundation and Proxmox Integration
-**Rationale:** Everything depends on Proxmox API connectivity and LXC container management. The Proxmox Service is the foundational dependency. The `proxmox-api` library needs early validation (MEDIUM confidence). VAAPI passthrough must be proven in Phase 1, not retrofitted later.
-**Delivers:** Working SvelteKit skeleton, SQLite persistence layer, Proxmox API client that can create/start/stop/destroy LXC containers with GPU passthrough, settings UI for Proxmox host configuration.
-**Addresses:** Proxmox host configuration, credential management, LXC container lifecycle (from FEATURES.md)
-**Avoids:** Proxmox API token permission errors, VAAPI silent failures, credentials in repo (from PITFALLS.md)
+### Phase 0: H2C Hardware Validation Spike
+**Rationale:** The H2C is new enough that core assumptions (RTSPS path, TLS behavior, SSDP service type, MQTT topics) cannot be taken as given from X1C/P1S field reports. This spike must run against the user's actual printer before any implementation is committed.
+**Delivers:** Confirmed RTSPS URL path, TLS behavior, SSDP USN format, MQTT topic structure — or corrections that feed back into Phases 1-3.
+**Avoids:** Pitfall 8 (H2C newness), prevents designing against X1C assumptions that don't hold on H2C.
+**Research flag:** Cannot be addressed by further desk research. Requires physical hardware access.
 
-### Phase 2: Mobotix Camera Pipeline
-**Rationale:** Mobotix is the simpler camera type (go2rtc only, no nginx). Building the full provisioning pipeline for one camera type validates the Pipeline Orchestrator pattern and Config-as-Template pattern before adding Loxone complexity.
-**Delivers:** End-to-end provisioning for Mobotix cameras: go2rtc config generation, container provisioning with go2rtc installed, MJPEG-to-H.264 transcoding via VAAPI, RTSP stream output, stream health verification.
-**Addresses:** go2rtc config generation, one-click onboarding (from FEATURES.md)
-**Avoids:** go2rtc connection loss without recovery (from PITFALLS.md)
+### Phase 1: Foundation — Discovery, Credentials, Pre-flight
+**Rationale:** Everything downstream depends on correct device identification and credential handling. Discovery must be in place before the wizard can route to Bambu-specific steps. Credential storage must be decided before go2rtc config generation can reference the right fields. Pre-flight validates credentials before an LXC slot is consumed.
+**Delivers:** SSDP scanner extension, manual-IP fallback, Access Code + Serial form wired to existing AES-256-GCM store, `testBambuConnection()` with three distinct error states, Bambu type added to all enums.
+**Addresses:** SSDP discovery, manual-IP fallback, credential form, pre-flight handshake, encrypt at rest, firmware/LAN Mode checklist in wizard.
+**Avoids:** Pitfalls 4 (access code rotation UX), 5 (discovery false positives / MQTT confirmation gate), 10 (plaintext credentials).
 
-### Phase 3: Loxone Pipeline and Network Discovery
-**Rationale:** Loxone Intercom requires nginx auth-proxy on top of go2rtc, making it a natural extension of Phase 2. Network discovery is independent and can be built alongside, providing the camera detection UI entry point.
-**Delivers:** Loxone Intercom pipeline (nginx auth-proxy + go2rtc), network scanner (ARP + ONVIF + MAC fingerprinting), scanner UI with camera type classification.
-**Addresses:** Camera-type-specific workflows, network camera discovery (from FEATURES.md)
-**Avoids:** Loxone nginx auth proxy misconfiguration, nginx MJPEG buffering issues (from PITFALLS.md)
+### Phase 2: Stream Pipeline — go2rtc Config + LXC Template
+**Rationale:** Core value of the milestone. All TLS, keyframe, reconnect, and single-connection gotchas must be handled here. Gate on Phase 0 confirming the RTSPS URL and TLS behavior.
+**Delivers:** `generateGo2rtcConfigBambu()` with `rtspx://` / `-tls_verify 0`, `-rtsp_transport tcp`, `-g 20`, AUD insertion, reconnect flags; Bambu branch in `configureGo2rtc`; nginx skipped; VAAPI re-encode as fallback; LXC template reuse from Mobotix.
+**Uses:** go2rtc `rtspx://` scheme; ffmpeg `-g 20 -bsf:v h264_metadata=aud=insert`; existing Mobotix LXC template (VAAPI passthrough included).
+**Avoids:** Pitfalls 1 (go2rtc as sole consumer), 2 (TLS cert mismatch), 6 (garbled Protect frames), 12 (VAAPI re-implementation).
+**Research flag:** `#video=copy` vs forced re-encode must be validated against real Protect adoption in this phase — treat Protect rejection as the gate condition.
 
-### Phase 4: Dashboard, Monitoring, and UniFi Protect
-**Rationale:** Status monitoring is a read-only concern that layers on top of working provisioning. UniFi Protect adoption is semi-manual and should only be built once streams are proven stable.
-**Delivers:** Camera status dashboard with tiered health checks, stream validation/preview via go2rtc WebRTC, UniFi Protect adoption instructions and verification, re-adoption detection.
-**Addresses:** Camera status dashboard, stream validation/preview, UniFi Protect adoption (from FEATURES.md)
-**Avoids:** UniFi Protect adoption fragility (from PITFALLS.md)
+### Phase 3: UniFi Protect Adoption + Status + Dashboard Errors
+**Rationale:** Adoption is straightforward (existing module, no changes) but must be verified end-to-end with the Bambu stream source. Dashboard error taxonomy for Bambu-specific failure modes is new work and belongs here before the UI polish phase.
+**Delivers:** End-to-end verified (discovered printer → LXC → go2rtc → adopted in Protect); TCP :322 health probe in status poller (never open RTSPS stream for health); RTSPS hang vs auth fail vs port-closed error differentiation; inline "Update Access Code" action.
+**Avoids:** Pitfall 1 (polling steals connection slot), Pitfall 4 (silent auth failure), Pitfall 9 (document Bambu Studio trade-off).
 
-### Phase 5: Installer and Distribution
-**Rationale:** The app must work before it can be packaged. The one-line installer is the distribution mechanism and must be tested on a fresh Proxmox VM.
-**Delivers:** Bash installer script (Node.js + clone + npm install + systemd service), update mechanism, documentation for end users.
-**Addresses:** One-line install script (from FEATURES.md)
-**Avoids:** Installer fails on fresh system (from PITFALLS.md)
+### Phase 4: Wizard UI Polish + Adaptive Stream Mode
+**Rationale:** UI work sits on top of the functional pipeline. Adaptive Stream Mode requires MQTT status subscription (Phase 1) and go2rtc config toggling (Phase 2) — cannot be built until both are solid.
+**Delivers:** Bambu credential step component in wizard; SSDP model-name display ("Bambu Lab H2C"); polished "LAN Mode Liveview OFF" error with screenshot; Adaptive Stream Mode toggle (live RTSPS during active print, snapshot polling 1/min otherwise) as per-camera setting, off by default.
+**Addresses:** Auto-detect H2C model variant, "LAN Liveview OFF" diagnostic UI, Adaptive Stream Mode differentiator.
+**Avoids:** Pitfall 1 (Adaptive Stream Mode is the structural solution to 24/7 stability).
+**Research flag:** MQTT print-state topic and payload structure must be confirmed (Phase 0 / ha-bambulab `pybambu` source) before implementing the mode-switch logic.
+
+### Phase 5: Docs + Installer
+**Rationale:** Documentation for LAN Mode setup, Access Code retrieval, firmware freeze recommendation, and Bambu Studio trade-off is required for external users of the one-line installer. ToS framing must be careful.
+**Delivers:** README section "Bambu Lab H2C Setup", onboarding wizard help text + screenshots, "disable auto-update" recommendation, known-good firmware version pin.
+**Avoids:** Pitfalls 3 (firmware regression — document and warn), 9 (Bambu Studio conflict), 11 (ToS framing: "uses documented LAN Mode RTSPS endpoint", not "bypasses Bambu security").
 
 ### Phase Ordering Rationale
 
-- **Proxmox first** because every other feature depends on creating and managing LXC containers. Validating the API client and GPU passthrough early de-risks the entire project.
-- **Mobotix before Loxone** because Mobotix is the simpler pipeline (no nginx layer). It validates the core orchestration pattern before adding auth-proxy complexity.
-- **Network discovery in Phase 3** (not Phase 1) because cameras can be added manually during early phases. Discovery is a UX convenience, not a functional dependency.
-- **Dashboard and Protect in Phase 4** because monitoring requires working cameras to monitor, and Protect adoption requires stable streams to adopt.
-- **Installer last** because packaging a broken app is pointless. The app must be feature-complete before distribution.
+- Phase 0 before everything: H2C is new enough that a wrong assumption (different RTSPS path, different SSDP type) discovered after Phase 1-2 are built would require backtracking across multiple files.
+- Phase 1 before Phase 2: Schema/credential decisions gate the go2rtc template (needs to know which field holds the access code).
+- Phase 2 before Phase 3: Protect adoption requires a working go2rtc stream to adopt.
+- Phase 4 after Phase 1+2: Adaptive Stream Mode requires both MQTT subscription and go2rtc config toggling.
+- Phase 5 last: docs written once implementation is stable.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 1:** Proxmox API token auth and LXC device passthrough configuration need hands-on validation. The `proxmox-api` npm package may need to be replaced with direct REST calls.
-- **Phase 3:** Loxone Intercom auth-proxy pattern is documented in only a few sources (LoxWiki, one blog post, one go2rtc issue). Needs real hardware testing.
-- **Phase 4:** UniFi Protect third-party camera adoption has no stable public API. The `unifi-protect` library is unofficial. Integration must be tested against real UDM hardware.
+Phases needing deeper research or hardware validation during planning:
 
-Phases with standard patterns (skip research-phase):
-- **Phase 2:** go2rtc configuration and ffmpeg transcoding are well-documented with extensive community examples.
-- **Phase 5:** One-line installer scripts follow the established Proxmox Helper Scripts pattern. Standard systemd service creation.
+- **Phase 0:** Hardware validation spike — desk research cannot resolve H2C-specific RTSPS path, SSDP service type string, and MQTT topic format. Must run against user's physical H2C.
+- **Phase 2:** `#video=copy` vs forced VAAPI re-encode — must be validated against real UniFi Protect adoption, not theoretical.
+- **Phase 4 (Adaptive Stream Mode):** MQTT print-state field names — verify against ha-bambulab `pybambu` source or real MQTT capture before implementing mode-switch logic.
+
+Phases with standard patterns (can skip research-phase):
+
+- **Phase 1 (credentials):** AES-256-GCM store is unchanged; Drizzle schema extension is a one-migration add. Well-understood.
+- **Phase 3 (Protect adoption):** Existing module handles this; only Bambu-specific work is dashboard error taxonomy, which is straightforward branching.
+- **Phase 5 (docs):** No technical uncertainty; content is known from research.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM-HIGH | SvelteKit, SQLite, node-ssh are high confidence. `proxmox-api` is MEDIUM due to 2-year publish gap. Validate early or fall back to direct REST. |
-| Features | HIGH | Domain is narrow and well-understood. Comparable tools analyzed (Frigate, Shinobi, unifi-cam-proxy). Feature scope is clear. |
-| Architecture | HIGH | Single-process monolith with service modules is straightforward. Pipeline orchestrator pattern is well-documented. One-LXC-per-camera model is proven. |
-| Pitfalls | HIGH | All critical pitfalls verified across multiple sources (Proxmox forums, go2rtc GitHub issues, UniFi community). Prevention strategies are concrete. |
+| Stack | HIGH | One new dep (`mqtt`), all others existing. `rtspx://` / `-tls_verify 0` pattern confirmed by multiple independent community sources. |
+| Features | MEDIUM-HIGH | Table stakes well-defined from official Bambu docs + HA integration. H2C-specific behavior (secondary stream path, quad-cam quirks) extrapolated from X1C/H2D — verify in Phase 0. |
+| Architecture | HIGH | Fit into existing type-branching architecture clear and verified against actual source files. Credential Option A vs B is the only open design choice. |
+| Pitfalls | MEDIUM-HIGH | Live555 fragility, TLS cert issue, firmware regression, access code rotation — all confirmed across multiple independent issue trackers. H2C-specific severity may differ; H2C is newer and less field-tested. |
 
 **Overall confidence:** MEDIUM-HIGH
 
 ### Gaps to Address
 
-- **`proxmox-api` library viability:** Last published 2 years ago. Must validate against Proxmox VE 8.x in Phase 1. Fallback: direct REST client using `fetch` (~1 day effort).
-- **UniFi Protect adoption automation:** No stable public API for programmatic adoption. The app can prepare streams and provide instructions, but full automation may not be possible. Validate with real UDM in Phase 4.
-- **VAAPI concurrent session limits:** Intel iGPU supports 8-16 simultaneous encode sessions. With 4 cameras (per PROJECT.md scope), this is not an issue, but should be documented as a scaling constraint.
-- **Loxone Intercom auth mechanism:** Documentation is sparse. The Base64 auth header approach is confirmed by LoxWiki and one go2rtc issue, but edge cases (token expiry, firmware updates) are unknown.
-- **ONVIF discovery library:** The `onvif` npm package has MEDIUM confidence. May need evaluation against alternatives or a thin custom WS-Discovery implementation.
+- **H2C RTSPS path:** `/streaming/live/1` assumed from X1C/P1S; unconfirmed on H2C. Resolve in Phase 0 spike.
+- **SSDP service type on H2C firmware:** `urn:bambulab-com:device:3dprinter:1` confirmed on P1S; assume same for H2C but verify in Phase 0.
+- **`#video=copy` Protect compatibility:** Cannot determine without live testing. Phase 2 gate condition.
+- **MQTT print-state field names:** Needed for Adaptive Stream Mode. Cross-reference ha-bambulab `pybambu` source and confirm against real H2C MQTT capture.
+- **Bird's Eye Camera secondary path:** `/streaming/live/2` reported for compatible models; unconfirmed on H2C. Defer to v1.3.
+- **Schema decision (Option A vs B):** Recommend Option A (zero-migration) for v1.2 since Cloud-Auth is deferred. Lock in Phase 1 plan.
+- **Cloud-Auth scope decision:** Must be explicitly confirmed with user before planning begins. Research recommendation is to drop from v1.2 and add `BambuTransport` stub only.
+
+---
 
 ## Sources
 
-### Primary (HIGH confidence)
-- [Proxmox VE API Documentation](https://pve.proxmox.com/wiki/Proxmox_VE_API) -- REST API reference, LXC management, API tokens
-- [go2rtc GitHub](https://github.com/AlexxIT/go2rtc) -- Configuration, HTTP API, ffmpeg transcoding, VAAPI
-- [UniFi Protect Third-Party Cameras](https://help.ui.com/hc/en-us/articles/26301104828439-Third-Party-Cameras-in-UniFi-Protect) -- Official ONVIF adoption docs
-- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) -- v12.8.0, battle-tested SQLite driver
-- [SvelteKit docs](https://www.npmjs.com/package/@sveltejs/kit) -- v2.55.0, adapter-node deployment
-- [unifi-protect npm](https://www.npmjs.com/package/unifi-protect) -- v4.27.7, actively maintained
+### Primary (HIGH confidence — official Bambu documentation)
 
-### Secondary (MEDIUM confidence)
-- [proxmox-api npm](https://www.npmjs.com/package/proxmox-api) -- v1.1.1, TypeScript, last published 2 years ago
-- [Proxmox LXC iGPU passthrough](https://forum.proxmox.com/threads/proxmox-lxc-igpu-passthrough.141381/) -- Community tutorial
-- [LoxWiki Loxone Intercom + go2rtc](https://loxwiki.atlassian.net/wiki/spaces/LOXEN/pages/2517499917/) -- nginx auth-proxy reference
-- [Florian Rhomberg blog](https://www.florian-rhomberg.net/2025/01/how-to-integrate-a-third-party-camera-into-unifi-protect/) -- Third-party camera walkthrough
-- [unifi-cam-proxy](https://github.com/keshavdv/unifi-cam-proxy) -- Alternative adoption approach
-- [go2rtc connection recovery issue #762](https://github.com/AlexxIT/go2rtc/issues/762) -- Known reconnection limitations
+- [Bambu Wiki — Printer Network Ports](https://wiki.bambulab.com/en/general/printer-network-ports) — port 322 RTSPS, 8883 MQTTS, 1990/2021 SSDP confirmed
+- [Bambu Wiki — Streaming video / virtual camera](https://wiki.bambulab.com/en/software/bambu-studio/virtual-camera) — official RTSPS URL format, concurrent access rules
+- [Bambu Wiki — Live View Troubleshooting](https://wiki.bambulab.com/en/software/bambu-studio/faq/live-view) — LAN Mode Liveview toggle requirement, H2D/H2S/H2C grouped together
+- [Bambu Blog — Authorization Control System](https://blog.bambulab.com/firmware-update-introducing-new-authorization-control-system-2/) — video access confirmed permitted under current firmware
+- [Bambu Wiki — Third-party Integration](https://wiki.bambulab.com/en/software/third-party-integration) — official sanction of LAN MQTT access
 
-### Tertiary (LOW confidence)
-- [onvif npm](https://www.npmjs.com/package/onvif) -- ONVIF WS-Discovery, needs evaluation
-- [nmap for network scanning](https://nmap.org/) -- Optional fallback, requires system binary
+### Primary (HIGH confidence — verified issue trackers)
+
+- [BambuStudio #4481](https://github.com/bambulab/BambuStudio/issues/4481) — Live555 hang after ungraceful disconnect, requires power-cycle
+- [ha-bambulab #1627](https://github.com/greghesp/ha-bambulab/issues/1627) — single-connection limit confirmed, go2rtc-as-sole-consumer pattern recommended
+- [ha-bambulab #1798](https://github.com/greghesp/ha-bambulab/issues/1798) — TLS cert hostname validation failure, IP-only workaround
+- [ha-bambulab #1705](https://github.com/greghesp/ha-bambulab/issues/1705) — H2C not yet fully supported in ha-bambulab
+- [ha-bambulab #221](https://github.com/greghesp/ha-bambulab/issues/221) — LAN Mode liveview drops 1-3s after connect, firmware-induced
+- [Hackaday — Authorization Control analysis](https://hackaday.com/2025/01/17/new-bambu-lab-firmware-update-adds-mandatory-authorization-control-system/) — firmware regression history and community impact
+
+### Secondary (MEDIUM confidence — community implementations)
+
+- [psychoticbeef/BambuLabOrcaSlicerDiscovery](https://github.com/psychoticbeef/BambuLabOrcaSlicerDiscovery) — SSDP ports 1990/2021 and service URN `urn:bambulab-com:device:3dprinter:1`
+- [TomWis97/bs-lan-discovery](https://github.com/TomWis97/bs-lan-discovery) — SSDP non-standard port behavior, VLAN issues
+- [synman/bambu-go2rtc](https://github.com/synman/bambu-go2rtc) — proven go2rtc integration pattern, ffmpeg flag reference
+- [Frigate discussion #19832](https://github.com/blakeblackshear/frigate/discussions/19832) — garbled stream debugging, `-rtsp_transport tcp`, audio strip
+- [greghesp/ha-bambulab](https://github.com/greghesp/ha-bambulab) — protocol reference (Python, authoritative on MQTT message schema)
+- [bambu-node GitHub (THE-SIMPLE-MARK)](https://github.com/THE-SIMPLE-MARK/bambu-node) — TypeScript message type reference (vendor types only, do not depend on)
+- [mqtt npm](https://www.npmjs.com/package/mqtt) — v5.x, recommended MQTT client
+- [WolfWithSword — X1C camera in HA](https://www.wolfwithsword.com/bambulabs-x1c-camera-in-home-assistant/) — RTSPS URL format, LAN Mode Liveview gotcha
+- [Bambu forum — Access Code rotation](https://forum.bambulab.com/t/access-code-always-needs-to-be-re-entered/82201) — rotation frequency and trigger conditions
 
 ---
-*Research completed: 2026-03-22*
-*Ready for roadmap: yes*
+*Research completed: 2026-04-13*
+*Ready for roadmap: yes — pending Cloud-Auth scope decision from user*

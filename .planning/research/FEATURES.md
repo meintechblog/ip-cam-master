@@ -1,186 +1,139 @@
-# Feature Research
+# Feature Landscape — Bambu Lab H2C Camera Integration (v1.2)
 
-**Domain:** IP camera management and Proxmox orchestration for UniFi Protect integration
-**Researched:** 2026-03-22
-**Confidence:** HIGH (domain well-understood, comparable tools analyzed, project scope is narrow and well-defined)
+**Domain:** Self-hosted IP-camera onboarding tool, new device class = Bambu Lab H2C 3D-printer cameras
+**Researched:** 2026-04-13
+**Scope:** ONLY camera-feed integration into UniFi Protect. Print control, AMS, telemetry are explicitly out of scope.
+**Reuse target:** ~80% of the existing Mobotix/Loxone pipeline (LXC + go2rtc + adoption flow). The Bambu-specific work is in **discovery, credential model, stream URL shape, and pre-flight validation**.
 
-## Feature Landscape
+---
 
-### Table Stakes (Users Expect These)
+## Domain Primer (one-screen briefing)
 
-Features users assume exist. Missing these = product feels incomplete or untrustworthy.
+The Bambu Lab H2C is a multi-material 3D printer launched 2025-11-18. It carries an **AI quad-camera vision system** (chamber/toolhead cams used by the printer's own diagnostics) plus an optional **Bird's Eye Camera** accessory mounted in the lid. From a network-integration standpoint:
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Camera discovery via network scan** | Every NVR tool (Frigate, Shinobi, MotionEye) auto-discovers cameras. Manual IP entry alone feels archaic. | MEDIUM | Use mDNS/Bonjour, ONVIF WS-Discovery, and ARP+port scanning. Mobotix cameras respond on RTSP :554. Loxone Intercoms discoverable via mDNS. Must differentiate ONVIF-capable (display-only) from non-ONVIF (workflow-needed). |
-| **Camera status dashboard** | Shinobi, Frigate, MotionEye all show live grid of camera thumbnails with online/offline status. Users need at-a-glance health. | MEDIUM | Poll go2rtc API (port 1984) for stream health. Show per-camera: name, IP, type, container status, stream status, UniFi Protect adoption status. |
-| **One-click camera onboarding** | This is the project's core value proposition. Proxmox Helper Scripts proved that one-click LXC provisioning is expected for self-hosted tools. Manual SSH + config editing is the pain point being solved. | HIGH | Full pipeline: create LXC, install go2rtc (+ nginx for Loxone), configure streams, start services. Must be idempotent -- running again should repair, not duplicate. |
-| **LXC container lifecycle management** | Proxmox Helper Scripts set the standard: create, start, stop, delete containers through a UI. Users expect to manage what the tool created. | MEDIUM | Proxmox API (proxmoxer) for CRUD. Show container state (running/stopped/error). Allow restart and delete with confirmation. One container per camera is the architecture. |
-| **Credential management (secure)** | Camera credentials must be stored but never leaked. Public GitHub repo makes this critical. Every self-hosted tool handles credentials through local config or env vars. | LOW | Store in local config file outside repo (e.g., /etc/ip-cam-master/credentials.yaml or SQLite). Never commit. Mask in UI. Validate on entry by testing camera connection. |
-| **go2rtc configuration generation** | go2rtc is the transcoding engine. Users expect the tool to generate correct YAML config, not require hand-editing. Frigate auto-generates go2rtc config from its own camera config. | MEDIUM | Template-based: Mobotix gets ffmpeg transcode config (MJPEG->H.264 with VAAPI), Loxone gets nginx proxy + go2rtc config. Must handle VAAPI device passthrough (/dev/dri) in LXC config. |
-| **One-line install/update script** | Proxmox Helper Scripts popularized `bash -c "$(curl -fsSL ...)"` pattern. Self-hosters expect this. No manual dependency hunting. | MEDIUM | Script must: detect prerequisites (Proxmox API access, network), install app (VM or container), handle updates (git pull + service restart). Version-aware: skip if current. |
-| **Proxmox host configuration** | Users need to tell the app which Proxmox host to manage. Connection details, API token, storage target. | LOW | Settings page: hostname/IP, API token (not root password), target storage, VMID range, network bridge. Test connection on save. |
+- **Stream protocol:** `rtsps://bblp:<access_code>@<printer_ip>:322/streaming/live/1` — same scheme used by all current Bambu printers since firmware 01.06.x. Codec is **H.264 in RTSPS (TLS)**, *not* MJPEG. (This is a key difference from Mobotix.)
+- **Auth model:** Single shared password called the **Access Code**, displayed on the printer's 5" touchscreen under *Settings → WLAN/General → Access Code* (8 digits). Username is always literal `bblp`. The **Serial Number** (e.g. `0309CA...`) is shown on the same screen and is needed for MQTT/SSDP correlation, not for the RTSPS stream itself.
+- **Required toggle:** `LAN Mode Liveview` must be enabled in the printer's network settings. This is *separate* from full LAN-Only Mode — Liveview can be on while the printer still uses Bambu Cloud for slicer connectivity. Without this toggle, port 322 refuses connections.
+- **Discovery:** Printers broadcast SSDP `NOTIFY` packets every ~5 s on UDP 2021 (Bambu's quirky variant of SSDP/mDNS). USN field carries the serial. There is no `_bambulab._tcp` mDNS record — that was an assumption in the milestone goal; **the actual mechanism is SSDP**.
+- **Authorization Control System (Jan 2025+):** Bambu's firmware now blocks third-party *control* operations, but **explicitly permits remote video access via LAN Mode Liveview**. So our read-only camera use case is on the supported side of the firewall — no Developer Mode required.
 
-### Differentiators (Competitive Advantage)
+This means our existing Mobotix pipeline needs four delta-changes: SSDP scanner, two-field credential form, RTSPS source string, and a preflight that checks "is LAN Liveview on?". Everything downstream (LXC, go2rtc YAML deploy, UniFi Protect adoption, status polling) reuses the existing modules unchanged.
 
-Features that set ip-cam-master apart from generic NVR tools and manual scripting.
+---
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **End-to-end UniFi Protect adoption** | No existing tool does discovery-to-Protect-adoption in one flow. unifi-cam-proxy requires manual Docker setup. Frigate/Shinobi are NVRs, not Protect integration tools. This is the unique value. | HIGH | After container+go2rtc are running, trigger Protect adoption via ONVIF discovery or RTSP URL. Requires Protect 5.0+ for third-party camera support. Adoption token valid 60 min -- must be automated. |
-| **Camera-type-specific workflows** | Mobotix (MJPEG->H.264 transcode) and Loxone Intercom (nginx auth-proxy + transcode) need different pipelines. Encoding this knowledge into the tool eliminates hours of blog-reading. | MEDIUM | Plugin/template architecture: each camera type defines its own pipeline (services needed, config templates, stream URLs). Extensible for future camera types. |
-| **VAAPI hardware acceleration auto-config** | Transcoding MJPEG to H.264 is CPU-intensive. Auto-detecting Intel GPU and configuring /dev/dri passthrough to LXC is something no tool does automatically. | MEDIUM | Detect /dev/dri on Proxmox host. Configure LXC with device passthrough. Set go2rtc ffmpeg flags for VAAPI. Validate with test transcode. Fallback to software encoding if VAAPI unavailable. |
-| **Container-per-camera isolation** | Unlike monolithic NVRs (Frigate runs all cameras in one container), one LXC per camera means: independent restart, independent resource limits, one camera failure does not cascade. | LOW | Architecture decision already made. UI should make isolation visible: per-camera container stats (CPU, memory), independent start/stop/restart. |
-| **UniFi Protect health monitoring** | SSH to Dream Machine to check adopted camera status, parse Protect logs for "camera not available" errors. No other tool does this. | HIGH | SSH to UDM, parse Protect logs, correlate with managed cameras. Surface diagnostics: "Camera X disconnected 3 times in 24h, last error: timeout". Future: pattern detection. |
-| **Stream validation/preview** | Before completing setup, show user the transcoded stream to confirm it works. go2rtc exposes WebRTC/MSE preview on port 1984. | LOW | Embed go2rtc web player (iframe or direct WebRTC) in the setup wizard. "Can you see your camera? [Yes/No]" confirmation step. Catches config errors before Protect adoption. |
-| **Guided setup wizard** | Step-by-step: select discovered camera -> enter credentials -> test connection -> choose transcode settings -> create container -> verify stream -> adopt in Protect. | MEDIUM | Multi-step form with validation at each stage. Back/retry on failure. Progress indicator. Much friendlier than CLI scripts. |
+## Table Stakes
 
-### Anti-Features (Commonly Requested, Often Problematic)
+Features users *expect*. Missing = product feels broken or "Bambu support" is a lie.
 
-Features that seem good but create problems for this specific project.
+| Feature | Why Expected | Complexity | Depends On (existing modules) | Notes |
+|---|---|---|---|---|
+| **SSDP-based Bambu discovery on the dashboard scanner** | Users assume "click Scan, see my printer" — same UX as Mobotix today | Medium | Existing network-scanner module (extend with SSDP listener on UDP 2021) | Listen for ~10s, parse `USN` for serial, `LOCATION` for IP, model field for `H2C` substring. Also add a manual-IP fallback because SSDP fails across VLANs. |
+| **Onboarding form: Access Code + Serial Number, both required** | Bambu's documented auth model — copy/paste from printer screen | Simple | Existing credential store (AES-256-GCM in SQLite) — just two new string fields on the camera record | Mask Access Code input. Validate Serial against `^[0-9A-Z]{15}$` (Bambu format). |
+| **Pre-flight RTSPS handshake before LXC provisioning** | Users hit "Onboard" expecting clear error if creds wrong, *not* a half-built container that fails silently | Medium | New utility `bambu-preflight.ts` using ffprobe in a child process; called from existing onboarding flow | If TLS handshake works but auth fails → "Wrong Access Code". If TCP refused on :322 → "Enable LAN Mode Liveview on printer". If host unreachable → "Check IP/network". These three messages are the entire onboarding-debugging UX. |
+| **go2rtc config template for Bambu RTSPS source** | Camera must actually appear in UniFi Protect | Simple | Existing go2rtc-config-generator + SSH deploy modules | Source line: `streams: bambu_<id>: ffmpeg:rtsps://bblp:{{access_code}}@{{ip}}:322/streaming/live/1#video=copy#audio=copy`. **Skip transcoding** — H.264 is already what UniFi wants. Pass-through saves CPU/VAAPI. |
+| **`-rtsp_transport tcp` + `-allowed_media_types video` ffmpeg flags** | Bambu's RTSPS implementation is finicky over UDP and reliably stalls on audio negotiation; community widely reports garbled feeds without these | Simple | go2rtc YAML template extension | Frigate/HA users hit this exact issue (GH discussion #19832). Set as default for the Bambu profile. |
+| **Encrypt Access Code at rest** | Same security promise as Mobotix/Loxone passwords | Simple | Existing AES-256-GCM credential store — zero new code, just route the new field through it | Non-negotiable per project security constraint. |
+| **Online/offline status via TCP probe to `:322`** | Dashboard already shows online/offline for other cameras | Simple | Existing status-poller module (port-probe variant) | 5 s interval, 2 s timeout. Don't open the RTSPS stream for health checks — that triggers Bambu's "in use" lockout where the next real client gets refused. |
+| **Manual-IP add as fallback when discovery fails** | Cross-VLAN, mDNS-blocking switches, "I just want it to work" | Simple | Existing manual-add path (already in app for Loxone) | Document SSDP cross-subnet limitation in the help text. |
+| **One Bambu camera = one LXC container** | Architectural consistency with Mobotix/Loxone | Simple | Existing LXC provisioner — Bambu uses the same go2rtc-only template (no nginx auth-proxy needed; RTSPS handles auth natively) | Even cheaper than Loxone (no nginx layer). |
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Built-in NVR/recording** | "Why not record too?" | UniFi Protect already handles recording. Duplicating NVR functionality adds massive complexity (storage management, playback UI, retention policies) and conflicts with the core value of being an orchestration tool, not a replacement. Frigate and Shinobi already own this space. | Display "Recording handled by UniFi Protect" with link to Protect dashboard. Show Protect recording status per camera. |
-| **AI/object detection** | Frigate has it, users may expect it | Completely out of scope. This is a camera onboarding and orchestration tool, not a detection/analytics platform. Adding TensorFlow/Coral support would 10x complexity. | Recommend Frigate for users who want AI detection alongside Protect. |
-| **Multi-site / multi-Proxmox management** | Enterprise users want it | Dramatically increases complexity: multi-host API management, cross-network discovery, site selection UI. V1 is for single-site homelabs. | Design data model to not preclude multi-site later (site_id field), but do not build the UI or logic. |
-| **Cloud/remote access** | "Access from anywhere" | Security nightmare for a tool that manages camera credentials and has Proxmox API access. Local-only is a feature, not a limitation. | Document how to use Tailscale/WireGuard for remote access if users want it. |
-| **Mobile native app** | "I want an app" | Web-first with responsive design covers mobile viewing. Native app is a separate project with separate maintenance burden. | Responsive web UI that works on mobile browsers. PWA manifest for "Add to Home Screen". |
-| **Generic camera brand support** | "Support Hikvision, Dahua, Reolink..." | These cameras already support ONVIF and can be adopted directly in UniFi Protect 5.0+ without any proxy. The tool exists specifically for cameras that CANNOT be adopted natively (Mobotix classic, Loxone Intercom). | Show ONVIF-capable cameras as "direct adoption possible" in discovery, with link to Protect's native adoption flow. |
-| **Real-time log streaming in UI** | "Show me container logs live" | WebSocket log streaming adds frontend complexity and is rarely useful after initial setup. Most debugging happens via SSH. | Show last N log lines on demand (pull, not push). Link to Proxmox console for full access. |
+---
+
+## Differentiators
+
+Features that elevate the product. **Defer all of these to v1.3 unless cheap.**
+
+| Feature | Value Proposition | Complexity | Depends On | Notes |
+|---|---|---|---|---|
+| **Auto-detect H2C model variant from SSDP** | UI shows "Bambu Lab H2C" not "Unknown printer" — feels polished | Simple | SSDP parser already extracts the model field | Cheap if we're already parsing SSDP. Map `3DPrinter-H2C` → friendly name. Do it in v1.2 if it's literally a one-line lookup table. |
+| **Bird's Eye Camera as a second adoptable stream** | Power users with the accessory get both viewpoints in Protect | Medium | Same go2rtc template, second LXC container OR second `streams:` entry | Bird's Eye exposes a second RTSPS path on the same printer (`/streaming/live/2` per community reports — verify before shipping). Architect for it but ship as v1.3 unless a tester actually has the accessory. |
+| **"Test Stream" button in UI that opens a 5 s preview** | Lets the user verify before adoption — huge confidence boost | Medium | New module: ffmpeg snapshot to JPEG, served once via dashboard | Reuse for all camera types eventually. Probably worth its own phase. |
+| **Auto-detect "LAN Mode Liveview is OFF" and link to the printer's web UI / show step-by-step screenshot** | Top support question for every Bambu integration (HA, Frigate, SimplyPrint all document it) | Simple | Preflight already detects this — just polish the error UI | Cheap polish. Worth doing. |
+| **Detect Authorization Control firmware version and warn if user is on a build that broke video access** | Future-proofing against Bambu firmware regressions | Complex | Need MQTT subscription (auth required) OR HTTP probe to extract firmware version | Skip unless we hear of an actual regression. Bambu has *promised* to keep video unrestricted — taking them at their word until proven otherwise. |
+| **Reuse Access Code across multiple Bambu printers in the same household** | Most users have one access code per *printer*, but UI could remember the last-used one as a default | Simple | UI-only convenience | Nice but not essential. |
+
+---
+
+## Anti-Features (Explicitly NOT in v1.2)
+
+These come up constantly in HA/bambu-farm/SimplyPrint discussions. We say "no" loudly and document why in the README to set expectations.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|---|---|---|
+| **Print job control (start/pause/cancel)** | Out of scope (camera tool, not printer manager). Also requires MQTT auth + survives Bambu's Authorization Control firmware as a *restricted* operation. Whole different threat & API surface. | Direct user to Bambu Handy / Bambu Studio / Home Assistant `bambu_lab` integration. Link in docs. |
+| **AMS (filament) status, temperature, progress %** | Same reason — printer telemetry isn't a camera concern | Same redirect. |
+| **Cloud-mode authentication / Bambu account login / `mqtt://us.mqtt.bambulab.com:8883`** | (1) Adds OAuth + token-refresh complexity. (2) Cloud streams use a different transport (TUTK P2P, not RTSPS). (3) The whole reason a self-hosted user picked our tool is *to avoid the cloud*. | LAN Mode Liveview only. The milestone PROJECT.md mentions "cloud auth as fallback" — recommend dropping that from scope. If LAN Liveview is off, the right answer is "turn it on", not "fall back to cloud". |
+| **Embedding/running go2rtc inside our app process** | Already a settled architectural pattern: we generate config, ship it to the per-camera LXC, go2rtc runs there | Existing go2rtc-config-generator handles this. |
+| **Re-encoding the H.264 stream "just in case"** | Wastes CPU/VAAPI for zero quality gain. Bambu already ships H.264 baseline that UniFi Protect accepts | Use `#video=copy`. Only fall back to transcode if a specific firmware ships H.265 (none have). |
+| **Polling the RTSPS stream for health** | Bambu's RTSPS server only allows ~1 concurrent client; a polling probe will steal the slot from go2rtc | TCP probe to port 322 only. Trust go2rtc's own connection state for richer status. |
+| **Ingesting the AI vision system's per-frame metadata (defect detection, spaghetti detection)** | Cool, but it's a printer-internal feature with no public API | N/A. |
+| **Supporting the older P1S/A1/X1C in v1.2** | Even though the protocol is identical, "scope creep" risk. Adding them is one config switch — but test matrix explodes (different firmware quirks per model) | Mention in roadmap as v1.3 "free win" once H2C is solid. The same code path already works; only model-string handling and tester access differ. |
+
+---
 
 ## Feature Dependencies
 
 ```
-[Network Scanner / Camera Discovery]
-    |
-    +--> [Camera Onboarding Wizard]
-    |        |
-    |        +--> requires --> [Proxmox Host Config] (need API access to create containers)
-    |        |
-    |        +--> requires --> [Credential Management] (need camera creds for stream config)
-    |        |
-    |        +--> requires --> [go2rtc Config Generation] (need stream config for container)
-    |        |
-    |        +--> requires --> [LXC Container Lifecycle] (need to create/start container)
-    |        |
-    |        +--> optional --> [Stream Validation/Preview] (confirm before adoption)
-    |        |
-    |        +--> optional --> [UniFi Protect Adoption] (final step)
-    |
-[Camera Status Dashboard]
-    |
-    +--> requires --> [LXC Container Lifecycle] (need container status)
-    |
-    +--> enhanced-by --> [UniFi Protect Health Monitoring] (richer status info)
-
-[One-Line Install Script] -- independent, no dependencies on app features
-
-[VAAPI Auto-Config] -- enhances --> [go2rtc Config Generation]
-
-[Camera-Type Workflows] -- enhances --> [Camera Onboarding Wizard]
+SSDP discovery ──► Auto-detect H2C model (differentiator)
+       │
+       ▼
+Onboarding form (Access Code + Serial) ──► Encrypt at rest (existing module)
+       │
+       ▼
+Pre-flight RTSPS handshake ──► "LAN Liveview off" diagnostic UI (differentiator)
+       │
+       ▼
+LXC provisioning (existing) ──► go2rtc config with Bambu template ──► UniFi adoption (existing)
+       │
+       ▼
+TCP :322 status probe (existing poller, new port)
 ```
 
-### Dependency Notes
+Manual-IP fallback short-circuits SSDP discovery and feeds directly into the onboarding form.
 
-- **Onboarding Wizard requires Proxmox Host Config:** Cannot create LXC containers without valid Proxmox API connection. This must be the first thing configured.
-- **Onboarding Wizard requires Credential Management:** Camera streams need authentication. Credentials must be stored before go2rtc config can be generated.
-- **Dashboard requires LXC Container Lifecycle:** Status display depends on ability to query container state from Proxmox API.
-- **UniFi Protect Adoption depends on working stream:** Protect will only adopt a camera if the RTSP stream is accessible. Stream must be validated first.
-- **VAAPI Auto-Config enhances go2rtc Config Generation:** VAAPI is optional -- software transcoding works as fallback. But VAAPI should be auto-detected during container creation.
+Bird's Eye second stream (differentiator) branches off the same LXC after primary adoption succeeds.
 
-## MVP Definition
+---
 
-### Launch With (v1)
+## MVP Recommendation (v1.2 Scope)
 
-Minimum viable product -- what is needed to validate the core value of "one-click camera onboarding."
+Ship these 9 table-stakes items. Nothing else.
 
-- [ ] **Proxmox host configuration** -- Foundation: without this, nothing works
-- [ ] **Network camera discovery** -- Core UX entry point, discovers Mobotix and Loxone devices
-- [ ] **Credential management** -- Secure storage for camera and Proxmox credentials
-- [ ] **LXC container creation and management** -- Create, start, stop, delete containers via Proxmox API
-- [ ] **go2rtc config generation** -- Mobotix (MJPEG->H.264) and Loxone (nginx+go2rtc) templates
-- [ ] **Camera status dashboard** -- At-a-glance view of all managed cameras and container health
-- [ ] **One-line install script** -- Required for distribution as open-source tool
+1. SSDP scanner extension (new) — **medium**
+2. Manual-IP fallback wired to Bambu profile (existing path, new device type) — **simple**
+3. Onboarding form: Access Code + Serial, both encrypted (existing store) — **simple**
+4. Pre-flight RTSPS handshake with three clear error states — **medium**
+5. go2rtc Bambu YAML template (`#video=copy#audio=copy` + `-rtsp_transport tcp`) — **simple**
+6. LXC provisioning reuses existing Mobotix template (no nginx) — **simple**
+7. UniFi Protect adoption monitoring reuses existing module — **zero new code**
+8. TCP :322 health probe (existing poller, new port number) — **simple**
+9. Documentation: "How to find Access Code on H2C", "Enable LAN Mode Liveview" with screenshots — **simple**
 
-### Add After Validation (v1.x)
+**Defer to v1.3:**
+- Bird's Eye Camera as a second stream
+- "Test Stream" preview button (worth its own milestone)
+- Older Bambu model support (P1S/A1/X1C)
+- Firmware version detection / Authorization Control warnings
 
-Features to add once the core onboarding pipeline works end-to-end.
+**Drop from PROJECT.md scope:**
+- Cloud-Auth Fallback. It's a 5-10× complexity multiplier (OAuth + TUTK P2P + token refresh) for a feature that contradicts the product positioning. If LAN Liveview can't be enabled, the printer probably can't be supported in v1.2.
 
-- [ ] **Stream validation/preview** -- Embed go2rtc WebRTC preview in onboarding flow
-- [ ] **UniFi Protect adoption trigger** -- Automate the final adoption step (currently can be done manually in Protect UI)
-- [ ] **VAAPI auto-detection and configuration** -- Auto-detect Intel GPU, configure passthrough
-- [ ] **Guided setup wizard** -- Multi-step onboarding with back/retry (v1 can be a simpler form)
-- [ ] **Container resource monitoring** -- CPU/memory per container, visible in dashboard
-
-### Future Consideration (v2+)
-
-Features to defer until the core product is proven.
-
-- [ ] **UniFi Protect health monitoring (SSH diagnostics)** -- Parse Protect logs for camera errors, requires SSH to UDM
-- [ ] **Disconnect pattern detection** -- Analyze camera reliability over time
-- [ ] **Additional camera type plugins** -- Extensible architecture for new camera types beyond Mobotix and Loxone
-- [ ] **Bulk operations** -- Restart all containers, update all go2rtc configs
-- [ ] **Backup/restore configuration** -- Export/import all camera configs and credentials
-
-## Feature Prioritization Matrix
-
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Proxmox host configuration | HIGH | LOW | P1 |
-| Network camera discovery | HIGH | MEDIUM | P1 |
-| Credential management | HIGH | LOW | P1 |
-| LXC container creation/mgmt | HIGH | MEDIUM | P1 |
-| go2rtc config generation | HIGH | MEDIUM | P1 |
-| Camera status dashboard | HIGH | MEDIUM | P1 |
-| One-line install script | HIGH | MEDIUM | P1 |
-| Stream validation/preview | MEDIUM | LOW | P2 |
-| UniFi Protect adoption | HIGH | HIGH | P2 |
-| VAAPI auto-detection | MEDIUM | MEDIUM | P2 |
-| Guided setup wizard | MEDIUM | MEDIUM | P2 |
-| Container resource monitoring | LOW | LOW | P2 |
-| Protect health monitoring | MEDIUM | HIGH | P3 |
-| Disconnect pattern detection | LOW | HIGH | P3 |
-| Camera type plugins | MEDIUM | MEDIUM | P3 |
-| Bulk operations | LOW | LOW | P3 |
-| Backup/restore | LOW | LOW | P3 |
-
-**Priority key:**
-- P1: Must have for launch -- without these, the tool cannot demonstrate its core value
-- P2: Should have, add when core pipeline works end-to-end
-- P3: Nice to have, future consideration after user validation
-
-## Competitor Feature Analysis
-
-| Feature | Frigate | Shinobi | MotionEye | Proxmox Helper Scripts | unifi-cam-proxy | ip-cam-master (ours) |
-|---------|---------|---------|-----------|------------------------|-----------------|---------------------|
-| Camera discovery | ONVIF via go2rtc | ONVIF built-in | Limited ONVIF | N/A | N/A | ONVIF + mDNS + port scan, type-aware |
-| Stream transcoding | go2rtc (embedded) | ffmpeg | motion (software) | N/A | ffmpeg (manual) | go2rtc per-container with VAAPI |
-| Container orchestration | Single Docker | Single Docker | Single install | LXC creation scripts | Single Docker | One LXC per camera, full lifecycle |
-| UniFi Protect integration | None (separate NVR) | None | None | None | Proxy adoption | End-to-end adoption pipeline |
-| Web dashboard | Recording/detection UI | Multi-camera grid | Simple grid | N/A (CLI) | N/A (CLI) | Orchestration-focused status UI |
-| Non-ONVIF camera support | Manual config | Manual config | Manual config | N/A | RTSP proxy | Camera-type-specific workflows |
-| Install experience | Docker compose | npm/Docker | pip/Docker | One-line bash | Docker compose | One-line bash + web UI |
-| Hardware acceleration | Coral TPU, VAAPI | GPU support | None | N/A | None | VAAPI auto-config |
-| Auth proxy for cameras | N/A | N/A | N/A | N/A | N/A | nginx auth-stripping for Loxone |
-
-**Key insight:** No existing tool covers the discovery-to-Protect-adoption pipeline. Frigate, Shinobi, and MotionEye are NVRs that compete with Protect. unifi-cam-proxy handles adoption but requires manual Docker setup. Proxmox Helper Scripts handle LXC creation but not camera-specific configuration. ip-cam-master uniquely combines orchestration (Proxmox LXC) with camera-specific knowledge (Mobotix MJPEG, Loxone auth) and Protect integration.
+---
 
 ## Sources
 
-- [Frigate NVR documentation](https://docs.frigate.video/) -- Feature set, go2rtc integration, camera configuration
-- [Shinobi CCTV features](https://shinobi.video/features) -- Multi-camera management, ONVIF support, multi-user
-- [MotionEye GitHub](https://github.com/motioneye-project/motioneye) -- Simple NVR features, limitations
-- [Proxmox VE Helper Scripts (community)](https://community-scripts.github.io/ProxmoxVE/) -- One-line install pattern, LXC management UX
-- [go2rtc GitHub](https://github.com/AlexxIT/go2rtc) -- Stream protocol support, codec negotiation, ffmpeg transcoding
-- [UniFi Protect third-party cameras](https://help.ui.com/hc/en-us/articles/26301104828439-Third-Party-Cameras-in-UniFi-Protect) -- ONVIF adoption, feature limitations
-- [unifi-cam-proxy](https://github.com/keshavdv/unifi-cam-proxy) -- Non-ONVIF adoption via proxy, Docker deployment
-- [Florian Rhomberg blog: third-party camera integration](https://www.florian-rhomberg.net/2025/01/how-to-integrate-a-third-party-camera-into-unifi-protect/) -- Protect 5.0+ adoption process
-- [LoxWiki: Loxone Intercom + UniFi Protect via go2rtc](https://loxwiki.atlassian.net/wiki/spaces/LOXEN/pages/2517499917/) -- nginx auth-proxy pipeline
-- [Mobotix RTSP streaming community](https://community.mobotix.com/t/rtsp-streaming-with-mobotix-cameras/4912) -- MJPEG limitations, classic vs MOVE series
-- [go2rtc issue #1825: Loxone Intercom + Protect](https://github.com/AlexxIT/go2rtc/issues/1825) -- Real-world integration challenges
-- [Proxmox VE API documentation](https://pve.proxmox.com/wiki/Proxmox_VE_API) -- LXC container CRUD, proxmoxer library
+- [Bambu Wiki — Streaming video of Bambu Printer](https://wiki.bambulab.com/en/software/bambu-studio/virtual-camera) — HIGH (official)
+- [Bambu Wiki — Live View Troubleshooting](https://wiki.bambulab.com/en/software/bambu-studio/faq/live-view) — HIGH (official, covers H2D/H2S/H2C LAN Mode Liveview toggle)
+- [Bambu Wiki — Printer Network Ports](https://wiki.bambulab.com/en/general/printer-network-ports) — HIGH (official, port 322 RTSPS confirmed)
+- [Bambu Forum — How to access camera on LAN (firmware 01.06+)](https://forum.bambulab.com/t/how-to-access-camera-on-lan-firmware-01-06/23500) — HIGH (canonical RTSPS URL format)
+- [Bambu Lab H2C Specs](https://bambulab.com/en/h2c/specs) — HIGH (quad-camera vision system, launched 2025-11-18)
+- [Bambu Blog — Authorization Control System](https://blog.bambulab.com/firmware-update-introducing-new-authorization-control-system-2/) — HIGH (confirms remote video access remains permitted)
+- [ha-bambulab Setup Docs (greghesp)](https://docs.page/greghesp/ha-bambulab/setup) — HIGH (proven HA integration, validates RTSPS approach)
+- [TomWis97/bs-lan-discovery](https://github.com/TomWis97/bs-lan-discovery) — MEDIUM (SSDP packet structure, USN/serial mapping)
+- [Frigate GH discussion #19832 — Bambu garbled feed](https://github.com/blakeblackshear/frigate/discussions/19832) — MEDIUM (real-world go2rtc gotchas: rtsp_transport tcp, audio strip)
+- [BambuBoard VIDEO_STREAMING_SETUP.md](https://github.com/t0nyz0/BambuBoard/blob/main/VIDEO_STREAMING_SETUP.md) — MEDIUM (community reference setup)
+- [Wolf's Armoury — X1C Camera in HA](https://www.wolfwithsword.com/bambulabs-x1c-camera-in-home-assistant/) — MEDIUM (LAN Mode Liveview gotcha + reboot requirement after enabling)
+- [BambuStudio Issue #2146 — RTSP feed URL](https://github.com/bambulab/BambuStudio/issues/2146) — MEDIUM (URL format community confirmation)
+- [SimplyPrint — Bambu webcam guide](https://help.simplyprint.io/en/article/bambu-lab-webcam-not-working-guide-pw6z3q/) — MEDIUM (common failure modes catalogued)
 
----
-*Feature research for: IP camera management and Proxmox orchestration for UniFi Protect integration*
-*Researched: 2026-03-22*
+**Confidence note:** H2C-specific RTSPS behaviour is extrapolated from documented X1C/H2D behaviour. The Bambu Wiki's Live View Troubleshooting page explicitly groups H2D/H2S together and uses the same LAN Mode Liveview toggle; community sources treat the protocol as identical across the current generation. **MEDIUM confidence on H2C specifically; HIGH on the protocol family.** First H2C tester onboarding will validate the secondary Bird's Eye stream URL and any quad-camera quirks.

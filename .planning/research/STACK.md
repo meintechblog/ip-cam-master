@@ -1,202 +1,200 @@
-# Technology Stack
+# Stack Research — v1.2 Bambu Lab H2C Integration
 
-**Project:** IP-Cam-Master
-**Researched:** 2026-03-22
-**Overall Confidence:** MEDIUM-HIGH
+**Domain:** Bambu Lab 3D-printer camera integration into existing IP-Cam-Master (SvelteKit + Proxmox LXC + go2rtc + UniFi Protect)
+**Researched:** 2026-04-13
+**Confidence:** MEDIUM-HIGH (RTSPS-via-go2rtc proven by community; bambu-node npm lib stale → cautious adoption)
 
-## Recommended Stack
+## Scope
 
-### Core Framework
+This is a **delta on the existing v1.0/v1.1 stack** — only additions for the Bambu H2C camera type are listed. Everything else (SvelteKit, Drizzle, proxmox-api, node-ssh, unifi-protect, AES-256-GCM credential store) is unchanged and re-used.
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| SvelteKit | 2.55+ (Svelte 5) | Full-stack web framework | Ships 50-70% less JS than React. Perfect for small-team dashboard tools. SSR + SPA hybrid. Single codebase for frontend and API routes. No separate backend server needed -- SvelteKit's server routes handle API logic directly. | HIGH |
-| Node.js | 22 LTS | Runtime | LTS with best library ecosystem for Proxmox/UniFi/SSH tooling. Svelte 5 runes provide clean reactivity for real-time camera status. | HIGH |
-| TypeScript | 5.x | Language | Type safety for complex infrastructure API interactions (Proxmox, UniFi, go2rtc). SvelteKit has first-class TS support. | HIGH |
+## Recommended Additions
 
-**Why SvelteKit over alternatives:**
-- **vs Next.js:** Next.js is overkill for a self-hosted infrastructure tool. React ecosystem overhead, Vercel-centric defaults, larger bundles. SvelteKit is purpose-built for this scale.
-- **vs plain Express + separate frontend:** SvelteKit gives you API routes (`+server.ts`) alongside pages. One deployment artifact, one process. Perfect for a self-hosted VM.
-- **vs Go/Python backend:** The Proxmox API has a TypeScript client (`proxmox-api`), UniFi Protect has a mature Node.js library (`unifi-protect`), SSH has `ssh2`/`node-ssh`. The Node.js ecosystem has the best coverage for all three integration points. Go and Python lack coverage in at least one area.
+### Stream Transcoding (go2rtc — already installed, new config pattern)
 
-### Database
+| Item | Version | Purpose | Why |
+|------|---------|---------|-----|
+| go2rtc `rtspx://` URL scheme | go2rtc ≥ 1.8 (already deployed) | Consume Bambu RTSPS stream on port 322 with self-signed cert | go2rtc's `rtsps://` scheme verifies the TLS cert against the URL host; Bambu's printer cert has no SAN matching the IP/hostname → handshake fails. The `rtspx://` scheme is the documented community workaround that performs an RTSPS connection but **skips certificate verification** (analogue to UniFi NVR pattern). Confirmed in HA `ha-bambulab` issue #1798 and Frigate/go2rtc community guides. |
+| ffmpeg+VAAPI in existing LXC template | (already installed) | Transcode Bambu H.264 stream to constrained baseline for UniFi Protect adoption | Bambu's stream is already H.264 (unlike Mobotix MJPEG). May only need re-mux, not full re-encode — saves CPU. Keep VAAPI path as fallback if Protect rejects the bitstream profile. |
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| SQLite via better-sqlite3 | 12.8+ | Persistent storage | Zero-dependency embedded database. No separate DB server to install/maintain -- critical for one-line installer. Synchronous API is simpler for config management. Stores camera configs, container mappings, credentials (encrypted). | HIGH |
-| Drizzle ORM | 0.45+ | Schema management & queries | Type-safe SQL. Lightweight (no heavy abstraction). Native SQLite support with better-sqlite3 driver. Schema-as-code with migrations via drizzle-kit. | MEDIUM |
+**Reference go2rtc.yaml stanza (template the app will generate):**
 
-**Why SQLite over PostgreSQL/MySQL:**
-- Self-hosted tool on a single VM. No concurrent write pressure. Database is config + status, not high-volume data.
-- One-line installer cannot assume PostgreSQL is available. SQLite is a file -- back it up with `cp`.
-- `better-sqlite3` over Node.js native `node:sqlite`: Native module is still experimental (no extensions, limited API). `better-sqlite3` is battle-tested with 4800+ dependents.
+```yaml
+streams:
+  bambu_h2c:
+    # rtspx = RTSPS without TLS verification (self-signed cert workaround)
+    - rtspx://bblp:{{ACCESS_CODE}}@{{PRINTER_IP}}:322/streaming/live/1
+    # Try copy first; fall back to VAAPI re-encode if Protect rejects profile
+    - "ffmpeg:bambu_h2c#video=copy#audio=copy"
+```
 
-**Why Drizzle over Prisma:**
-- Drizzle is SQL-first and lightweight. Prisma requires a binary engine, complicates installation, and is heavier than needed for an embedded SQLite use case.
+If UniFi Protect rejects the copied stream, fall back to the same VAAPI ffmpeg pattern already used for Mobotix:
 
-### Infrastructure Integration
+```yaml
+    - "ffmpeg:bambu_h2c#video=h264#hardware=vaapi#raw=-r 15#raw=-g 30"
+```
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| proxmox-api | 1.1.1 | Proxmox VE API client | TypeScript-native, maps 100% of Proxmox API surface. Creates/starts/stops LXC containers, manages storage. Typed API viewer auto-generated from Proxmox schema. | MEDIUM |
-| node-ssh | 2.0+ | SSH command execution | Promise-based wrapper over ssh2. Used for: executing commands inside LXC containers, deploying go2rtc configs, managing services via systemctl. Simpler API than raw ssh2. | HIGH |
-| ssh2 | 1.16+ | SSH transport (dependency of node-ssh) | Pure JS SSH2 implementation. Battle-tested. node-ssh provides the ergonomic layer on top. | HIGH |
+**Critical detail:** Use the printer's **IP address**, not hostname/mDNS name. Even with `rtspx://`, hostname-vs-cert mismatches have caused connector confusion in some go2rtc builds (HA issue #1798).
 
-**Note on proxmox-api:** Last published 2 years ago (v1.1.1), but the Proxmox REST API is stable and versioned. The library auto-generates types from the API schema, so it covers current Proxmox VE 8.x endpoints. If it proves stale, fallback is direct HTTP calls to Proxmox REST API (it's just REST + CSRF tokens). Confidence is MEDIUM because of the publish gap -- validate early.
+---
 
-**Alternative considered:** Writing a thin Proxmox REST client directly using `fetch`. Viable fallback if `proxmox-api` has issues, since the Proxmox API is well-documented REST with JSON responses.
+### Bambu LAN-Mode MQTT Client
 
-### Camera & Streaming
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| **`mqtt`** (npm) | 5.10+ | Generic MQTT 3.1.1 client over TLS to printer port 8883 | **Recommended over `bambu-node`.** Bambu's LAN protocol is plain MQTT-over-TLS with username `bblp` + password = Access Code; topics `device/<serial>/request` (publish) and `device/<serial>/report` (subscribe). The `mqtt` package is the de-facto Node.js MQTT client (8M+ weekly downloads), actively maintained, supports `rejectUnauthorized: false` for the printer's self-signed cert. We need only ~5 message types (push_status, info, optional control) — wrapping these directly is ~150 LOC and avoids a dead-weight dependency. |
+| ~~`bambu-node`~~ | last publish ≈ April 2025 (~12 months stale) | Typed Bambu LAN/cloud MQTT wrapper | **Do NOT adopt as direct dependency.** Last published ~1 year ago; only a handful of dependents; no 1.0 release. **Use as a reference implementation** (TypeScript types for the JSON message schema are gold) but vendor the relevant types into `src/lib/bambu/types.ts` rather than depending on an unmaintained package — the same discipline applied to Mobotix/Loxone in v1.0. |
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| go2rtc | latest (managed binary) | Stream transcoding | Runs inside each LXC container. MJPEG-to-H.264 transcoding via ffmpeg. VAAPI hardware acceleration. Exposes RTSP on :8554 for UniFi Protect adoption. App generates YAML config files, does not embed go2rtc. | HIGH |
-| unifi-protect | 4.27+ | UniFi Protect API client | Only complete Node.js implementation of the UniFi Protect API. Provides camera status, adoption monitoring, real-time event updates via WebSocket. Actively maintained (published 19 days ago). | HIGH |
+**Why not the alternatives:**
+- `@hiv3d/bambu-node` — fork, even less traction, not visibly maintained.
+- `Evan-2007/bambu-link` — early-stage, no npm publish, GitHub-only.
+- `cryptiklemur/node-bambu` — abandoned.
+- Python `pybambu` (greghesp/ha-bambulab core) — best-maintained reference but wrong runtime; use **only** as protocol documentation source.
 
-**go2rtc integration approach:**
-- The app does NOT run go2rtc itself. It generates `go2rtc.yaml` config files and deploys them to LXC containers via SSH.
-- go2rtc has an HTTP API at `:1984` for health checks and stream status (GET `/api/streams`).
-- Streams can be added dynamically via PUT `/api/streams?src=...&name=...` but the YAML config approach is more reliable for persistence across container restarts.
-- VAAPI config template: `-init_hw_device vaapi=intel:/dev/dri/renderD128 -filter_hw_device intel -c:v h264_vaapi`
+**Integration point:** New module `src/modules/bambu/lan-client.ts` — sits next to existing camera-type adapters. Connection life-cycle (connect, subscribe, JSON parse, status emit) hooks into the same camera status SSE bus already used by Mobotix/Loxone in v1.1.
 
-**UniFi Protect adoption path:**
-- UniFi Protect 5.0+ natively supports ONVIF third-party cameras (no proxy needed for ONVIF-capable cameras).
-- For non-ONVIF cameras (Mobotix without ONVIF, Loxone Intercom): go2rtc transcodes to RTSP, and adoption happens via the standard Protect RTSP adoption flow or `unifi-cam-proxy` if needed.
-- The `unifi-protect` npm library monitors adoption status and camera health, not the adoption itself.
+---
 
-### Network Discovery
+### Cloud-Mode Fallback (deferred, design hook only)
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| node-onvif | (or onvif npm) | ONVIF camera discovery | WS-Discovery probe for ONVIF devices on local subnet. Identifies cameras that already support ONVIF (display-only in the app). ~3 second scan. | MEDIUM |
-| Custom ARP/ping scanner | N/A | Non-ONVIF device discovery | For Mobotix/Loxone that don't announce via ONVIF. Scan 192.168.3.x subnet, probe known ports (554 for RTSP, 80/443 for HTTP). Identify by MAC OUI (Mobotix: 00:03:C5, Loxone: 50:4F:94). | MEDIUM |
-| nmap (system binary) | 7.x | Deep network scan fallback | Optional: call nmap via child_process for comprehensive port scanning. Requires nmap installed on the VM. Used as fallback when ARP scan isn't sufficient. | LOW |
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| **`mqtt`** (same lib, different broker URL) | 5.10+ | Connect to `mqtts://us.mqtt.bambulab.com:8883` with JWT-as-password | Same MQTT client; cloud differs only in (a) broker hostname, (b) auth = JWT obtained via Bambu account REST login + 2FA email code. Library coverage in JS/TS for the **auth flow** is essentially zero — `pybambu` is the only complete reference. |
+| built-in `fetch` | Node 22 LTS | Bambu Connect REST endpoints (`/api/sign-in/form`, `/api/sign-in/tfa`) | No extra dep needed. |
 
-**Discovery strategy:**
-1. ONVIF WS-Discovery for ONVIF-capable cameras (fast, standard protocol)
-2. ARP table scan + known port probing for non-ONVIF cameras
-3. MAC OUI matching to identify camera manufacturer
-4. HTTP probing on known endpoints (e.g., Mobotix `/control/userimage.html`, Loxone `/mjpg/video.mjpg`)
+**Recommendation:** Ship v1.2 with **LAN mode only.** Cloud mode is a much larger surface (account auth, JWT refresh, region routing, captcha risk) for a minority use-case (the user explicitly has LAN access). Mark cloud mode in PROJECT.md as v1.3+ candidate. The design hook should be a `BambuTransport` interface so cloud can plug in later without refactoring the LAN client.
 
-### Frontend UI
+---
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Tailwind CSS | 4.x | Utility-first styling | Fast prototyping, consistent design. No component library lock-in. Works perfectly with SvelteKit. | HIGH |
-| Lucide Svelte | latest | Icons | Lightweight, tree-shakeable icon set. Camera, network, server icons available. | HIGH |
-| bits-ui | latest | Headless UI primitives | Accessible, unstyled components (modals, dropdowns, tabs). Style with Tailwind. Svelte-native. | MEDIUM |
+### Discovery (extension to existing scanner)
 
-**Why NOT a full component library (Skeleton UI, shadcn-svelte):**
-- This is an infrastructure tool, not a SaaS product. Clean, functional UI > polished design system.
-- Tailwind + bits-ui gives maximum control with minimum dependencies.
-- shadcn-svelte is acceptable if more pre-built components are needed later -- it's Tailwind-based and tree-shakeable.
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| **Custom UDP listener** (`node:dgram`) | built-in | Listen for Bambu's non-standard SSDP-ish announcements on **UDP ports 1990 / 2021** (NOT standard 1900) | Bambu printers broadcast NOTIFY messages with service type `urn:bambulab-com:device:3dprinter:1` on non-standard ports. `node-ssdp` will not work out of the box because of port mismatch — recommend a **~40 LOC custom UDP listener** in the existing scanner module (`src/modules/discovery/`), reusing the dgram pattern already in place for ARP-based discovery. References: `psychoticbeef/BambuLabOrcaSlicerDiscovery` and `Alex-Schaefer` gist (Python implementations to mirror). |
+| ~~`bonjour-service` / `multicast-dns`~~ | — | mDNS lookup of `_bambulab._tcp` | **Skip.** Investigation shows Bambu does NOT publish a stable `_bambulab._tcp` mDNS service. Bambu Studio's "auto-discovery" is the SSDP mechanism above; references to mDNS in PROJECT.md are misattributions. Adding mDNS would yield false confidence. |
+| Existing port-scanner | (already in repo) | Probe TCP **322 (RTSPS)** and **8883 (MQTTS)** alongside existing 554/80/443 probes | One-line addition. MAC OUI for Bambu Lab varies by SKU; safest path is **port + SSDP signature**, not OUI. |
 
-### Security
+**Integration point:** Add a `bambu-ssdp.ts` to the existing `src/modules/discovery/` directory. Emits to the same `DiscoveredDevice` event the Mobotix/Loxone scanners use. UI badge: "Bambu Lab H2C — LAN Mode required".
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Node.js crypto (built-in) | N/A | Credential encryption | AES-256-GCM for encrypting camera passwords and SSH keys at rest in SQLite. No external dependency needed. | HIGH |
-| dotenv | 16.x | Environment config | Load secrets from `.env` file (DB encryption key, Proxmox API tokens). Standard pattern for self-hosted tools. | HIGH |
+---
 
-### Process Management & Deployment
+### Credential Storage (no new lib)
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| systemd | (OS-level) | Process management | The app runs as a systemd service on the VM. Auto-restart, logging via journalctl. Standard for Linux server processes. No PM2 needed. | HIGH |
-| Bash installer script | N/A | One-line install | `curl -fsSL https://raw.githubusercontent.com/meintechblog/ip-cam-master/main/install.sh \| bash` -- installs Node.js (via NodeSource), clones repo, runs npm install, creates systemd service, opens firewall port. | HIGH |
+The existing AES-256-GCM credential store handles arbitrary string blobs. New row schema additions (in Drizzle):
 
-**Why systemd over PM2/Docker:**
-- Target is a Proxmox VM (Debian/Ubuntu). systemd is already there.
-- PM2 adds a dependency for no benefit on a single-process app.
-- Docker adds complexity to a one-line installer on a VM that's already running inside Proxmox. The app manages LXC containers -- adding Docker as another layer of containerization is unnecessary.
+| Field | Type | Notes |
+|-------|------|-------|
+| `bambuAccessCode` | encrypted text | 8-digit code from printer LCD → Settings → WLAN → Access Code |
+| `bambuSerial` | text (not secret) | Printed on device + visible via SSDP NOTIFY payload |
+| `bambuTransport` | enum `'lan'` | `'cloud'` reserved for v1.3 |
+
+No new dependency.
+
+---
+
+## Installation Delta
+
+```bash
+# Only one new runtime dep:
+npm install mqtt@^5.10.0
+
+# That's it. Everything else is either:
+#   - already installed (better-sqlite3, ssh2, proxmox-api, unifi-protect, go2rtc binary in LXC)
+#   - a code-only addition (Bambu types vendored from bambu-node, custom SSDP listener)
+```
+
+---
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Framework | SvelteKit | Next.js | Overkill for self-hosted tool, heavier bundles, Vercel-oriented defaults |
-| Framework | SvelteKit | Express + React SPA | Two deployment artifacts, more boilerplate, no SSR benefits |
-| Framework | SvelteKit | Go + htmx | Better raw performance, but poor library coverage for UniFi Protect and Proxmox APIs |
-| Database | SQLite (better-sqlite3) | PostgreSQL | Requires separate server, complicates one-line install, overkill for config storage |
-| Database | better-sqlite3 | node:sqlite (native) | Still experimental, no extensions, limited API surface |
-| ORM | Drizzle | Prisma | Binary engine requirement, heavier, worse SQLite support for embedded use |
-| Proxmox Client | proxmox-api (npm) | proxmoxer (Python) | Would require Python runtime alongside Node.js, or a separate service |
-| Proxmox Client | proxmox-api (npm) | Direct REST calls | Viable fallback, but loses type safety. Keep as Plan B. |
-| UniFi Client | unifi-protect (npm) | uiprotect (Python) | Same language mismatch problem as proxmoxer |
-| Deployment | systemd | Docker Compose | Adds container-in-container complexity, harder one-line install |
-| Deployment | systemd | PM2 | Extra dependency for no benefit on single-process app |
-| CSS | Tailwind | Bootstrap | Heavier, opinionated design language doesn't fit infrastructure tools |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `mqtt` + vendored types | `bambu-node` npm | Only if upstream resumes maintenance & cuts a 1.0 release |
+| `mqtt` + vendored types | `pybambu` via Python sidecar | Never — would force a Python runtime into a Node-only deployment |
+| `rtspx://` in go2rtc | Resolve hostname → IP, then `rtsps://` | If a future go2rtc release deprecates `rtspx://` (no signal of this) |
+| Re-mux first (`#video=copy`) | Always full VAAPI re-encode | If Protect adoption errors out on the original H.264 profile |
+| Custom SSDP listener on UDP 1990/2021 | `node-ssdp` library | Library targets standard port 1900; not worth a fork |
+| LAN-only v1.2 | LAN+Cloud at launch | Defer — cloud auth is a significant separate milestone |
 
-## Full Dependency List
+## What NOT to Use
 
-```bash
-# Core
-npm install @sveltejs/kit svelte vite
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `bambu-node` as a direct dependency | ~12 months stale, no 1.0, tiny dependent count | Vendor the type definitions, use plain `mqtt` |
+| Python `pybambu` bridge | Adds Python runtime to a Node-only one-line installer | Re-implement the ~5 message handlers in TS from `pybambu` reference |
+| `rtsps://` with strict TLS | Bambu cert has no matching SAN → handshake fails | `rtspx://` (verification disabled) |
+| mDNS / `_bambulab._tcp` service browsing | Service does not exist on Bambu printers | SSDP listener on UDP 1990/2021 |
+| `node-ssdp` library default config | Hard-coded to standard port 1900 | Hand-rolled `node:dgram` listener on Bambu's non-standard ports |
+| `unifi-cam-proxy` for Bambu | Designed for non-RTSP cameras; Bambu already speaks RTSP(S) | Standard go2rtc → RTSP :8554 → Protect adoption flow |
+| Embedding go2rtc in app process | Existing pattern is "app generates yaml, deploys via SSH to LXC" | Keep that pattern; only the YAML template changes |
+| A second MQTT client (e.g. `async-mqtt`, `mqtt-packet` directly) | `mqtt` already provides promises via `.connectAsync()` and a clean event API | Single `mqtt@5.x` for both LAN now and cloud later |
 
-# Backend / API
-npm install proxmox-api node-ssh unifi-protect better-sqlite3 drizzle-orm dotenv
+## Integration Map (where each piece slots into the existing architecture)
 
-# Frontend
-npm install tailwindcss @tailwindcss/vite lucide-svelte bits-ui
-
-# Network discovery
-npm install onvif
-
-# Dev dependencies
-npm install -D typescript @sveltejs/adapter-node drizzle-kit @types/better-sqlite3 @types/ssh2
+```
+src/
+├── modules/
+│   ├── discovery/
+│   │   ├── (existing arp + onvif scanners)
+│   │   └── bambu-ssdp.ts            ← NEW: UDP 1990/2021 listener
+│   ├── cameras/
+│   │   └── adapters/
+│   │       ├── mobotix.ts           (existing)
+│   │       ├── loxone.ts            (existing)
+│   │       └── bambu.ts             ← NEW: glue (credentials → go2rtc YAML)
+│   └── bambu/                       ← NEW module
+│       ├── lan-client.ts            (mqtt over TLS, port 8883)
+│       ├── types.ts                 (vendored from bambu-node)
+│       └── go2rtc-template.ts       (rtspx URL + ffmpeg stanza generator)
+├── lib/
+│   └── crypto/                      (existing — reused for access code)
+└── routes/
+    └── (onboarding/+page.svelte)    (extend to ask for serial + access code)
 ```
 
-### SvelteKit Adapter
+## Version Compatibility
 
-Use `@sveltejs/adapter-node` to produce a standalone Node.js server. This outputs a `build/` directory that runs with `node build/index.js` -- perfect for systemd deployment. Do NOT use adapter-auto or adapter-static.
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `mqtt@5.10` | Node.js 22 LTS (already in stack) | Pure JS, no native bindings → safe for the one-line installer |
+| `mqtt@5.10` | TLS `rejectUnauthorized: false` | Required for printer's self-signed cert on port 8883 |
+| go2rtc current build | `rtspx://` scheme | Documented community workaround; verify on the deployed go2rtc binary version during Phase 1 |
 
-## Architecture Implications
+## Confidence by Area
 
-The stack produces a **single Node.js process** that:
-1. Serves the SvelteKit frontend (SSR + client hydration)
-2. Handles API routes for Proxmox/UniFi/camera operations
-3. Reads/writes SQLite for configuration persistence
-4. Connects to Proxmox API over HTTPS
-5. SSHes into LXC containers for go2rtc management
-6. Polls UniFi Protect for camera status
-7. Runs network discovery scans on demand
+| Area | Confidence | Reason |
+|------|------------|--------|
+| RTSPS via go2rtc `rtspx://` | HIGH | Multiple community sources (HA issue #1798, go2rtc tutorials, Bambu wiki) confirm the pattern works for Bambu cameras |
+| LAN MQTT auth (`bblp` + access code) | HIGH | Documented in Bambu wiki, ha-bambulab, multiple community projects |
+| `mqtt` over `bambu-node` | HIGH | Empirical: bambu-node not updated in ~12 months; protocol surface is small enough to vendor |
+| SSDP discovery on ports 1990/2021 | MEDIUM | Confirmed by 3+ community projects, but Bambu has changed firmware behavior in past — verify on real H2C device during Phase 1 |
+| `_bambulab._tcp` does NOT exist | MEDIUM | Negative claim — derived from absence in community implementations rather than official Bambu confirmation |
+| Cloud-mode deferral | HIGH | User has LAN access; cloud is a clearly-larger separate workstream |
 
-This single-process model is ideal for a self-hosted VM tool: one systemd unit, one port (default 3000), one log stream, simple backup (copy the SQLite file).
+## Open Questions for Phase Research
 
-## Version Pinning Strategy
-
-Pin major versions in `package.json` with `^` (caret) to allow patch updates:
-```json
-{
-  "svelte": "^5.0.0",
-  "@sveltejs/kit": "^2.0.0",
-  "better-sqlite3": "^12.0.0",
-  "drizzle-orm": "^0.45.0",
-  "proxmox-api": "^1.1.0",
-  "unifi-protect": "^4.27.0",
-  "node-ssh": "^2.0.0"
-}
-```
+- **H2C-specific quirks:** The H2C is a newer SKU than the X1C/P1S that most community work targets. Verify on a real device that (a) RTSPS stream path is `/streaming/live/1` (not `/streaming/live/2` or H2-specific), (b) MQTT topics use the same `device/<serial>/...` pattern, (c) SSDP service type matches `urn:bambulab-com:device:3dprinter:1`.
+- **Stream codec/profile compatibility with UniFi Protect:** Does Protect accept the Bambu H.264 stream as-is via re-mux, or is full VAAPI re-encode required? Resolve in onboarding test phase.
+- **Access Code rotation:** Does the printer rotate the access code on firmware update / factory reset? UI must support re-entering it without recreating the LXC.
 
 ## Sources
 
-- [proxmox-api npm](https://www.npmjs.com/package/proxmox-api) -- TypeScript Proxmox API client, v1.1.1
-- [proxmox-api GitHub](https://github.com/UrielCh/proxmox-api) -- Source, TypeScript, auto-generated types
-- [unifi-protect npm](https://www.npmjs.com/package/unifi-protect) -- v4.27.7, hjdhjd
-- [unifi-protect GitHub](https://github.com/hjdhjd/unifi-protect) -- Complete UniFi Protect API implementation
-- [go2rtc GitHub](https://github.com/AlexxIT/go2rtc) -- Ultimate camera streaming application
-- [go2rtc API docs](https://github.com/AlexxIT/go2rtc/blob/master/api/README.md) -- HTTP API reference
-- [go2rtc dynamic streams issue](https://github.com/AlexxIT/go2rtc/issues/1592) -- Dynamic add/remove via API
-- [unifi-cam-proxy](https://github.com/keshavdv/unifi-cam-proxy) -- Third-party camera adoption into Protect
-- [UniFi Protect Third-Party Cameras](https://help.ui.com/hc/en-us/articles/26301104828439-Third-Party-Cameras-in-UniFi-Protect) -- Native ONVIF support in Protect 5.0
-- [Florian Rhomberg guide](https://www.florian-rhomberg.net/2025/01/how-to-integrate-a-third-party-camera-into-unifi-protect/) -- Third-party camera integration walkthrough
-- [better-sqlite3 npm](https://www.npmjs.com/package/better-sqlite3) -- v12.8.0, fastest SQLite for Node.js
-- [Drizzle ORM](https://orm.drizzle.team/) -- Type-safe ORM, v0.45.1
-- [SvelteKit npm](https://www.npmjs.com/package/@sveltejs/kit) -- v2.55.0
-- [Svelte 5 announcement](https://svelte.dev/blog) -- Runes-based reactivity
-- [node-ssh npm](https://www.npmjs.com/package/node-ssh) -- Promise-based SSH
-- [ssh2 GitHub](https://github.com/mscdex/ssh2) -- Pure JS SSH2 implementation
-- [onvif npm](https://www.npmjs.com/package/onvif) -- ONVIF WS-Discovery for Node.js
-- [Node.js native SQLite status](https://nodejs.org/api/sqlite.html) -- Still experimental in Node 22
-- [Proxmox VE API docs](https://pve.proxmox.com/wiki/Proxmox_VE_API) -- REST API reference
-- [Proxmox LXC creation via API](https://forum.proxmox.com/threads/create-lxc-container-via-curl-api-bad-request-400.27321/) -- POST /nodes/{node}/lxc
+- [bambu-node on npm](https://www.npmjs.com/package/bambu-node) — last publish ~12 months ago, low dependent count → not recommended as direct dep
+- [bambu-node GitHub (THE-SIMPLE-MARK)](https://github.com/THE-SIMPLE-MARK/bambu-node) — typed message schema reference (vendor types only)
+- [synman/bambu-go2rtc](https://github.com/synman/bambu-go2rtc) — community go2rtc + bambu pattern (Python wrapper, but useful template structure)
+- [HA ha-bambulab issue #1798](https://github.com/greghesp/ha-bambulab/issues/1798) — confirms self-signed TLS issue and the IP-vs-hostname workaround
+- [Frigate discussion #19832](https://github.com/blakeblackshear/frigate/discussions/19832) — Bambu via go2rtc, garbled-stream debugging context
+- [WolfWithSword: Bambulabs X1C Camera in HA](https://www.wolfwithsword.com/bambulabs-x1c-camera-in-home-assistant/) — community RTSPS URL format reference
+- [Bambu Lab Wiki: Printer Network Ports](https://wiki.bambulab.com/en/general/printer-network-ports) — official port list (322, 8883, 990 FTPS, 1990/2021 SSDP)
+- [Bambu Lab Wiki: Streaming Video](https://wiki.bambulab.com/en/software/bambu-studio/virtual-camera) — official RTSPS URL format
+- [Bambu Lab Wiki: Third-party Integration](https://wiki.bambulab.com/en/software/third-party-integration) — official sanction of LAN MQTT
+- [greghesp/ha-bambulab](https://github.com/greghesp/ha-bambulab) — protocol reference (Python, but authoritative on message schema)
+- [psychoticbeef/BambuLabOrcaSlicerDiscovery](https://github.com/psychoticbeef/BambuLabOrcaSlicerDiscovery) — SSDP discovery reference (confirms ports 1990/2021 + service URN)
+- [Alex-Schaefer SSDP gist](https://gist.github.com/Alex-Schaefer/72a9e2491a42da2ef99fb87601955cc3) — fake-SSDP packet structure
+- [TomWis97/bs-lan-discovery](https://github.com/TomWis97/bs-lan-discovery) — VLAN-bridging discovery, confirms non-standard SSDP behavior
+- [nuxx.net Bambu P1S on IoT VLAN](https://nuxx.net/blog/2024/12/19/bambu-lab-p1s-on-iot-vlan/) — confirms ports + SSDP service-type string
+- [mqtt npm](https://www.npmjs.com/package/mqtt) — recommended generic MQTT client, v5.x
+
+---
+*Stack research delta for: v1.2 Bambu Lab H2C integration*
+*Researched: 2026-04-13*
