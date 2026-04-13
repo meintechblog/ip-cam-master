@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "Bambu Lab H2C Kamera-Integration"
-status: defining_requirements
-stopped_at: "milestone v1.2 started — research phase"
+status: roadmap_complete
+stopped_at: "Roadmap drafted for v1.2 (Phases 10–15), ready for /gsd:plan-phase 10"
 last_updated: "2026-04-13T00:00:00.000Z"
 last_activity: 2026-04-13
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,42 +17,47 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-10)
+See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** No active milestone. v1.0 and v1.1 shipped. Run `/gsd:new-milestone` to start v1.2 or v2.0.
+**Current focus:** v1.2 — Bambu Lab H2C Kamera-Integration. Integrate the H2C as a third `camera_type` alongside Mobotix and Loxone with SSDP discovery, LAN-mode Access Code + Serial credentials, go2rtc RTSPS passthrough, and UniFi Protect adoption. Includes user-proposed Adaptive Stream Mode (live during print, snapshot during idle) to protect the printer's fragile Live555 server.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 10 — H2C Hardware Validation Spike (not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-13 — Milestone v1.2 Bambu Lab H2C Kamera-Integration started
+Status: Roadmap complete, awaiting `/gsd:plan-phase 10`
+Last activity: 2026-04-13 — Roadmap drafted for v1.2 (Phases 10–15, 26 requirements, 100% coverage)
+
+Phase numbering: continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10.
 
 Shipped milestones:
 - v1.0 — One-click camera onboarding (2026-03-23)
 - v1.1 — Self-Maintenance & Polish (2026-04-10)
 
+```
+[          ] 0% — v1.2 just started (0/6 phases)
+```
+
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0 (v1.1) / 11 (v1.0 archived)
-- Average duration: -
-- Total execution time: 0 hours (v1.1)
+- Total plans completed (v1.2): 0
+- Phases planned (v1.2): 6 (Phases 10–15)
+- Requirements mapped: 26 / 26 (100%)
+- New npm deps expected: 1 (`mqtt@^5.10`)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: -
-- Trend: -
-
-*Updated after each plan completion*
+| 10 | 0 | - | - |
+| 11 | 0 | - | - |
+| 12 | 0 | - | - |
+| 13 | 0 | - | - |
+| 14 | 0 | - | - |
+| 15 | 0 | - | - |
 
 **Historical (v1.0):**
 | Phase 01 P01 | 6min | 3 tasks | 24 files |
@@ -73,6 +78,16 @@ Shipped milestones:
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
+
+- v1.2 Roadmap: 6 phases (10–15) derived from 26 BAMBU-* requirements, standard granularity
+- v1.2 Roadmap: Phase 10 is an **investigation spike** against real H2C (not a build phase) — deliverable is `.planning/research/H2C-FIELD-NOTES.md`; Phases 11+ gate on its findings
+- v1.2 Roadmap: Cloud-Auth **dropped from v1.2 scope** — LAN-only; `transport` schema stub added in Phase 11 to keep the v1.3+ door open
+- v1.2 Roadmap: **go2rtc is the sole RTSPS consumer** of the printer — architectural guarantee encoded in Phase 12, documented in Phase 15 (Pitfall 1 mitigation)
+- v1.2 Roadmap: Adaptive Stream Mode (user-proposed differentiator) scheduled in Phase 14 — structural mitigation for Live555 24/7-exposure risk
+- v1.2 Roadmap: Existing LXC template reused for Bambu (no new template); VAAPI passthrough unchanged; new npm dep is `mqtt@^5.10` only
+- v1.2 Roadmap: Phase numbering continues from v1.1 (starts at 10, not reset)
+
+*Historical v1.1 decisions preserved:*
 
 - v1.1 Roadmap: 4 phases derived from 17 Active requirements, standard granularity
 - v1.1 Roadmap: Observability first (low-risk, builds primitives for update runner), then backup (safety prerequisite), then read-only update check, then execution runner last
@@ -109,13 +124,22 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Run Phase 10 spike against the user's real H2C before planning Phase 11
+- Resolve schema Option A (zero-migration, reuse `password`) vs Option B (new `accessCode` / `serialNumber` columns) in the Phase 11 plan
+- Validate `#video=copy` vs VAAPI re-encode against live UniFi Protect adoption during Phase 12
+- Confirm MQTT print-state field names from Phase 10 findings before implementing Adaptive Stream Mode in Phase 14
 
 ### Blockers/Concerns
 
-- Research flag (Phase 09): `systemd-run --transient` behavior when the parent service is the target of `systemctl restart` needs validation on the deployed VM (Debian 13). Fallback: `nohup bash -c ... &` with PID tracking.
-- Research flag (Phase 09): Schema-hash comparison is a stopgap — noted in REQUIREMENTS.md Future section as "real Drizzle migration system" follow-up. Acceptable for v1.1.
-- Research flag (Phase 08): GitHub API unauthenticated rate limit is 60 req/hour per IP — with 24h auto-check + manual checks this is fine for single-user homelab, but document the limit.
+- Research flag (Phase 10): H2C-specific RTSPS path, SSDP service URN, and MQTT topic schema cannot be resolved by desk research — requires physical hardware access (user has it)
+- Research flag (Phase 12): `#video=copy` passthrough vs forced VAAPI re-encode must be validated against live UniFi Protect adoption (not theoretical)
+- Research flag (Phase 14): MQTT print-state field names must be confirmed from Phase 10 findings or ha-bambulab `pybambu` source before mode-switch logic is implemented
+
+*Prior concerns from v1.1 (resolved/archived):*
+
+- Research flag (Phase 09): `systemd-run --transient` behavior validated on deployed VM (Debian 13) during v1.1 shipping
+- Research flag (Phase 09): Schema-hash comparison stopgap documented as future "real Drizzle migration system" follow-up
+- Research flag (Phase 08): GitHub API unauthenticated rate limit (60 req/h) documented, acceptable for single-user homelab
 
 ### Quick Tasks Completed
 
@@ -126,6 +150,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-10
-Stopped at: Roadmap complete, ready to run `/gsd:plan-phase 06`
+Last activity: 2026-04-13
+Stopped at: Roadmap complete for v1.2 (Phases 10–15), ready to run `/gsd:plan-phase 10`
 Resume file: None
