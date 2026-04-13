@@ -15,7 +15,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 
 ## Phases
 
-- [ ] **Phase 10: H2C Hardware Validation Spike** — Investigation spike against real H2C; deliverable is a findings note that gates all later phases
+- [ ] **Phase 10: H2C Hardware Validation Spike** — Investigation spike against real H2C; deliverable is a findings note that gates all later phases (4 plans)
 - [ ] **Phase 11: Foundation — Discovery, Credentials, Pre-flight** — SSDP discovery, encrypted Access Code + Serial storage, three-state pre-flight handshake
 - [ ] **Phase 12: Stream Pipeline — go2rtc RTSPS + LXC Reuse** — `rtspx://` passthrough config, go2rtc as sole RTSPS consumer, existing LXC template reused
 - [ ] **Phase 13: UniFi Protect Adoption + Dashboard Error Taxonomy** — End-to-end adoption verified; Bambu-specific error states on dashboard; inline Access Code update
@@ -33,7 +33,11 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
   2. User can see, in the same document, the confirmed SSDP service URN and broadcast port observed from a live capture on the local network
   3. User can see the confirmed MQTT topic schema (at minimum, the print-state field name and payload shape) captured from the real printer
   4. Subsequent phase plans cite H2C-FIELD-NOTES.md as ground truth when they diverge from X1C/P1S assumptions
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] PLAN-01-tooling-prep.md — Install openssl/ffmpeg/mosquitto-clients/tcpdump/socat + go2rtc binary on App-VM (192.168.3.233)
+- [ ] PLAN-02-spike-script.md — Bash spike script (run-spike.sh) + go2rtc config template; four phases with hard timeouts
+- [ ] PLAN-03-field-notes-template.md — H2C-FIELD-NOTES.md skeleton + RUN-GUIDE.md runbook
+- [ ] PLAN-04-field-run.md — Run spike against real H2C, fill field notes, commit (gated on user home + credentials)
 
 ### Phase 11: Foundation — Discovery, Credentials, Pre-flight
 **Goal**: User can discover their Bambu printer, enter credentials securely, and receive a clear pre-flight verdict before any LXC is provisioned
@@ -95,7 +99,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 10. H2C Hardware Validation Spike | 0/? | Not started | - |
+| 10. H2C Hardware Validation Spike | 0/4 | Not started | - |
 | 11. Foundation — Discovery, Credentials, Pre-flight | 0/? | Not started | - |
 | 12. Stream Pipeline — go2rtc RTSPS + LXC Reuse | 0/? | Not started | - |
 | 13. UniFi Protect Adoption + Dashboard Error Taxonomy | 0/? | Not started | - |
