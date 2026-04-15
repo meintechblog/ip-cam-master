@@ -95,7 +95,15 @@ firmware_version: 01.01.05.00
     }
   }
   ```
-- **Sample idle message**: NOT captured this run (printer was actively printing). **Recommendation:** capture an idle sample in a follow-up 60s run before Phase 14 implementation to confirm the IDLE sentinel value of `print.gcode_state`.
+- **Sample idle message** (captured post-print-completion, 2026-04-15):
+  ```
+  print.gcode_state   = 'FINISH'   ← post-completion sentinel (sustains for a while after print ends)
+  print.mc_print_stage= '1'        ← was '2' during RUNNING
+  print.mc_stage      = 1          ← was 2 during RUNNING
+  print.state         = 6          ← was 4 during RUNNING
+  print.print_type    = ''         ← was 'cloud' during RUNNING
+  ```
+  Note: `FINISH` is observed immediately after print completion; `IDLE` is likely the sentinel after user clears the job or after further timeout. For Adaptive Mode purposes, treat any of `FINISH | IDLE | FAILED` as the same idle group (→ Snapshot). `RUNNING | PREPARE | PAUSE` as the live group (→ Live stream).
 - **Note**: `print.print_type = 'cloud'` is reported even with LAN Mode active and no internet pull from the cloud — this is metadata about *the originating slicer*, not the active connection mode.
 
 ## go2rtc Smoketest

@@ -93,6 +93,41 @@ Bambu printers expose their live camera as **RTSPS on TCP 322** in **LAN Mode Li
 
 MQTT handshake in pre-flight uses the `mqtt` npm package with `rejectUnauthorized: false` — `mosquitto_sub --insecure` is **broken** against the H2C's self-signed cert on Debian 13 (mosquitto-clients 2.0.21), confirmed during the Phase 10 hardware spike.
 
+**Adaptive Stream Mode** — a long-lived MQTT subscriber (spawned per Bambu camera on app boot) watches `device/<serial>/report` for `print.gcode_state` transitions. On state-group changes, go2rtc is toggled via `systemctl` over SSH so the printer is not under a 24/7 RTSPS pull while idle (the H2C's Live555 server is known fragile). State groups:
+
+| `print.gcode_state` | Mode | go2rtc |
+|---------------------|------|--------|
+| `RUNNING`, `PREPARE`, `PAUSE` | **Live** | running — Protect streams + records |
+| `FINISH`, `IDLE`, `FAILED`    | **Snapshot** | stopped — printer left alone |
+
+Per-camera override via `PATCH /api/cameras/:id/bambu-state {"streamMode": "always_live" | "always_snapshot" | "adaptive"}`. The ONVIF server inside the LXC stays running in both modes, so Protect keeps the device adopted and registered even during idle (stream just goes offline temporarily).
+
+### Bambu Lab H2C — Setup Walkthrough
+
+Before onboarding a Bambu H2C, the printer itself needs these three things enabled:
+
+1. **LAN Mode Liveview** — on the printer display:
+   `Settings → WLAN → LAN Mode = ON`
+   This exposes RTSPS on TCP 322 and MQTT on TCP 8883.
+
+2. **(Recommended) Developer Mode** — same menu tree; improves Live555 stability under observer load.
+
+3. **Note the Access Code** — printer display:
+   `Settings → WLAN → Access Code`  (8-digit, rotates when LAN Mode is toggled)
+
+Then in the IP-Cam-Master web UI:
+- The H2C appears in auto-discovery (SSDP broadcast; identified via `DevModel.bambu.com: O1C2`)
+- Click **"Einrichten"** — wizard prefills Serial from SSDP
+- Enter the 8-digit Access Code — pre-flight runs TCP + RTSPS + MQTT handshake
+- On success, the app allocates a VMID, clones an LXC from the `ipcm-base` template, deploys `go2rtc.yaml` with `rtspx://` passthrough, starts go2rtc + ONVIF server
+- UniFi Protect auto-discovers the new ONVIF device within ~1 min; click **Adopt** in Protect
+
+**⚠ Firmware caveats:**
+
+- **Do not enable Bambu Studio concurrent LAN control** while the app is adopted — the H2C's Live555 server has a single-connection limit for the camera. Use Studio via the cloud pathway if you need both.
+- **Bambu "Authorization Control"** (rolled out in a firmware update in 2025) can invalidate existing Access Codes on firmware upgrade. **Recommendation: disable auto-update on any adopted H2C** in `Settings → Firmware` and apply updates manually with a re-onboarding plan in hand.
+- Bird's-Eye camera (`/streaming/live/2`) is **not exposed by the H2C** (confirmed 404 during hardware validation). Intentionally out of scope — keep deferred for a future Bambu model.
+
 ### Onboarding Flow
 
 1. **Auto-Discovery** scans the network, identifies cameras by type (Mobotix/Loxone/ONVIF)
