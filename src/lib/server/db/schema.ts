@@ -1,5 +1,7 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
+export type CameraType = 'mobotix' | 'mobotix-onvif' | 'loxone' | 'bambu';
+
 export const settings = sqliteTable('settings', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	key: text('key').notNull().unique(),
@@ -43,6 +45,8 @@ export const cameras = sqliteTable('cameras', {
 	rtspUrl: text('rtsp_url'),
 	containerIp: text('container_ip'),
 	status: text('status').notNull().default('pending'),
+	accessCode: text('access_code'),
+	serialNumber: text('serial_number'),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
