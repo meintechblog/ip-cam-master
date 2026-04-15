@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
 import { cameras, credentials } from '$lib/server/db/schema';
 import { decrypt } from '$lib/server/services/crypto';
+import { discoverBambuDevices } from '$lib/server/services/bambu-discovery';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFileSync, unlinkSync } from 'node:fs';
@@ -33,9 +34,13 @@ const execAsync = promisify(exec);
 
 export interface DiscoveredCamera {
 	ip: string;
-	type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'unknown';
+	type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'bambu' | 'unknown';
 	alreadyOnboarded: boolean;
 	name: string | null;
+	// Optional Bambu-only annotations (set only when type === 'bambu'):
+	serialNumber?: string;
+	model?: string;
+	lanModeHint?: 'likely_on';
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -48,9 +53,13 @@ export const GET: RequestHandler = async ({ url }) => {
 			(db.select().from(cameras).all() as any[]).map((c) => c.ip)
 		);
 
-		// Write scan script to temp file to avoid shell quoting issues
-		const scriptPath = join(tmpdir(), `ipcam-scan-${Date.now()}.sh`);
-		writeFileSync(scriptPath, `#!/bin/bash
+		// Factored so the existing HTTP-probe scan can run in parallel with the
+		// SSDP listener via Promise.all. Behavior is preserved bit-for-bit from
+		// the pre-change code — only the surrounding wrapper is new.
+		const runExistingHttpScan = async (): Promise<DiscoveredCamera[]> => {
+			// Write scan script to temp file to avoid shell quoting issues
+			const scriptPath = join(tmpdir(), `ipcam-scan-${Date.now()}.sh`);
+			writeFileSync(scriptPath, `#!/bin/bash
 for ip in $(seq ${rangeStart} ${rangeEnd}); do
   (
     FULL="${subnet}.$ip"
@@ -76,68 +85,100 @@ done
 wait
 `, { mode: 0o755 });
 
-		const { stdout } = await execAsync(`bash ${scriptPath}`, {
-			timeout: 60000,
-			encoding: 'utf-8'
-		});
-
-		// Clean up
-		try { unlinkSync(scriptPath); } catch { /* ignore */ }
-
-		// Get saved credentials for name lookup
-		const savedCreds = (db.select().from(credentials).all() as any[])
-			.sort((a, b) => a.priority - b.priority)
-			.map((c) => { try { return { u: c.username, p: decrypt(c.password) }; } catch { return null; } })
-			.filter(Boolean) as { u: string; p: string }[];
-
-		const discovered: DiscoveredCamera[] = stdout
-			.trim()
-			.split('\n')
-			.filter(Boolean)
-			.map((line) => {
-				const colonIdx = line.indexOf(':');
-				const type = line.substring(0, colonIdx) as DiscoveredCamera['type'];
-				const ip = line.substring(colonIdx + 1);
-				return {
-					ip,
-					type,
-					alreadyOnboarded: onboarded.has(ip),
-					name: null as string | null
-				};
-			})
-			.sort((a, b) => {
-				const aNum = parseInt(a.ip.split('.').pop() || '0');
-				const bNum = parseInt(b.ip.split('.').pop() || '0');
-				return aNum - bNum;
+			const { stdout } = await execAsync(`bash ${scriptPath}`, {
+				timeout: 60000,
+				encoding: 'utf-8'
 			});
 
-		// Try to grab camera names using saved credentials
-		if (savedCreds.length > 0) {
-			await Promise.allSettled(
-				discovered.filter((c) => !c.alreadyOnboarded).map(async (cam) => {
-					for (const cred of savedCreds) {
-						try {
-							const { stdout: html } = await execAsync(
-								`curl -s --basic -u "${cred.u}:${cred.p}" -L "http://${cam.ip}/" --max-time 2`,
-								{ timeout: 3000, encoding: 'utf-8' }
-							);
-							const titleMatch = html.match(/<title>([^<]+)<\/title>/);
-							if (titleMatch) {
-								let name = titleMatch[1].replace(/ Live$/, '').replace(/Error.*/, '').trim();
-								// Fix German umlaut replacements from Mobotix (camera title has no UTF-8)
-								name = fixGermanUmlauts(name);
-								if (name && !name.includes('Error') && !name.includes('Unauthorized')) {
-									cam.name = name;
-									break;
-								}
-							}
-						} catch { /* try next cred */ }
-					}
-				})
-			);
-		}
+			// Clean up
+			try { unlinkSync(scriptPath); } catch { /* ignore */ }
 
-		return json({ cameras: discovered });
+			// Get saved credentials for name lookup
+			const savedCreds = (db.select().from(credentials).all() as any[])
+				.sort((a, b) => a.priority - b.priority)
+				.map((c) => { try { return { u: c.username, p: decrypt(c.password) }; } catch { return null; } })
+				.filter(Boolean) as { u: string; p: string }[];
+
+			const discovered: DiscoveredCamera[] = stdout
+				.trim()
+				.split('\n')
+				.filter(Boolean)
+				.map((line) => {
+					const colonIdx = line.indexOf(':');
+					const type = line.substring(0, colonIdx) as DiscoveredCamera['type'];
+					const ip = line.substring(colonIdx + 1);
+					return {
+						ip,
+						type,
+						alreadyOnboarded: onboarded.has(ip),
+						name: null as string | null
+					};
+				});
+
+			// Try to grab camera names using saved credentials
+			if (savedCreds.length > 0) {
+				await Promise.allSettled(
+					discovered.filter((c) => !c.alreadyOnboarded).map(async (cam) => {
+						for (const cred of savedCreds) {
+							try {
+								const { stdout: html } = await execAsync(
+									`curl -s --basic -u "${cred.u}:${cred.p}" -L "http://${cam.ip}/" --max-time 2`,
+									{ timeout: 3000, encoding: 'utf-8' }
+								);
+								const titleMatch = html.match(/<title>([^<]+)<\/title>/);
+								if (titleMatch) {
+									let name = titleMatch[1].replace(/ Live$/, '').replace(/Error.*/, '').trim();
+									// Fix German umlaut replacements from Mobotix (camera title has no UTF-8)
+									name = fixGermanUmlauts(name);
+									if (name && !name.includes('Error') && !name.includes('Unauthorized')) {
+										cam.name = name;
+										break;
+									}
+								}
+							} catch { /* try next cred */ }
+						}
+					})
+				);
+			}
+
+			return discovered;
+		};
+
+		// Run the existing HTTP-probe scan and the Bambu SSDP listener in parallel.
+		// discoverBambuDevices never rejects — it resolves to [] on socket error
+		// (e.g. EADDRINUSE on UDP 2021) so the HTTP scan result is authoritative
+		// for non-Bambu devices even if UDP is blocked.
+		const [httpScanResult, bambuDevices] = await Promise.all([
+			runExistingHttpScan(),
+			discoverBambuDevices({ listenMs: 6000 })
+		]);
+
+		const bambuRows: DiscoveredCamera[] = bambuDevices.map((d) => ({
+			ip: d.ip,
+			type: 'bambu' as const,
+			alreadyOnboarded: onboarded.has(d.ip),
+			name: d.name,
+			serialNumber: d.serialNumber,
+			model: d.model,
+			// SSDP only fires when LAN Mode is on; not authoritative (real check
+			// lives in the pre-flight handler — Plan 11-03).
+			lanModeHint: 'likely_on' as const
+		}));
+
+		// Merge: Bambu rows take precedence over HTTP-scan rows on IP collision,
+		// since the Bambu annotation (serial, model, lanModeHint) is strictly
+		// more informative than a generic 'unknown'/'mobotix' row.
+		const byIp = new Map<string, DiscoveredCamera>();
+		for (const row of httpScanResult) byIp.set(row.ip, row);
+		for (const row of bambuRows) byIp.set(row.ip, row);
+
+		const merged = [...byIp.values()].sort((a, b) => {
+			const aNum = parseInt(a.ip.split('.').pop() || '0');
+			const bNum = parseInt(b.ip.split('.').pop() || '0');
+			return aNum - bNum;
+		});
+
+		return json({ cameras: merged });
 	} catch (err) {
 		return json({ cameras: [], error: err instanceof Error ? err.message : 'Scan failed' });
 	}
