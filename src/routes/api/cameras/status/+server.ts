@@ -138,7 +138,9 @@ export const GET: RequestHandler = async () => {
 					liveFps: null,
 					lxcCpu,
 					lxcMemory,
-					lxcMac
+					lxcMac,
+					printState: cam.cameraType === 'bambu' ? (cam.printState ?? null) : null,
+					streamMode: cam.cameraType === 'bambu' ? (cam.streamMode ?? 'adaptive') : null
 				} satisfies CameraCardData;
 			})
 		);

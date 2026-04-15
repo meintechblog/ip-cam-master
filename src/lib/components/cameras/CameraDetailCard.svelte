@@ -90,6 +90,25 @@
 	let rebootConfirm = $state(false);
 	let rebooting = $state(false);
 
+	// Bambu stream mode (Phase 14)
+	let streamModeUpdating = $state(false);
+	async function updateStreamMode(mode: string) {
+		streamModeUpdating = true;
+		try {
+			await fetch(`/api/cameras/${camera.id}/bambu-state`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ streamMode: mode })
+			});
+			// Optimistic update — next /api/cameras/status poll will overwrite with DB truth
+			camera.streamMode = mode;
+		} catch {
+			// Silent — next poll will reflect actual state
+		} finally {
+			streamModeUpdating = false;
+		}
+	}
+
 	async function rebootCamera() {
 		rebootLoading = true;
 		rebootConfirm = false;
@@ -287,6 +306,45 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Bambu-specific: print state + stream mode (Phase 14) -->
+			{#if camera.cameraType === 'bambu'}
+				<div class="mt-3 pt-3 border-t border-border space-y-2">
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-text-secondary">Druckstatus</span>
+						{#if !camera.printState}
+							<span class="text-text-secondary">—</span>
+						{:else if camera.printState === 'RUNNING'}
+							<span class="px-2 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">Live (RUNNING)</span>
+						{:else if camera.printState === 'PREPARE'}
+							<span class="px-2 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">Live (PREPARE)</span>
+						{:else if camera.printState === 'PAUSE'}
+							<span class="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-medium">Live (PAUSE)</span>
+						{:else if camera.printState === 'FINISH'}
+							<span class="px-2 py-0.5 rounded bg-text-secondary/20 text-text-secondary font-medium">Idle (FINISH)</span>
+						{:else if camera.printState === 'IDLE'}
+							<span class="px-2 py-0.5 rounded bg-text-secondary/20 text-text-secondary font-medium">Idle</span>
+						{:else if camera.printState === 'FAILED'}
+							<span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">Failed</span>
+						{:else}
+							<span class="text-text-primary font-mono">{camera.printState}</span>
+						{/if}
+					</div>
+					<div class="flex items-center justify-between text-xs gap-2">
+						<span class="text-text-secondary shrink-0">Stream-Modus</span>
+						<select
+							value={camera.streamMode ?? 'adaptive'}
+							onchange={(e) => updateStreamMode((e.currentTarget as HTMLSelectElement).value)}
+							disabled={streamModeUpdating}
+							class="bg-bg-input border border-border rounded px-1.5 py-0.5 text-text-primary text-xs focus:border-accent focus:outline-none disabled:opacity-50 cursor-pointer"
+						>
+							<option value="adaptive">Adaptive (MQTT)</option>
+							<option value="always_live">Immer Live</option>
+							<option value="always_snapshot">Immer Aus</option>
+						</select>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Container Actions -->
 			<div class="flex items-center gap-1.5 mt-3 pt-3 border-t border-border">

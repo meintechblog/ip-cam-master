@@ -133,6 +133,9 @@ export interface CameraCardData {
 	protectConfigured?: boolean;
 	protectUrl?: string | null;
 	flapping?: boolean;
+	// Bambu-only — populated when cameraType === 'bambu'
+	printState?: string | null;
+	streamMode?: string | null;
 }
 
 export interface ProtectCamera {
