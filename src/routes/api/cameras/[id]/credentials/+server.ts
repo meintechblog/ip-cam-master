@@ -25,14 +25,16 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	// Test credentials if requested
 	if (test) {
 		const endpoint = camera.camera_type === 'loxone' ? '/mjpg/video.mjpg' : '/record/current.jpg';
-		const timeout = camera.camera_type === 'loxone' ? 1 : 3;
+		const isMjpeg = camera.camera_type === 'loxone';
+		const connectTimeout = isMjpeg ? 5 : 3;
+		const maxTime = isMjpeg ? 10 : 3;
 
 		try {
 			let stdout = '';
 			try {
 				const result = await execAsync(
-					`curl -s --basic -u "${username}:${password}" "http://${camera.ip}${endpoint}" --max-time ${timeout} -o /dev/null -w "%{http_code}"`,
-					{ timeout: 5000, encoding: 'utf-8' }
+					`curl -s --basic -u "${username}:${password}" "http://${camera.ip}${endpoint}" --connect-timeout ${connectTimeout} --max-time ${maxTime} -o /dev/null -w "%{http_code}"`,
+					{ timeout: (maxTime + 5) * 1000, encoding: 'utf-8' }
 				);
 				stdout = result.stdout;
 			} catch (e: unknown) {

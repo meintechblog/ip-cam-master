@@ -43,12 +43,16 @@ export const POST: RequestHandler = async ({ request }) => {
 			const password = decrypt(row.password);
 			for (const endpoint of endpoints) {
 				try {
-					const timeout = endpoint.includes('mjpg') ? 3 : 3;
+					// MJPEG streams never complete — use longer max-time to allow slow devices
+					// (Loxone Intercom can take 5-8s to return HTTP headers)
+					const isMjpeg = endpoint.includes('mjpg');
+					const connectTimeout = isMjpeg ? 5 : 3;
+					const maxTime = isMjpeg ? 10 : 3;
 					let stdout = '';
 					try {
 						const result = await execAsync(
-							`curl -s --basic -u "${row.username}:${password}" "http://${ip}${endpoint}" --max-time ${timeout} -o /dev/null -w "%{http_code}"`,
-							{ timeout: 5000, encoding: 'utf-8' }
+							`curl -s --basic -u "${row.username}:${password}" "http://${ip}${endpoint}" --connect-timeout ${connectTimeout} --max-time ${maxTime} -o /dev/null -w "%{http_code}"`,
+							{ timeout: (maxTime + 5) * 1000, encoding: 'utf-8' }
 						);
 						stdout = result.stdout;
 					} catch (e: unknown) {

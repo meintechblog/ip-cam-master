@@ -14,12 +14,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		if (cameraType === 'loxone') {
-			// Loxone Intercom: test HTTP MJPEG stream (stays open — use 3s timeout for slow response)
+			// Loxone Intercom: test HTTP MJPEG stream (stays open — never completes)
+			// Use --connect-timeout for fast fail on unreachable hosts,
+			// and longer --max-time to allow slow Intercoms to return HTTP headers.
+			// curl exits 28 on timeout but still writes %{http_code} to stdout.
 			let code = '000';
 			try {
 				const { stdout } = await execAsync(
-					`curl -s --basic -u "${username}:${password}" "http://${ip}/mjpg/video.mjpg" --max-time 3 -o /dev/null -w "%{http_code}"`,
-					{ timeout: 8000, encoding: 'utf-8' }
+					`curl -s --basic -u "${username}:${password}" "http://${ip}/mjpg/video.mjpg" --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}"`,
+					{ timeout: 15000, encoding: 'utf-8' }
 				);
 				code = stdout.trim();
 			} catch (e: unknown) {
