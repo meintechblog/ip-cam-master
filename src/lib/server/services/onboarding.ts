@@ -1,5 +1,5 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
 import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
@@ -278,11 +278,21 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 			}
 		}
 
-		const decryptedPassword = decrypt(camera.password);
 		let yamlContent: string;
 
-		if (camera.cameraType === 'loxone') {
+		if (camera.cameraType === 'bambu') {
+			// Bambu: go2rtc pulls RTSPS from the printer (rtspx:// skips TLS verify),
+			// passthrough h264. Access Code is stored in access_code, not password.
+			const accessCode = camera.accessCode ? decrypt(camera.accessCode) : '';
+			if (!accessCode) throw new Error('Bambu camera missing access_code');
+			yamlContent = generateGo2rtcConfigBambu({
+				streamName: camera.streamName,
+				printerIp: camera.ip,
+				accessCode
+			});
+		} else if (camera.cameraType === 'loxone') {
 			// Loxone: go2rtc reads from local nginx proxy
+			const _password = decrypt(camera.password);
 			yamlContent = generateGo2rtcConfigLoxone({
 				streamName: camera.streamName,
 				width: camera.width,
@@ -290,8 +300,10 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 				fps: camera.fps,
 				bitrate: camera.bitrate
 			});
+			void _password;
 		} else {
 			// Mobotix: go2rtc reads directly from camera RTSP
+			const decryptedPassword = decrypt(camera.password);
 			yamlContent = generateGo2rtcConfig({
 				streamName: camera.streamName,
 				cameraIp: camera.ip,

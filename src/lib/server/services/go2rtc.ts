@@ -115,6 +115,32 @@ log:
 }
 
 /**
+ * Generates go2rtc YAML config for a Bambu Lab printer (H2C and future models).
+ * Uses `rtspx://` scheme to skip TLS verification for the printer's self-signed
+ * cert (per .planning/research/H2C-FIELD-NOTES.md). No VAAPI transcode — the
+ * H2C already serves H.264, so `#video=copy` is sufficient (field notes
+ * confirmed passthrough works cleanly at 1680x1080 30fps).
+ */
+export function generateGo2rtcConfigBambu(params: {
+	streamName: string;
+	printerIp: string;
+	accessCode: string;
+}): string {
+	const { streamName, printerIp, accessCode } = params;
+	const sourceUrl = `rtspx://bblp:${accessCode}@${printerIp}:322/streaming/live/1`;
+	return `streams:
+  ${streamName}:
+    - ${sourceUrl}#video=copy#audio=copy
+
+ffmpeg:
+  bin: ffmpeg
+
+log:
+  level: info
+`;
+}
+
+/**
  * Generates nginx config for Loxone Intercom auth-proxy.
  */
 export function generateNginxConfig(intercomIp: string, username: string, password: string): string {

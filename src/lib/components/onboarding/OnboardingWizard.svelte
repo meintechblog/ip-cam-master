@@ -40,6 +40,9 @@
 	let bambuSaveError = $state<string | null>(null);
 	let bambuSaving = $state(false);
 	let bambuSaved = $state(false);
+	let bambuProvisioning = $state(false);
+	let bambuProvisioned = $state(false);
+	let bambuProvisionError = $state<string | null>(null);
 
 	async function handleBambuPreflightDone(ok: boolean) {
 		if (!ok) {
@@ -49,6 +52,7 @@
 		bambuStep = 'done';
 		bambuSaving = true;
 		bambuSaveError = null;
+		let cameraId: number | null = null;
 		try {
 			const res = await fetch('/api/onboarding/bambu/save-camera', {
 				method: 'POST',
@@ -66,10 +70,33 @@
 				return;
 			}
 			bambuSaved = true;
+			cameraId = data.cameraId;
 		} catch (err) {
 			bambuSaveError = err instanceof Error ? err.message : String(err);
+			return;
 		} finally {
 			bambuSaving = false;
+		}
+
+		if (!cameraId) return;
+		bambuProvisioning = true;
+		bambuProvisionError = null;
+		try {
+			const res = await fetch('/api/onboarding/bambu/provision', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ cameraId })
+			});
+			const data = await res.json();
+			if (!res.ok || !data.success) {
+				bambuProvisionError = data.error ?? 'LXC-Provisionierung fehlgeschlagen';
+				return;
+			}
+			bambuProvisioned = true;
+		} catch (err) {
+			bambuProvisionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bambuProvisioning = false;
 		}
 	}
 
@@ -688,11 +715,20 @@
 						<p class="text-sm text-text-secondary">Speichere Kamera…</p>
 					{:else if bambuSaveError}
 						<p class="text-sm text-red-400">Speichern fehlgeschlagen: {bambuSaveError}</p>
-					{:else if bambuSaved}
+					{:else if bambuProvisioning}
 						<p class="text-sm text-text-secondary">
-							Seriennummer und Access Code verschlüsselt gespeichert. LXC-Provisionierung
-							folgt in Phase 12.
+							Kamera gespeichert. LXC-Container wird bereitgestellt und go2rtc konfiguriert
+							(ca. 15–30 Sekunden)…
 						</p>
+					{:else if bambuProvisionError}
+						<p class="text-sm text-red-400">LXC-Provisionierung fehlgeschlagen: {bambuProvisionError}</p>
+					{:else if bambuProvisioned}
+						<p class="text-sm text-green-400">
+							Fertig — LXC läuft, go2rtc-Stream live. Kamera erscheint jetzt in der
+							Kameraübersicht.
+						</p>
+					{:else if bambuSaved}
+						<p class="text-sm text-text-secondary">Kamera gespeichert…</p>
 					{/if}
 					<div class="flex justify-end">
 						<button

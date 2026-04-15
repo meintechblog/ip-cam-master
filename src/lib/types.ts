@@ -1,5 +1,5 @@
 export type ContainerStatus = 'running' | 'stopped' | 'error' | 'unknown';
-export type CameraType = 'mobotix' | 'mobotix-onvif' | 'loxone' | 'onvif' | 'other';
+export type CameraType = 'mobotix' | 'mobotix-onvif' | 'loxone' | 'onvif' | 'bambu' | 'other';
 
 export interface ProxmoxSettings {
 	proxmox_host: string;
@@ -74,6 +74,8 @@ export interface Camera {
 	rtspUrl: string | null;
 	containerIp: string | null;
 	status: CameraStatus;
+	accessCode: string | null;
+	serialNumber: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
