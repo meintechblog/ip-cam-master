@@ -2,11 +2,12 @@
 
 One-click camera onboarding for UniFi Protect. Discover cameras in the network, and the app handles everything — container creation, stream transcoding, ONVIF wrapping, and Protect adoption.
 
-Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone Intercom) into UniFi Protect without manual setup.
+Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone Intercom, Bambu Lab printers) into UniFi Protect without manual setup.
 
 ## Features
 
-- **Auto-Discovery** — Scans the network for Mobotix cameras and Loxone Intercoms, shows them with name, type, and live snapshot thumbnail
+- **Auto-Discovery** — Scans the network for Mobotix cameras, Loxone Intercoms, and Bambu Lab printers (SSDP on UDP 2021); shows them with name, type, and live snapshot thumbnail
+- **Bambu Lab H2C Integration** — Pre-flight handshake (TCP + RTSPS + MQTT) surfaces distinct error states; auto-provisions an LXC with go2rtc in pure H.264 passthrough (no transcode) so UniFi Protect gets a 1680×1080 30fps feed without touching the printer's fragile Live555 server directly
 - **Credential Presets** — Store standard logins once, cameras are auto-matched during onboarding
 - **5-Step Onboarding Wizard** — From credential entry to verified stream in UniFi Protect
 - **Batch Onboarding** — "Alle hinzufügen" button processes all discovered cameras sequentially with live step-by-step progress, sub-steps, and snapshot thumbnails
@@ -36,12 +37,61 @@ Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone 
 └─────────────┘     └──────────────────────────────────────────────┘     └──────────────┘
 ```
 
-### Two Camera Types
+### Three Camera Types
 
-| Type | Example | Onboarding | Container |
-|------|---------|-----------|-----------|
-| **Pipeline** (no ONVIF) | Mobotix S15D | Full 5-step wizard | Yes — go2rtc + ONVIF Server |
-| **Native ONVIF** | Mobotix S16B | Simple registration | No — direct Protect adoption |
+| Type | Example | Onboarding | Container | Stream Handling |
+|------|---------|-----------|-----------|-----------------|
+| **Pipeline** (no ONVIF) | Mobotix S15D, Loxone Intercom | Full 5-step wizard | Yes — go2rtc + ONVIF Server | MJPEG → H.264 **VAAPI transcode** |
+| **Native ONVIF** | Mobotix S16B | Simple registration | No — direct Protect adoption | Protect pulls ONVIF directly |
+| **Bambu Lab** (H2C, H2D) | Bambu Lab H2C | Pre-flight + auto-provision | Yes — go2rtc + ONVIF Server | **H.264 passthrough** (no transcode) |
+
+### Bambu Lab H2C — Technical Details
+
+Bambu printers expose their live camera as **RTSPS on TCP 322** in **LAN Mode Liveview**. The H2C stream is already H.264 High Profile (Level 4.1) at 1680×1080@30fps with **no audio** — which means the app uses go2rtc in **pure passthrough mode** (`#video=copy`), **no VAAPI transcoding required**. Each printer still gets its own LXC container so the architecture stays symmetric with Mobotix/Loxone cameras.
+
+```
+┌────────────────────────┐     ┌──────────────────────────────────────────────┐     ┌──────────────┐
+│  Bambu Lab H2C         │     │  LXC Container (Proxmox, cloned from base)   │     │  UniFi       │
+│  ─────────────────     │     │  ─────────────────────────────────────────    │     │  Protect     │
+│  RTSPS :322   ─────────┼────►│  go2rtc                                       │     │              │
+│    (self-signed cert)  │     │   ├─ producer: rtspx:// passthrough           │     │              │
+│                        │     │   │   (one TCP conn → single-connection       │     │              │
+│  MQTT :8883            │     │   │    limit respected)                       │     │              │
+│    (Phase 14)          │     │   ├─ stream: <name>      (HQ, 1680x1080)      │     │              │
+│                        │     │   └─ stream: <name>-low  (alias → HQ)         │     │              │
+│  SSDP :2021 ───────────┼──►  │          │                                    │     │              │
+│  (discovery broadcast) │     │          ▼                                    │     │              │
+│                        │     │  RTSP :8554  ◄────────────────────────────────┼────►│  ONVIF grab  │
+│                        │     │  ONVIF Server (WS-Discovery UDP 3702)         │     │  HQ + LQ     │
+└────────────────────────┘     └──────────────────────────────────────────────┘     └──────────────┘
+```
+
+**Protocol details (ground truth from `.planning/research/H2C-FIELD-NOTES.md`):**
+
+| What | Value | Notes |
+|------|-------|-------|
+| Discovery | SSDP NOTIFY on **UDP 2021** | URN `urn:bambulab-com:device:3dprinter:1`; printer identified by `DevModel.bambu.com: O1C2` (H2C's internal model code) |
+| Auth | User `bblp` + **8-digit Access Code** from printer display | stored AES-256-GCM encrypted in SQLite |
+| Live stream | `rtsps://bblp:<code>@<ip>:322/streaming/live/1` | H.264 High @ 1680x1080 30fps, no audio, Live555 server |
+| TLS | Self-signed cert, CN = printer serial, issuer `BBL Device CA O1C2-V2` | go2rtc uses `rtspx://` scheme to skip verification |
+| Transcode | **None** | `#video=copy` passthrough — same bytes in as out |
+| MQTT | TCP 8883 TLS, topic `device/<serial>/report` | used for Phase 14 Adaptive Mode; not needed for basic stream |
+| Bird's-Eye (`live/2`) | **Not present on H2C** (404) | documented out of scope for v1.2 |
+
+**Architectural guarantees:**
+
+1. **go2rtc is the sole RTSPS consumer** of the printer — UniFi Protect only ever talks to go2rtc's :8554 restream, **never** to the printer's port 322 directly. This protects the printer's fragile Live555 server from multi-client load.
+2. **Single TCP connection to the printer** — the `<name>-low` substream is a go2rtc-internal alias, not a second pull. One producer, two consumer endpoints.
+3. **No credential leakage to UniFi Protect** — Protect authenticates against the LXC's ONVIF server (anonymous), not the printer. Access Code stays encrypted in the app's DB and in the container-local `/etc/go2rtc/go2rtc.yaml`.
+4. **Same LXC template as Mobotix** — `ipcm-base` gets cloned; no Bambu-specific template. VAAPI passthrough stays configured (unused by Bambu, present for mixed-camera setups).
+
+**Pre-flight before provisioning** — four distinct error states surfaced in the UI instead of one opaque failure:
+- `LAN_MODE_OFF` — port 322 refused / MQTT unreachable on 8883
+- `WRONG_ACCESS_CODE` — RTSPS 401 or MQTT auth reject
+- `PRINTER_UNREACHABLE` — IP not responding
+- `RTSPS_HANDSHAKE_HUNG` — Live555 wedged (recommend printer power-cycle)
+
+MQTT handshake in pre-flight uses the `mqtt` npm package with `rejectUnauthorized: false` — `mosquitto_sub --insecure` is **broken** against the H2C's self-signed cert on Debian 13 (mosquitto-clients 2.0.21), confirmed during the Phase 10 hardware spike.
 
 ### Onboarding Flow
 
