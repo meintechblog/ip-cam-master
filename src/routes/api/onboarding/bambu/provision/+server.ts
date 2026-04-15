@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { createCameraContainer, configureGo2rtc, configureOnvif, getNextVmid, verifyStream } from '$lib/server/services/onboarding';
+import { addBambuSubscriber } from '$lib/server/services/bambu-mqtt';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const { cameraId } = await request.json();
@@ -45,6 +46,12 @@ export const POST: RequestHandler = async ({ request }) => {
 				streamInfo: health.streamInfo
 			}, { status: 502 });
 		}
+
+		// Start MQTT subscriber for Adaptive Stream Mode (Phase 14).
+		// Fire-and-forget — failure here does not block onboarding.
+		addBambuSubscriber(cameraId).catch((err) =>
+			console.error(`[provision] bambu-mqtt subscriber failed for cam=${cameraId}:`, err)
+		);
 
 		return json({ success: true, vmid, containerIp, streamName: camera.streamName, rtspUrl: health.rtspUrl });
 	} catch (err) {

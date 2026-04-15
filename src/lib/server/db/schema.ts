@@ -47,6 +47,8 @@ export const cameras = sqliteTable('cameras', {
 	status: text('status').notNull().default('pending'),
 	accessCode: text('access_code'),
 	serialNumber: text('serial_number'),
+	printState: text('print_state'),
+	streamMode: text('stream_mode').default('adaptive'),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),

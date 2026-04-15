@@ -6,6 +6,7 @@ import { getProtectStatus } from './protect';
 import { checkForUpdate } from './update-check';
 import { cleanupOldUpdateLogs } from './update-history';
 import { getCurrentVersion } from './version';
+import { startBambuSubscribers, stopBambuSubscribers } from './bambu-mqtt';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 
@@ -172,7 +173,12 @@ export function startScheduler(): void {
 		updateLogCleanupInterval = setInterval(runCleanup, 86_400_000);
 	}
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h), update log cleanup (24h)');
+	// Start Bambu MQTT subscribers (Adaptive Stream Mode driven by print.gcode_state)
+	startBambuSubscribers().catch((err) =>
+		console.error('[scheduler] bambu-mqtt startup failed:', err)
+	);
+
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h), update log cleanup (24h), bambu MQTT');
 }
 
 export function stopScheduler(): void {
@@ -200,6 +206,7 @@ export function stopScheduler(): void {
 		clearInterval(updateCheckInterval);
 		updateCheckInterval = null;
 	}
+	stopBambuSubscribers();
 	if (updateLogCleanupInterval) {
 		clearInterval(updateLogCleanupInterval);
 		updateLogCleanupInterval = null;

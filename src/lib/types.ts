@@ -76,6 +76,8 @@ export interface Camera {
 	status: CameraStatus;
 	accessCode: string | null;
 	serialNumber: string | null;
+	printState: string | null;
+	streamMode: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
