@@ -102,6 +102,23 @@ MQTT handshake in pre-flight uses the `mqtt` npm package with `rejectUnauthorize
 
 Per-camera override via `PATCH /api/cameras/:id/bambu-state {"streamMode": "always_live" | "always_snapshot" | "adaptive"}`. The ONVIF server inside the LXC stays running in both modes, so Protect keeps the device adopted and registered even during idle (stream just goes offline temporarily).
 
+**Which mode should you pick?**
+
+| Your situation | Recommended | Why |
+|----------------|-------------|-----|
+| H2C in a living-space, want to peek anytime + continuous Protect timeline | `always_live` | Drucker steht 24/7 unter RTSPS-Pull. Bei neueren H2C-Firmware (01.01.05+) unproblematisch — Live555 bleibt stabil. Gibt lückenlose Aufzeichnung |
+| H2C an der Leistungsgrenze / ältere Firmware / Live555 ist schonmal abgestürzt | `adaptive` (default) | Schont den Drucker automatisch wenn kein Druck läuft — ~22 h/Tag keine Last; Protect zeigt "offline" zwischen Drucken |
+| Du willst den Drucker komplett schonen (z.B. Nachtabschaltung) | `always_snapshot` | Go2rtc bleibt dauerhaft aus; Protect sieht nie Live. Brauchst dann einen anderen Monitoring-Weg |
+
+Switch anytime without re-provisioning:
+```bash
+curl -X PATCH -H "Content-Type: application/json" \
+  -d '{"streamMode":"always_live"}' \
+  http://<ipcm-host>/api/cameras/<id>/bambu-state
+```
+
+Der Schalter ist sofort wirksam — beim nächsten MQTT-Event oder manuell: `always_live` erzwingt `systemctl start go2rtc`, `always_snapshot` → `stop`, `adaptive` → folgt wieder dem MQTT-`print.gcode_state`.
+
 ### Bambu Lab H2C — Setup Walkthrough
 
 Before onboarding a Bambu H2C, the printer itself needs these three things enabled:

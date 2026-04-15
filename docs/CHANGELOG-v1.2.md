@@ -47,3 +47,15 @@ All H2C-specific protocol values (SSDP port, URN, RTSPS URL path, MQTT topic, ce
 ## Hardware validated against
 
 Bambu Lab H2C, firmware `01.01.05.00`, DevModel `O1C2`, serial prefix `31B8BP*`, date 2026-04-15. Stream: h264 High Level 4.1 @ 1680×1080 30fps, no audio.
+
+## Field experience note — streamMode recommendation
+
+The `adaptive` mode was originally specified as the default because early X1C/P1S firmware had well-known Live555 stability issues under sustained RTSPS load. First-pass field testing on the H2C with firmware `01.01.05.00` showed no such issues during multi-hour continuous streaming — the printer handled a 24/7 go2rtc pull without Live555 wedging.
+
+Practical consequence for single-printer home setups: **`always_live` is likely the better default**, because otherwise UniFi Protect goes offline between prints (often >22 h/day of idle) and timeline recording has large gaps. The API lets you flip without re-provisioning:
+
+```
+PATCH /api/cameras/<id>/bambu-state  {"streamMode": "always_live"}
+```
+
+`adaptive` stays useful as a safety net if you run an older firmware, see Live555 crashes, or operate multiple H2Cs where cumulative load matters. The README now documents this trade-off explicitly.
