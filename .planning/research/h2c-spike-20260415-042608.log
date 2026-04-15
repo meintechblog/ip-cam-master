@@ -1,0 +1,271 @@
+==========================================
+Phase 10 H2C Spike  v1.0
+Date:    2026-04-15T04:26:08+00:00
+Host:    ip-cam-master
+IP:      192.168.3.XXX
+Serial:  31B8******453
+Log:     /root/h2c-spike-20260415-042608.log
+==========================================
+
+=== Phase 1: SSDP (UDP 1990 + 2021) ===
+--- tcpdump (20 packets, 10s budget) ---
+tcpdump: WARNING: any: That device doesn't support promiscuous mode
+(Promiscuous mode not supported on the "any" device)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+04:26:10.774065 eth0  B   IP 192.168.3.109.2021 > 255.255.255.255.2021: UDP, length 432
+E...].@.@..B...m............NOTIFY * HTTP/1.1
+Host: 239.255.255.250:1990
+Server: UPnP/1.0
+Location: 192.168.3.109
+NT: urn:bambulab-com:device:3dprinter:1
+NTS: ssdp:alive
+USN: 31B8BP611201453
+Cache-Control: max-age=1800
+DevModel.bambu.com: O1C2
+DevName.bambu.com: Bob the Builder
+DevConnect.bambu.com: cloud
+DevBind.bambu.com: occupied
+Devseclink.bambu.com: secure
+DevInf.bambu.com: wlan0
+DevVersion.bambu.com: 01.01.05.00
+DevCap.bambu.com: 1
+
+
+04:26:13.656589 eth0  B   IP 192.168.3.195.1900 > 255.255.255.255.2021: UDP, length 402
+E.........4..........l.....kNOTIFY * HTTP/1.1
+HOST: 239.255.255.250:1900
+Server: UPnP/1.0
+Location: 192.168.3.195
+NT: urn:bambulab-com:device:3dprinter:1
+USN: 03919A3B0100254
+Cache-Control: max-age=1800
+DevModel.bambu.com: N2S
+DevName.bambu.com: A1
+DevSignal.bambu.com: -61
+DevConnect.bambu.com: cloud
+DevBind.bambu.com: occupied
+Devseclink.bambu.com: secure
+DevVersion.bambu.com: 01.07.02.00
+DevCap.bambu.com: 1
+
+
+04:26:15.890793 eth0  B   IP 192.168.3.109.2021 > 255.255.255.255.2021: UDP, length 432
+E...az@.@......m............NOTIFY * HTTP/1.1
+Host: 239.255.255.250:1990
+Server: UPnP/1.0
+Location: 192.168.3.109
+NT: urn:bambulab-com:device:3dprinter:1
+NTS: ssdp:alive
+USN: 31B8BP611201453
+Cache-Control: max-age=1800
+DevModel.bambu.com: O1C2
+DevName.bambu.com: Bob the Builder
+DevConnect.bambu.com: cloud
+DevBind.bambu.com: occupied
+Devseclink.bambu.com: secure
+DevInf.bambu.com: wlan0
+DevVersion.bambu.com: 01.01.05.00
+DevCap.bambu.com: 1
+
+
+
+3 packets captured
+5 packets received by filter
+0 packets dropped by kernel
+--- socat UDP-RECV:2021 (10s budget) ---
+0000000   N   O   T   I   F   Y       *       H   T   T   P   /   1   .
+0000020   1  \r  \n   H   o   s   t   :       2   3   9   .   2   5   5
+0000040   .   2   5   5   .   2   5   0   :   1   9   9   0  \r  \n   S
+0000060   e   r   v   e   r   :       U   P   n   P   /   1   .   0  \r
+0000100  \n   L   o   c   a   t   i   o   n   :       1   9   2   .   1
+0000120   6   8   .   3   .   1   0   9  \r  \n   N   T   :       u   r
+0000140   n   :   b   a   m   b   u   l   a   b   -   c   o   m   :   d
+0000160   e   v   i   c   e   :   3   d   p   r   i   n   t   e   r   :
+0000200   1  \r  \n   N   T   S   :       s   s   d   p   :   a   l   i
+0000220   v   e  \r  \n   U   S   N   :       3   1   B   8   B   P   6
+0000240   1   1   2   0   1   4   5   3  \r  \n   C   a   c   h   e   -
+0000260   C   o   n   t   r   o   l   :       m   a   x   -   a   g   e
+0000300   =   1   8   0   0  \r  \n   D   e   v   M   o   d   e   l   .
+0000320   b   a   m   b   u   .   c   o   m   :       O   1   C   2  \r
+0000340  \n   D   e   v   N   a   m   e   .   b   a   m   b   u   .   c
+0000360   o   m   :       B   o   b       t   h   e       B   u   i   l
+0000400   d   e   r  \r  \n   D   e   v   C   o   n   n   e   c   t   .
+0000420   b   a   m   b   u   .   c   o   m   :       c   l   o   u   d
+0000440  \r  \n   D   e   v   B   i   n   d   .   b   a   m   b   u   .
+0000460   c   o   m   :       o   c   c   u   p   i   e   d  \r  \n   D
+0000500   e   v   s   e   c   l   i   n   k   .   b   a   m   b   u   .
+0000520   c   o   m   :       s   e   c   u   r   e  \r  \n   D   e   v
+0000540   I   n   f   .   b   a   m   b   u   .   c   o   m   :       w
+0000560   l   a   n   0  \r  \n   D   e   v   V   e   r   s   i   o   n
+0000600   .   b   a   m   b   u   .   c   o   m   :       0   1   .   0
+0000620   1   .   0   5   .   0   0  \r  \n   D   e   v   C   a   p   .
+0000640   b   a   m   b   u   .   c   o   m   :       1  \r  \n  \r  \n
+0000660   N   O   T   I   F   Y       *       H   T   T   P   /   1   .
+0000700   1  \r  \n   H   O   S   T   :       2   3   9   .   2   5   5
+0000720   .   2   5   5   .   2   5   0   :   1   9   0   0  \r  \n   S
+0000740   e   r   v   e   r   :       U   P   n   P   /   1   .   0  \r
+0000760  \n   L   o   c   a   t   i   o   n   :       1   9   2   .   1
+0001000   6   8   .   3   .   1   9   5  \r  \n   N   T   :       u   r
+0001020   n   :   b   a   m   b   u   l   a   b   -   c   o   m   :   d
+0001040   e   v   i   c   e   :   3   d   p   r   i   n   t   e   r   :
+0001060   1  \r  \n   U   S   N   :       0   3   9   1   9   A   3   B
+0001100   0   1   0   0   2   5   4  \r  \n   C   a   c   h   e   -   C
+0001120   o   n   t   r   o   l   :       m   a   x   -   a   g   e   =
+0001140   1   8   0   0  \r  \n   D   e   v   M   o   d   e   l   .   b
+0001160   a   m   b   u   .   c   o   m   :       N   2   S  \r  \n   D
+0001200   e   v   N   a   m   e   .   b   a   m   b   u   .   c   o   m
+0001220   :       A   1  \r  \n   D   e   v   S   i   g   n   a   l   .
+0001240   b   a   m   b   u   .   c   o   m   :       -   5   7  \r  \n
+0001260   D   e   v   C   o   n   n   e   c   t   .   b   a   m   b   u
+0001300   .   c   o   m   :       c   l   o   u   d  \r  \n   D   e   v
+0001320   B   i   n   d   .   b   a   m   b   u   .   c   o   m   :    
+0001340   o   c   c   u   p   i   e   d  \r  \n   D   e   v   s   e   c
+0001360   l   i   n   k   .   b   a   m   b   u   .   c   o   m   :    
+0001400   s   e   c   u   r   e  \r  \n   D   e   v   V   e   r   s   i
+0001420   o   n   .   b   a   m   b   u   .   c   o   m   :       0   1
+0001440   .   0   7   .   0   2   .   0   0  \r  \n   D   e   v   C   a
+0001460   p   .   b   a   m   b   u   .   c   o   m   :       1  \r  \n
+0001500  \r  \n   N   O   T   I   F   Y       *       H   T   T   P   /
+0001520   1   .   1  \r  \n   H   o   s   t   :       2   3   9   .   2
+0001540   5   5   .   2   5   5   .   2   5   0   :   1   9   9   0  \r
+0001560  \n   S   e   r   v   e   r   :       U   P   n   P   /   1   .
+0001600   0  \r  \n   L   o   c   a   t   i   o   n   :       1   9   2
+0001620   .   1   6   8   .   3   .   1   0   9  \r  \n   N   T   :    
+0001640   u   r   n   :   b   a   m   b   u   l   a   b   -   c   o   m
+0001660   :   d   e   v   i   c   e   :   3   d   p   r   i   n   t   e
+0001700   r   :   1  \r  \n   N   T   S   :       s   s   d   p   :   a
+0001720   l   i   v   e  \r  \n   U   S   N   :       3   1   B   8   B
+0001740   P   6   1   1   2   0   1   4   5   3  \r  \n   C   a   c   h
+0001760   e   -   C   o   n   t   r   o   l   :       m   a   x   -   a
+0002000   g   e   =   1   8   0   0  \r  \n   D   e   v   M   o   d   e
+0002020   l   .   b   a   m   b   u   .   c   o   m   :       O   1   C
+0002040   2  \r  \n   D   e   v   N   a   m   e   .   b   a   m   b   u
+0002060   .   c   o   m   :       B   o   b       t   h   e       B   u
+0002100   i   l   d   e   r  \r  \n   D   e   v   C   o   n   n   e   c
+0002120   t   .   b   a   m   b   u   .   c   o   m   :       c   l   o
+0002140   u   d  \r  \n   D   e   v   B   i   n   d   .   b   a   m   b
+0002160   u   .   c   o   m   :       o   c   c   u   p   i   e   d  \r
+0002200  \n   D   e   v   s   e   c   l   i   n   k   .   b   a   m   b
+0002220   u   .   c   o   m   :       s   e   c   u   r   e  \r  \n   D
+0002240   e   v   I   n   f   .   b   a   m   b   u   .   c   o   m   :
+0002260       w   l   a   n   0  \r  \n   D   e   v   V   e   r   s   i
+0002300   o   n   .   b   a   m   b   u   .   c   o   m   :       0   1
+0002320   .   0   1   .   0   5   .   0   0  \r  \n   D   e   v   C   a
+0002340   p   .   b   a   m   b   u   .   c   o   m   :       1  \r  \n
+0002360  \r  \n   2   0   2   6   /   0   4   /   1   5       0   4   :
+0002400   2   6   :   2   8       s   o   c   a   t   [   5   5   6   6
+0002420   ]       W       e   x   i   t   i   n   g       o   n       s
+0002440   i   g   n   a   l       1   5  \n
+0002451
+--- socat UDP-RECV:1990 (10s budget) ---
+0000000   2   0   2   6   /   0   4   /   1   5       0   4   :   2   6
+0000020   :   3   8       s   o   c   a   t   [   5   5   7   2   ]    
+0000040   W       e   x   i   t   i   n   g       o   n       s   i   g
+0000060   n   a   l       1   5  \n
+0000067
+[OK] SSDP phase exited cleanly
+
+=== Phase 2: RTSPS (TCP 322) ===
+--- TLS cert (openssl s_client, 10s budget) ---
+subject=CN=31B8BP611201453
+issuer=C=CN, O=BBL Technologies Co. Ltd, CN=BBL Device CA O1C2-V2
+sha256 Fingerprint=05:5E:1C:A4:64:02:4B:BD:26:2E:47:F6:92:73:4F:52:84:D7:B7:C1:D8:5C:C1:15:EE:B9:32:C8:BF:AD:80:A6
+notBefore=Jan 12 11:34:34 2026 GMT
+notAfter=Jan 10 11:34:34 2036 GMT
+--- ffprobe live/1 (15s budget) ---
+Option tls_verify skipped - not known to demuxer.
+Option rw_timeout skipped - not known to demuxer.
+Input #0, rtsp, from 'rtsps://bblp:<REDACTED_ACCESS_CODE>@192.168.3.109:322/streaming/live/1':
+  Metadata:
+    title           : rtsp stream server
+    comment         : Wed Apr 15 12:16:28 2026
+  Duration: N/A, start: 0.033700, bitrate: N/A
+  Stream #0:0: Video: h264 (High), yuv420p(progressive), 1680x1080, 30 fps, 30 tbr, 90k tbn
+--- ffprobe live/2 probe (Bird's-Eye, 15s budget) ---
+[rtsp @ 0x5618532c0340] method DESCRIBE failed: 404 Stream Not Found
+rtsps://bblp:<REDACTED_ACCESS_CODE>@192.168.3.109:322/streaming/live/2: Server returned 404 Not Found
+[OK] RTSPS phase exited cleanly
+
+=== Phase 3: MQTT (TCP 8883, 60s window) ===
+--- mosquitto_sub on device/31B8BP611201453/# ---
+Error: Problem setting TLS options: File not found.
+[OK] MQTT phase exited cleanly
+
+=== Phase 4: go2rtc smoketest ===
+--- rendered config (CODE redacted) ---
+api:
+  listen: ":1984"
+rtsp:
+  listen: ":8554"
+streams:
+  bambu:
+    - rtspx://bblp:<REDACTED>@192.168.3.109:322/streaming/live/1
+log:
+  level: info
+--- starting go2rtc ---
+go2rtc PID=5591 — sleeping 5s for startup
+--- :1984/api/streams ---
+{
+  "bambu": {
+    "producers": [
+      {
+        "url": "rtspx://bblp:<REDACTED_ACCESS_CODE>@192.168.3.109:322/streaming/live/1"
+      }
+    ],
+    "consumers": null
+  }
+}
+--- ffprobe restream rtsp://127.0.0.1:8554/bambu (10s budget) ---
+[rtsp @ 0x55820081e2c0] method SETUP failed: 461 Unsupported transport
+Input #0, rtsp, from 'rtsp://127.0.0.1:8554/bambu':
+  Metadata:
+    title           : go2rtc/1.9.14
+  Duration: N/A, start: 0.030244, bitrate: N/A
+  Stream #0:0: Video: h264 (High), yuv420p(progressive), 1680x1080, 30 fps, 30 tbr, 90k tbn
+--- go2rtc stderr tail ---
+04:26:42.090 INF go2rtc platform=linux/amd64 revision=b5948cf version=1.9.14
+04:26:42.090 INF config path=/tmp/go2rtc-spike.yaml
+04:26:42.091 INF [rtsp] listen addr=:8554
+04:26:42.091 INF [api] listen addr=:1984
+04:26:42.091 INF [webrtc] listen tcp addr=[::]:8555
+04:26:42.091 INF [webrtc] listen udp addr=192.168.3.249:8555
+[OK] go2rtc phase exited cleanly
+
+==========================================
+Spike complete — log: /root/h2c-spike-20260415-042608.log
+==========================================
+
+--- cleanup (rc=0) ---
+killing go2rtc PID=5591
+--- done ---
+
+==========================================
+=== Phase 3 RE-RUN: MQTT via paho-mqtt ===
+==========================================
+NOTE: mosquitto_sub 2.0.21 rejected --insecure --cafile /dev/null with
+"Problem setting TLS options: File not found" and "Protocol error" with
+system CA. Switched to python3-paho-mqtt with ssl.CERT_NONE — works.
+
+[connect] rc=Success
+[topic] device/31B8BP611201453/report  (only topic seen in 45s window)
+
+--- Print-state field discovery (print=RUNNING during capture) ---
+print.gcode_state = 'RUNNING'           ← Phase 14 Adaptive Mode trigger field
+print.mc_print_stage = '2'
+print.mc_stage = 2
+print.print_type = 'cloud'
+print.state = 4
+print.2D.cur_stage.state = 0
+print.job.cur_stage.state = 2
+print.device.bed.state = 2
+print.device.extruder.state = 2
+
+--- Top-level print.* keys observed (subset) ---
+2D, 3D, ams, ams_status, batch_id, bed_target_temper, bed_temper,
+big_fan1_speed, command, cooling_fan_speed, device, err, fail_reason,
+fan_gear, file, force_upgrade, gcode_file, gcode_file_prepare_percent,
+gcode_state, hms, home_flag, hw_switch_state, info, ipcam, job, job_attr,
+job_id, layer_num, mc_print_stage, mc_print_sub_stage, print_type, ...
+
+(layer_num=4 of total_layer_num=703 captured during print)

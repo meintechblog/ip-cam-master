@@ -1,0 +1,9 @@
+api:
+  listen: ":1984"
+rtsp:
+  listen: ":8554"
+streams:
+  bambu:
+    - rtspx://bblp:{{CODE}}@{{IP}}:322/streaming/live/1
+log:
+  level: info
