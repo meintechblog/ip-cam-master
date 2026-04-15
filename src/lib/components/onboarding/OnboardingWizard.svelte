@@ -37,12 +37,39 @@
 		bambuStep = 'preflight';
 	}
 
-	function handleBambuPreflightDone(ok: boolean) {
-		if (ok) {
-			bambuStep = 'done';
-		} else {
-			// Cancel → back to kameras list
+	let bambuSaveError = $state<string | null>(null);
+	let bambuSaving = $state(false);
+	let bambuSaved = $state(false);
+
+	async function handleBambuPreflightDone(ok: boolean) {
+		if (!ok) {
 			goto('/kameras');
+			return;
+		}
+		bambuStep = 'done';
+		bambuSaving = true;
+		bambuSaveError = null;
+		try {
+			const res = await fetch('/api/onboarding/bambu/save-camera', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: name || `Bambu Lab ${bambuSerial.slice(-6)}`,
+					ip: bambuIp,
+					serialNumber: bambuSerial,
+					accessCode: bambuAccessCode
+				})
+			});
+			const data = await res.json();
+			if (!res.ok || !data.success) {
+				bambuSaveError = data.error ?? 'Unbekannter Fehler beim Speichern';
+				return;
+			}
+			bambuSaved = true;
+		} catch (err) {
+			bambuSaveError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bambuSaving = false;
 		}
 	}
 
@@ -657,15 +684,22 @@
 						<CheckCircle class="w-6 h-6 text-green-400" />
 						<span class="text-text-primary font-bold">Pre-Flight bestanden</span>
 					</div>
-					<p class="text-sm text-text-secondary">
-						LXC-Provisionierung für Bambu-Drucker folgt in Phase 12. Für jetzt sind Seriennummer
-						und Access Code validiert und bereit zur Speicherung.
-					</p>
+					{#if bambuSaving}
+						<p class="text-sm text-text-secondary">Speichere Kamera…</p>
+					{:else if bambuSaveError}
+						<p class="text-sm text-red-400">Speichern fehlgeschlagen: {bambuSaveError}</p>
+					{:else if bambuSaved}
+						<p class="text-sm text-text-secondary">
+							Seriennummer und Access Code verschlüsselt gespeichert. LXC-Provisionierung
+							folgt in Phase 12.
+						</p>
+					{/if}
 					<div class="flex justify-end">
 						<button
 							type="button"
+							disabled={bambuSaving}
 							onclick={() => goto('/kameras')}
-							class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium cursor-pointer"
+							class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							Zur Kameraübersicht
 						</button>
