@@ -373,12 +373,18 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 		//   → Manufacturer="Terrasse", Model="" (empty), URI="MobotixS15D"
 		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
 		const isLoxone = camera.cameraType === 'loxone';
+		const isBambu = camera.cameraType === 'bambu';
 		const manufacturer = safeName; // Becomes the display name in Protect
 		const model = ''; // Empty — otherwise appended to display name
 
 		// Detect real camera model (e.g. "MOBOTIX S15D-Sec" → "MobotixS15D")
-		let onvifName = isLoxone ? `Loxone${safeName}` : 'GenericCamera'; // Unique per camera for Protect discovery
-		if (!isLoxone) {
+		let onvifName = 'GenericCamera';
+		if (isLoxone) {
+			onvifName = `Loxone${safeName}`;
+		} else if (isBambu) {
+			// Bambu H2C reports DevModel=O1C2 in SSDP (field-notes ground truth)
+			onvifName = 'BambuLabH2C';
+		} else {
 			try {
 				const pw = decrypt(camera.password);
 				const versionResult = await ssh.execCommand(
@@ -404,8 +410,8 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 		);
 
 		// Patch ONVIF server to advertise audio (G.711 mulaw) — only for Mobotix (has audio on RTSP)
-		// Loxone Intercom has no audio stream, so we skip the audio patch
-		if (!isLoxone) {
+		// Loxone Intercom and Bambu H2C have no audio stream, so we skip the audio patch
+		if (!isLoxone && !isBambu) {
 			await pushFileToContainer(ssh, camera.vmid, getOnvifAudioPatch(), '/tmp/patch-onvif-audio.js');
 			await executeOnContainer(ssh, camera.vmid, 'node /tmp/patch-onvif-audio.js');
 		}

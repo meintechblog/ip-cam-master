@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { createCameraContainer, configureGo2rtc, getNextVmid, verifyStream } from '$lib/server/services/onboarding';
+import { createCameraContainer, configureGo2rtc, configureOnvif, getNextVmid, verifyStream } from '$lib/server/services/onboarding';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const { cameraId } = await request.json();
@@ -31,7 +31,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		// 3. Deploy go2rtc config (rtspx:// passthrough) and start service
 		await configureGo2rtc(cameraId, fromTemplate);
 
-		// 4. Verify go2rtc /api/streams reports the Bambu stream live
+		// 4. Deploy ONVIF server so UniFi Protect can auto-discover + adopt
+		await configureOnvif(cameraId, fromTemplate);
+
+		// 5. Verify go2rtc /api/streams reports the Bambu stream live
 		const health = await verifyStream(cameraId);
 		if (!health.success) {
 			return json({
