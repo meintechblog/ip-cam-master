@@ -2,8 +2,10 @@
 	import { goto } from '$app/navigation';
 	import StepIndicator from './StepIndicator.svelte';
 	import StepCredentials from './StepCredentials.svelte';
+	import StepBambuCredentials from './StepBambuCredentials.svelte';
+	import StepBambuPreflight from './StepBambuPreflight.svelte';
 	import InlineAlert from '$lib/components/ui/InlineAlert.svelte';
-	import { Loader2, CheckCircle, Camera, Pencil } from 'lucide-svelte';
+	import { Loader2, CheckCircle, Camera, Pencil, Printer } from 'lucide-svelte';
 
 	let {
 		nextVmid,
@@ -11,7 +13,8 @@
 		prefillUsername = '',
 		prefillPassword = '',
 		prefillName = '',
-		cameraType = 'mobotix'
+		cameraType = 'mobotix',
+		prefillSerial = ''
 	}: {
 		nextVmid: number;
 		prefillIp?: string;
@@ -19,7 +22,33 @@
 		prefillPassword?: string;
 		prefillName?: string;
 		cameraType?: string;
+		prefillSerial?: string;
 	} = $props();
+
+	// ── Bambu branch state (parallel to the Mobotix/Loxone state below) ──
+	let bambuIp = $state(prefillIp);
+	let bambuSerial = $state(prefillSerial);
+	let bambuAccessCode = $state('');
+	let bambuStep = $state<'credentials' | 'preflight' | 'done'>('credentials');
+
+	function handleBambuCredentialsSubmit(result: { serialNumber: string; accessCode: string }) {
+		bambuSerial = result.serialNumber;
+		bambuAccessCode = result.accessCode;
+		bambuStep = 'preflight';
+	}
+
+	function handleBambuPreflightDone(ok: boolean) {
+		if (ok) {
+			bambuStep = 'done';
+		} else {
+			// Cancel → back to kameras list
+			goto('/kameras');
+		}
+	}
+
+	function handleBambuPreflightRetry() {
+		bambuStep = 'credentials';
+	}
 
 	// Wizard state
 	let currentStep = $state(0);
@@ -601,6 +630,51 @@
 	}
 </script>
 
+{#if cameraType === 'bambu'}
+	<div class="max-w-3xl">
+		<div class="flex items-center gap-2 mb-6">
+			<Printer class="w-5 h-5 text-accent" />
+			<h1 class="text-lg font-bold text-text-primary">Bambu Lab — Onboarding</h1>
+		</div>
+		<div class="bg-bg-card border border-border rounded-lg p-6">
+			{#if bambuStep === 'credentials'}
+				<StepBambuCredentials
+					ip={bambuIp}
+					prefillSerial={bambuSerial}
+					onSubmit={handleBambuCredentialsSubmit}
+				/>
+			{:else if bambuStep === 'preflight'}
+				<StepBambuPreflight
+					ip={bambuIp}
+					serialNumber={bambuSerial}
+					accessCode={bambuAccessCode}
+					onDone={handleBambuPreflightDone}
+					onRetry={handleBambuPreflightRetry}
+				/>
+			{:else if bambuStep === 'done'}
+				<div class="space-y-4">
+					<div class="flex items-center gap-3">
+						<CheckCircle class="w-6 h-6 text-green-400" />
+						<span class="text-text-primary font-bold">Pre-Flight bestanden</span>
+					</div>
+					<p class="text-sm text-text-secondary">
+						LXC-Provisionierung für Bambu-Drucker folgt in Phase 12. Für jetzt sind Seriennummer
+						und Access Code validiert und bereit zur Speicherung.
+					</p>
+					<div class="flex justify-end">
+						<button
+							type="button"
+							onclick={() => goto('/kameras')}
+							class="bg-accent text-white rounded-lg px-6 py-2 hover:bg-accent/90 transition-colors font-medium cursor-pointer"
+						>
+							Zur Kameraübersicht
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</div>
+{:else}
 <div class="max-w-3xl">
 	<StepIndicator {currentStep} {cameraType} />
 
@@ -740,3 +814,4 @@
 		</div>
 	</div>
 </div>
+{/if}

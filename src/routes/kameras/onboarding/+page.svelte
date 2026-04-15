@@ -1,13 +1,25 @@
 <script lang="ts">
 	import OnboardingWizard from '$lib/components/onboarding/OnboardingWizard.svelte';
-	import { Loader2, Wifi, Check, PlayCircle, XCircle, KeyRound, Copy } from 'lucide-svelte';
+	import { Loader2, Wifi, Check, PlayCircle, XCircle, KeyRound, Copy, Printer } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
 
 	let { data } = $props();
 
 	let selectedIp = $state<string | null>(null);
-	let discovered = $state<{ ip: string; type: string; alreadyOnboarded: boolean; name: string | null }[]>([]);
+	let selectedSerial = $state<string>('');
+	let discovered = $state<{
+		ip: string;
+		type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'bambu' | 'unknown';
+		alreadyOnboarded: boolean;
+		name: string | null;
+		serialNumber?: string;
+		model?: string;
+		lanModeHint?: string;
+	}[]>([]);
+	// Manual-add device-type selector (shown above the default wizard)
+	let manualDeviceType = $state<'mobotix' | 'loxone' | 'bambu'>('mobotix');
+	let manualBambuIp = $state('');
 	let scanning = $state(true);
 	let discoveryThumbnails = $state<Map<string, string>>(new Map());
 
@@ -195,16 +207,35 @@
 		registerLoading = false;
 	}
 
-	async function selectCamera(ip: string, name?: string | null, type?: string) {
+	async function selectCamera(ip: string, name?: string | null, type?: string, serialNumber?: string) {
 		prefillName = name || '';
 		selectedCameraType = type || 'mobotix';
-		const cred = await fetchCredentials(ip, selectedCameraType);
-		if (cred.success) {
-			prefillUser = cred.username;
-			prefillPass = cred.password;
-			prefillCredName = cred.name;
+		selectedSerial = serialNumber || '';
+		if (selectedCameraType !== 'bambu') {
+			const cred = await fetchCredentials(ip, selectedCameraType);
+			if (cred.success) {
+				prefillUser = cred.username;
+				prefillPass = cred.password;
+				prefillCredName = cred.name;
+			}
+		} else {
+			// Bambu has its own credential shape (Serial + Access Code); no generic creds
+			prefillUser = '';
+			prefillPass = '';
+			prefillCredName = '';
 		}
 		selectedIp = ip;
+	}
+
+	function startManualBambu() {
+		if (!manualBambuIp.trim()) return;
+		selectedCameraType = 'bambu';
+		selectedSerial = '';
+		prefillName = '';
+		prefillUser = '';
+		prefillPass = '';
+		prefillCredName = '';
+		selectedIp = manualBambuIp.trim();
 	}
 
 	async function startRegister(ip: string, name?: string | null) {
@@ -867,11 +898,49 @@
 			Login "{prefillCredName}" automatisch erkannt und vorausgefüllt.
 		</div>
 	{/if}
-	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} />
+	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} prefillSerial={selectedSerial} />
 {:else}
 	<!-- Manual entry -->
-	<div class="mb-6">
-		<OnboardingWizard nextVmid={data.nextVmid} />
+	<div class="mb-6 space-y-4">
+		<div class="bg-bg-card border border-border rounded-lg p-4">
+			<h3 class="text-sm font-bold text-text-primary mb-3">Kamera manuell hinzufügen</h3>
+			<div class="flex flex-wrap gap-3 mb-4">
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input type="radio" name="manual-device-type" value="mobotix" bind:group={manualDeviceType} class="accent-accent" />
+					<span class="text-sm text-text-primary">Mobotix / Loxone</span>
+				</label>
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input type="radio" name="manual-device-type" value="bambu" bind:group={manualDeviceType} class="accent-accent" />
+					<span class="text-sm text-text-primary flex items-center gap-1.5"><Printer class="w-3.5 h-3.5 text-orange-400" /> Bambu Lab</span>
+				</label>
+			</div>
+
+			{#if manualDeviceType === 'bambu'}
+				<div class="space-y-3">
+					<div>
+						<label for="manual-bambu-ip" class="block text-xs text-text-secondary mb-1">Drucker-IP</label>
+						<input
+							id="manual-bambu-ip"
+							type="text"
+							bind:value={manualBambuIp}
+							placeholder="192.168.3.109"
+							autocomplete="off"
+							class="w-full md:w-72 bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono"
+						/>
+					</div>
+					<button
+						type="button"
+						onclick={startManualBambu}
+						disabled={!manualBambuIp.trim()}
+						class="bg-orange-500 text-white rounded-lg px-4 py-2 hover:bg-orange-600 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						Weiter — Seriennummer + Access Code eingeben
+					</button>
+				</div>
+			{:else}
+				<OnboardingWizard nextVmid={data.nextVmid} />
+			{/if}
+		</div>
 	</div>
 
 	<!-- Auto-Discovery -->
@@ -926,6 +995,12 @@
 								{:else if cam.type === 'mobotix'}
 									<span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">MOBOTIX</span>
 									<span class="text-xs text-text-secondary">Braucht Pipeline (go2rtc + ONVIF)</span>
+								{:else if cam.type === 'bambu'}
+									<Printer class="w-4 h-4 text-orange-400" />
+									<span class="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400">BAMBU LAB {cam.model ?? ''}</span>
+									{#if cam.lanModeHint === 'likely_on'}
+										<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">LAN Mode</span>
+									{/if}
 								{:else}
 									<span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 uppercase">{cam.type}</span>
 								{/if}
@@ -936,6 +1011,13 @@
 									class="bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors text-sm cursor-pointer"
 								>
 									Registrieren
+								</button>
+							{:else if cam.type === 'bambu'}
+								<button
+									onclick={() => selectCamera(cam.ip, cam.name ?? 'Bambu Lab H2C', 'bambu', cam.serialNumber)}
+									class="bg-orange-500 text-white rounded-lg px-4 py-2 hover:bg-orange-600 transition-colors text-sm cursor-pointer"
+								>
+									Einrichten
 								</button>
 							{:else}
 								<button
