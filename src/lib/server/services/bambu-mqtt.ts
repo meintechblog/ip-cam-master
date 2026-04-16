@@ -22,12 +22,20 @@ function groupForState(gcodeState: string): 'live' | 'idle' | 'unknown' {
 	return 'unknown';
 }
 
+type BambuConnectionError =
+	| 'WRONG_ACCESS_CODE'
+	| 'LAN_MODE_OFF'
+	| 'PRINTER_UNREACHABLE'
+	| 'MQTT_DISCONNECTED';
+
 interface Subscriber {
 	cameraId: number;
 	serial: string;
 	client: MqttClient;
 	lastGroup: 'live' | 'idle' | 'unknown';
 	reconnectAttempts: number;
+	lastError: BambuConnectionError | null;
+	lastMessageAt: number;
 }
 
 const subscribers = new Map<number, Subscriber>();
@@ -87,12 +95,15 @@ function attachHandlers(sub: Subscriber): void {
 
 	client.on('connect', () => {
 		sub.reconnectAttempts = 0;
+		sub.lastError = null;
 		client.subscribe(`device/${serial}/report`, (err) => {
 			if (err) console.error(`[bambu-mqtt] cam=${cameraId} subscribe error:`, err.message);
 		});
 	});
 
 	client.on('message', (_topic, payload) => {
+		sub.lastMessageAt = Date.now();
+		sub.lastError = null;
 		let msg: any;
 		try {
 			msg = JSON.parse(payload.toString());
@@ -106,12 +117,26 @@ function attachHandlers(sub: Subscriber): void {
 	});
 
 	client.on('error', (err) => {
-		console.error(`[bambu-mqtt] cam=${cameraId} client error:`, err.message);
+		const msg = err.message.toLowerCase();
+		// MQTT return codes: 4 = bad username/password, 5 = not authorized
+		if (msg.includes('not authorized') || msg.includes('bad user') || msg.includes('connack') && msg.includes('4') || msg.includes('connack') && msg.includes('5')) {
+			sub.lastError = 'WRONG_ACCESS_CODE';
+		} else if (msg.includes('econnrefused') || msg.includes('ehostunreach') || msg.includes('timeout')) {
+			sub.lastError = 'LAN_MODE_OFF';
+		} else if (msg.includes('enotfound') || msg.includes('enetunreach')) {
+			sub.lastError = 'PRINTER_UNREACHABLE';
+		} else {
+			sub.lastError = 'MQTT_DISCONNECTED';
+		}
+		console.error(`[bambu-mqtt] cam=${cameraId} error: ${err.message} → ${sub.lastError}`);
 	});
 
 	client.on('close', () => {
 		sub.reconnectAttempts += 1;
-		// mqtt.js auto-reconnects; just log occasionally to avoid spam
+		// If no explicit error fired, still flag as disconnected after 3 retries
+		if (sub.reconnectAttempts >= 3 && !sub.lastError) {
+			sub.lastError = 'MQTT_DISCONNECTED';
+		}
 		if (sub.reconnectAttempts % 10 === 1) {
 			console.log(`[bambu-mqtt] cam=${cameraId} reconnecting (attempt ${sub.reconnectAttempts})`);
 		}
@@ -140,7 +165,9 @@ async function connectSubscriber(cameraId: number): Promise<void> {
 		serial: cam.serialNumber,
 		client,
 		lastGroup: 'unknown',
-		reconnectAttempts: 0
+		reconnectAttempts: 0,
+		lastError: null,
+		lastMessageAt: 0
 	};
 	subscribers.set(cameraId, sub);
 	attachHandlers(sub);
@@ -185,12 +212,26 @@ export function getBambuState(cameraId: number): {
 	printState: string | null;
 	streamGroup: 'live' | 'idle' | 'unknown';
 	connected: boolean;
+	error: BambuConnectionError | null;
+	lastMessageAgeSeconds: number | null;
 } {
 	const sub = subscribers.get(cameraId);
 	const cam = db.select().from(cameras).where(eq(cameras.id, cameraId)).get() as any;
+	const lastMessageAgeSeconds =
+		sub?.lastMessageAt ? Math.round((Date.now() - sub.lastMessageAt) / 1000) : null;
+
+	let error = sub?.lastError ?? null;
+	// Also flag MQTT_DISCONNECTED if we haven't heard from the printer in 2+ min
+	// and the client is not reporting connected (printer silent / turned off)
+	if (!error && sub && !sub.client.connected && sub.reconnectAttempts >= 3) {
+		error = 'MQTT_DISCONNECTED';
+	}
+
 	return {
 		printState: cam?.printState ?? null,
 		streamGroup: sub?.lastGroup ?? 'unknown',
-		connected: !!sub?.client.connected
+		connected: !!sub?.client.connected,
+		error,
+		lastMessageAgeSeconds
 	};
 }

@@ -136,6 +136,8 @@ export interface CameraCardData {
 	// Bambu-only — populated when cameraType === 'bambu'
 	printState?: string | null;
 	streamMode?: string | null;
+	bambuError?: string | null;
+	bambuMqttConnected?: boolean;
 }
 
 export interface ProtectCamera {

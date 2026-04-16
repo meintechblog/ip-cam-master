@@ -7,6 +7,7 @@ import { getSettings } from '$lib/server/services/settings';
 import { decrypt } from '$lib/server/services/crypto';
 import { getProtectStatus } from '$lib/server/services/protect';
 import { getFlappingCameras } from '$lib/server/services/events';
+import { getBambuState } from '$lib/server/services/bambu-mqtt';
 import type { CameraCardData, ProtectCameraMatch } from '$lib/types';
 
 export const GET: RequestHandler = async () => {
@@ -140,7 +141,9 @@ export const GET: RequestHandler = async () => {
 					lxcMemory,
 					lxcMac,
 					printState: cam.cameraType === 'bambu' ? (cam.printState ?? null) : null,
-					streamMode: cam.cameraType === 'bambu' ? (cam.streamMode ?? 'adaptive') : null
+					streamMode: cam.cameraType === 'bambu' ? (cam.streamMode ?? 'adaptive') : null,
+					bambuError: cam.cameraType === 'bambu' ? (getBambuState(cam.id).error ?? null) : null,
+					bambuMqttConnected: cam.cameraType === 'bambu' ? getBambuState(cam.id).connected : undefined
 				} satisfies CameraCardData;
 			})
 		);

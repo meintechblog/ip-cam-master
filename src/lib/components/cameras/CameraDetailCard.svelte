@@ -310,6 +310,42 @@
 			<!-- Bambu-specific: print state + stream mode (Phase 14) -->
 			{#if camera.cameraType === 'bambu'}
 				<div class="mt-3 pt-3 border-t border-border space-y-2">
+					{#if camera.bambuError}
+						{@const isAuth = camera.bambuError === 'WRONG_ACCESS_CODE'}
+						<div class="rounded border {isAuth ? 'border-red-500/40 bg-red-500/10' : 'border-yellow-500/40 bg-yellow-500/10'} p-2 text-xs space-y-1.5">
+							<div class="flex items-center justify-between gap-2">
+								<span class="{isAuth ? 'text-red-400' : 'text-yellow-400'} font-medium">
+									{#if camera.bambuError === 'WRONG_ACCESS_CODE'}
+										Access Code ungültig
+									{:else if camera.bambuError === 'LAN_MODE_OFF'}
+										LAN Mode am Drucker aus
+									{:else if camera.bambuError === 'PRINTER_UNREACHABLE'}
+										Drucker nicht erreichbar
+									{:else if camera.bambuError === 'MQTT_DISCONNECTED'}
+										MQTT getrennt
+									{:else}
+										{camera.bambuError}
+									{/if}
+								</span>
+								{#if isAuth}
+									<button onclick={openCredentials} class="px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 cursor-pointer text-[10px]">
+										Aktualisieren
+									</button>
+								{/if}
+							</div>
+							<p class="text-text-secondary text-[10px] leading-tight">
+								{#if camera.bambuError === 'WRONG_ACCESS_CODE'}
+									Der Access Code rotiert, wenn LAN Mode auf dem Drucker neu aktiviert wird. Prüfe ihn am Drucker-Display.
+								{:else if camera.bambuError === 'LAN_MODE_OFF'}
+									Settings → WLAN → LAN Mode am Drucker-Display einschalten.
+								{:else if camera.bambuError === 'PRINTER_UNREACHABLE'}
+									Drucker nicht im Netzwerk (abgeschaltet oder anderer Subnet).
+								{:else}
+									MQTT-Verbindung wird alle 15s neu versucht.
+								{/if}
+							</p>
+						</div>
+					{/if}
 					<div class="flex items-center justify-between text-xs">
 						<span class="text-text-secondary">Druckstatus</span>
 						{#if !camera.printState}
