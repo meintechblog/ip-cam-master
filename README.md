@@ -139,6 +139,16 @@ Then in the IP-Cam-Master web UI:
 - On success, the app allocates a VMID, clones an LXC from the `ipcm-base` template, deploys `go2rtc.yaml` with `rtspx://` passthrough, starts go2rtc + ONVIF server
 - UniFi Protect auto-discovers the new ONVIF device within ~1 min; click **Adopt** in Protect
 
+**⚠ UniFi Protect adoption — Port 1984 beachten:**
+
+When manually adding the camera in Protect (or re-adopting after a Protect update), use the **container IP with port 1984** (go2rtc's API port), not just the bare IP:
+
+```
+192.168.3.xxx:1984
+```
+
+Port 1984 is where go2rtc's ONVIF-compatible endpoint lives. Without the port, Protect may find the ONVIF server on port 8899 but fail to negotiate the stream correctly. If Protect loses the camera after a firmware update, remove it and re-add with `<container-ip>:1984`.
+
 **⚠ Firmware caveats:**
 
 - **Do not enable Bambu Studio concurrent LAN control** while the app is adopted — the H2C's Live555 server has a single-connection limit for the camera. Use Studio via the cloud pathway if you need both.
