@@ -92,22 +92,37 @@ export async function getProtectCameras(): Promise<ProtectCamera[]> {
 }
 
 export function matchCamerasToProtect(
-	ourCameras: { id: number; vmid: number; ip: string; containerIp: string | null }[],
+	ourCameras: { id: number; vmid: number; ip: string; containerIp: string | null; lxcMac: string | null }[],
 	protectCameras: ProtectCamera[]
 ): Map<number, ProtectCameraMatch> {
 	const matches = new Map<number, ProtectCameraMatch>();
 
 	for (const cam of ourCameras) {
-		// Pipeline cameras (vmid > 0): match by container IP
-		// Native ONVIF cameras (vmid === 0): match by camera IP
-		const matchIp = cam.vmid > 0 ? cam.containerIp : cam.ip;
-		if (!matchIp) continue;
+		let match: ProtectCamera | undefined;
 
-		// Prefer adopted+connected cameras over disconnected ghosts at the same IP
-		const candidates = protectCameras.filter((p) => p.host === matchIp);
-		const match = candidates.find((p) => p.isAdopted && p.state === 'CONNECTED')
-			?? candidates.find((p) => p.isAdopted)
-			?? candidates[0];
+		// Primary: match by MAC address (survives DHCP changes)
+		if (cam.lxcMac) {
+			const normalizedMac = cam.lxcMac.toUpperCase().replace(/[:-]/g, '');
+			const candidates = protectCameras.filter((p) => {
+				const pMac = (p.mac || '').toUpperCase().replace(/[:-]/g, '');
+				return pMac === normalizedMac;
+			});
+			match = candidates.find((p) => p.isAdopted && p.state === 'CONNECTED')
+				?? candidates.find((p) => p.isAdopted)
+				?? candidates[0];
+		}
+
+		// Fallback: match by IP (for cameras without MAC or native ONVIF)
+		if (!match) {
+			const matchIp = cam.vmid > 0 ? cam.containerIp : cam.ip;
+			if (!matchIp) continue;
+
+			const candidates = protectCameras.filter((p) => p.host === matchIp);
+			match = candidates.find((p) => p.isAdopted && p.state === 'CONNECTED')
+				?? candidates.find((p) => p.isAdopted)
+				?? candidates[0];
+		}
+
 		if (match) {
 			matches.set(cam.id, {
 				protectId: match.id,
@@ -123,7 +138,9 @@ export function matchCamerasToProtect(
 	return matches;
 }
 
-export async function getProtectStatus(): Promise<ProtectStatus> {
+export async function getProtectStatus(
+	macMap?: Map<number, string | null>
+): Promise<ProtectStatus> {
 	// Return cached data if still valid (30s TTL)
 	if (statusCache && Date.now() < statusCache.expiresAt) {
 		return statusCache.data;
@@ -140,7 +157,8 @@ export async function getProtectStatus(): Promise<ProtectStatus> {
 				id: c.id,
 				vmid: c.vmid,
 				ip: c.ip,
-				containerIp: c.containerIp
+				containerIp: c.containerIp,
+				lxcMac: macMap?.get(c.id) ?? null
 			})),
 			protectCameras
 		);

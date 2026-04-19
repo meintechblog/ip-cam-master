@@ -121,6 +121,10 @@ function attachHandlers(sub: Subscriber): void {
 		// MQTT return codes: 4 = bad username/password, 5 = not authorized
 		if (msg.includes('not authorized') || msg.includes('bad user') || msg.includes('connack') && msg.includes('4') || msg.includes('connack') && msg.includes('5')) {
 			sub.lastError = 'WRONG_ACCESS_CODE';
+			// Stop auto-reconnect to avoid hammering the printer with bad credentials.
+			// addBambuSubscriber() will re-create the client with new credentials.
+			sub.client.end(true);
+			console.log(`[bambu-mqtt] cam=${cameraId} stopped reconnect — wrong access code`);
 		} else if (msg.includes('econnrefused') || msg.includes('ehostunreach') || msg.includes('timeout')) {
 			sub.lastError = 'LAN_MODE_OFF';
 		} else if (msg.includes('enotfound') || msg.includes('enetunreach')) {
@@ -197,7 +201,12 @@ export function stopBambuSubscribers(): void {
 }
 
 export async function addBambuSubscriber(cameraId: number): Promise<void> {
-	if (subscribers.has(cameraId)) return;
+	// Remove stale subscriber if it exists (e.g. after access code rotation)
+	const existing = subscribers.get(cameraId);
+	if (existing) {
+		existing.client.end(true);
+		subscribers.delete(cameraId);
+	}
 	await connectSubscriber(cameraId);
 }
 

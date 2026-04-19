@@ -3,12 +3,35 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { decrypt } from '$lib/server/services/crypto';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { request as httpRequest } from 'node:http';
 
-const execAsync = promisify(exec);
+const JPEG_HEADERS = { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' };
 
+/**
+ * Fetch a JPEG frame from go2rtc's built-in frame API.
+ * Works for all camera types (Mobotix, Loxone, Bambu) as long as
+ * go2rtc is running in the container and the stream is active.
+ */
+async function fetchGo2rtcFrame(containerIp: string, streamName: string): Promise<Buffer | null> {
+	try {
+		const frameUrl = `http://${containerIp}:1984/api/frame.jpeg?src=${streamName}`;
+		const res = await fetch(frameUrl, { signal: AbortSignal.timeout(10000) });
+		if (!res.ok) return null;
+		const buf = Buffer.from(await res.arrayBuffer());
+		// Validate: minimum size + JPEG magic bytes
+		if (buf.length > 500 && buf[0] === 0xff && buf[1] === 0xd8) {
+			return buf;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Direct HTTP fetch with Basic auth — fallback for native ONVIF cameras
+ * that have no go2rtc container.
+ */
 function httpGetBuffer(url: string, authHeader: string, timeoutMs: number): Promise<{ status: number; body: Buffer }> {
 	return new Promise((resolve) => {
 		const req = httpRequest(url, {
@@ -36,91 +59,30 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	try {
-		// Bambu cameras: snapshot not available until Phase 12 LXC is provisioned
-		// and go2rtc restream is running.
-		if (camera.cameraType === 'bambu') {
-			if (!camera.containerIp) {
-				return new Response(null, { status: 204 });
+		// Primary path: go2rtc frame API (works for all camera types with a container)
+		if (camera.containerIp) {
+			const frame = await fetchGo2rtcFrame(camera.containerIp, camera.streamName);
+			if (frame) {
+				return new Response(new Uint8Array(frame), { headers: JPEG_HEADERS });
 			}
-			const { stdout } = await execAsync(
-				`ffmpeg -y -v quiet -rtsp_transport tcp -i "rtsp://${camera.containerIp}:8554/${camera.streamName}" -frames:v 1 -f image2 -q:v 2 pipe:1`,
-				{ timeout: 8000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
-			);
-			if (stdout.length < 500 || stdout[0] !== 0xff || stdout[1] !== 0xd8) {
-				return new Response('Snapshot unavailable', { status: 502 });
-			}
-			return new Response(new Uint8Array(stdout), {
-				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
-			});
-		}
-
-		const password = decrypt(camera.password);
-
-		if (camera.cameraType === 'loxone') {
-			// Loxone Intercom: grab single frame from MJPEG stream via ffmpeg
-			// Use containerIp nginx proxy if available, otherwise direct with auth
-			let source: string;
-			if (camera.containerIp) {
-				source = `http://${camera.containerIp}:8081/mjpg/video.mjpg`;
-			} else {
-				const auth = Buffer.from(`${camera.username}:${password}`).toString('base64');
-				source = `http://${camera.ip}/mjpg/video.mjpg`;
-			}
-
-			let stdout: Buffer;
-			try {
-				const result = await execAsync(
-					`ffmpeg -y -v quiet -headers "Authorization: Basic ${Buffer.from(`${camera.username}:${password}`).toString('base64')}\\r\\n" -i "http://${camera.ip}/mjpg/video.mjpg" -frames:v 1 -f image2 -q:v 2 pipe:1`,
-					{ timeout: 8000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
-				);
-				stdout = result.stdout;
-			} catch (e: any) {
-				// ffmpeg exits non-zero but might still have output
-				stdout = e?.stdout || Buffer.alloc(0);
-			}
-
-			if (stdout.length < 500) {
-				return new Response('Snapshot unavailable', { status: 502 });
-			}
-
-			return new Response(new Uint8Array(stdout), {
-				headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
-			});
-		}
-
-		// Mobotix: use node's native fetch with Basic auth. Replacing shell-exec
-		// curl — that path was returning auth-failure HTML for some S16 firmwares
-		// despite the same command working from a shell directly.
-		const authHeader = 'Basic ' + Buffer.from(`${camera.username}:${password}`).toString('base64');
-		async function fetchSnap(path: string): Promise<Buffer> {
-			const { status, body } = await httpGetBuffer(`http://${camera.ip}${path}`, authHeader, 3000);
-			if (status !== 200) return Buffer.alloc(0);
-			return body;
-		}
-		function isJpeg(buf: Buffer): boolean {
-			return buf.length > 1000 && buf[0] === 0xff && buf[1] === 0xd8;
-		}
-
-		let body = await fetchSnap('/record/current.jpg');
-		if (!isJpeg(body)) {
-			// Fallback: extract first JPEG frame out of faststream multipart via ffmpeg
-			try {
-				const r = await execAsync(
-					`ffmpeg -y -v quiet -headers "Authorization: ${authHeader}\\r\\n" -i "http://${camera.ip}/control/faststream.jpg?stream=full&fps=5&needlength" -frames:v 1 -f image2 -q:v 2 pipe:1`,
-					{ timeout: 6000, maxBuffer: 1024 * 1024, encoding: 'buffer' }
-				);
-				body = r.stdout as Buffer;
-			} catch (e: any) {
-				body = (e?.stdout as Buffer) ?? Buffer.alloc(0);
-			}
-		}
-		if (!isJpeg(body)) {
+			// go2rtc frame API failed — stream might not be active (e.g. Bambu idle)
 			return new Response('Snapshot unavailable', { status: 502 });
 		}
 
-		return new Response(new Uint8Array(body), {
-			headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache, no-store' }
-		});
+		// Fallback: native ONVIF cameras without a container (e.g. Auffahrt)
+		// Use direct HTTP fetch with Basic auth
+		if (camera.cameraType === 'mobotix-onvif' || camera.cameraType === 'onvif') {
+			const password = decrypt(camera.password);
+			const authHeader = 'Basic ' + Buffer.from(`${camera.username}:${password}`).toString('base64');
+			const { status, body } = await httpGetBuffer(`http://${camera.ip}/record/current.jpg`, authHeader, 3000);
+			if (status === 200 && body.length > 1000 && body[0] === 0xff && body[1] === 0xd8) {
+				return new Response(new Uint8Array(body), { headers: JPEG_HEADERS });
+			}
+			return new Response('Snapshot unavailable', { status: 502 });
+		}
+
+		// No container, not native ONVIF — nothing we can do
+		return new Response(null, { status: 204 });
 	} catch {
 		return new Response('Snapshot timeout', { status: 504 });
 	}

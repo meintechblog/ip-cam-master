@@ -148,12 +148,18 @@ export const GET: RequestHandler = async () => {
 			})
 		);
 
+		// Build MAC map from live Proxmox data for Protect MAC-based matching
+		const macMap = new Map<number, string | null>();
+		for (const result of results) {
+			macMap.set(result.id, result.lxcMac);
+		}
+
 		// Fetch Protect status (30s cache, cheap on 10s polling) and flapping cameras
 		let protectMatches = new Map<number, ProtectCameraMatch>();
 		let protectConfigured = false;
 		let flappingIds: number[] = [];
 		try {
-			const protectStatus = await getProtectStatus();
+			const protectStatus = await getProtectStatus(macMap);
 			protectConfigured = protectStatus.connected;
 			protectMatches = protectStatus.cameras;
 		} catch {

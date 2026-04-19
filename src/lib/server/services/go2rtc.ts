@@ -20,7 +20,7 @@ export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 	const { streamName, cameraIp, username, password, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
 	const sourceUrl = `http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength`;
-	const vaapiBase = `#video=h264#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
+	const vaapiBase = `#video=h264#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 5`;
 
 	// HQ: full resolution + audio passthrough
 	const hqVideo = `ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k`;
@@ -88,7 +88,7 @@ export function generateGo2rtcConfigLoxone(params: {
 	const { streamName, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
 	const sourceUrl = `http://localhost:8081/mjpg/video.mjpg`;
-	const vaapiBase = `#video=h264#raw=-r ${fps}#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
+	const vaapiBase = `#video=h264#raw=-r ${fps}#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 5`;
 
 	return `streams:
   ${streamName}:
@@ -124,7 +124,7 @@ export function generateGo2rtcConfigBambu(params: {
 	// LQ re-encodes from the local HQ restream via localhost:8554).
 	return `streams:
   ${streamName}:
-    - ${sourceUrl}#video=copy#audio=copy
+    - ${sourceUrl}#video=copy#audio=copy#reconnect_timeout=30
   ${streamName}-low:
     - ffmpeg:rtsp://127.0.0.1:8554/${streamName}#video=h264#hardware=vaapi#width=840#height=540#raw=-g 30#raw=-maxrate 500k#raw=-bufsize 1000k
 
