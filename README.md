@@ -250,6 +250,8 @@ Each camera LXC container uses minimal resources:
 | RAM | 192 MB |
 | Disk | 4 GB |
 | CPU | 1 core |
+| HQ Bitrate | 2000 kbit/s (default, configurable per camera) |
+| LQ Bitrate | 400 kbit/s (auto: HQ/5) |
 | Services | go2rtc + ONVIF server (systemd) |
 | Hostname | `cam-<camera-name>` |
 | VMID | Auto-assigned (next 1000 boundary) |

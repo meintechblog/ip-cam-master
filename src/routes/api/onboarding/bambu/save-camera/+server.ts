@@ -44,7 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			width: 1680,
 			height: 1080,
 			fps: 30,
-			bitrate: 5000,
+			bitrate: 2000,
 			streamName: `bambu-${serialNumber.slice(-6)}`,
 			status: CAMERA_STATUS.PENDING,
 			accessCode: encrypt(accessCode),

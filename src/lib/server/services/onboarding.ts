@@ -146,7 +146,7 @@ export async function saveCameraRecord(params: {
 			width: params.width || 1280,
 			height: params.height || 720,
 			fps: params.fps || 20,
-			bitrate: params.bitrate || 5000,
+			bitrate: params.bitrate || 2000,
 			streamName,
 			status: CAMERA_STATUS.PENDING
 		})

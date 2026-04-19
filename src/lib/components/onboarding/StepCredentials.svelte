@@ -7,7 +7,7 @@
 		width = $bindable(1280),
 		height = $bindable(720),
 		fps = $bindable(20),
-		bitrate = $bindable(5000),
+		bitrate = $bindable(2000),
 		onSubmit,
 		credentialsMatched = false
 	}: {

@@ -40,7 +40,7 @@ export const cameras = sqliteTable('cameras', {
 	width: integer('width').notNull().default(1280),
 	height: integer('height').notNull().default(720),
 	fps: integer('fps').notNull().default(20),
-	bitrate: integer('bitrate').notNull().default(5000),
+	bitrate: integer('bitrate').notNull().default(2000),
 	streamName: text('stream_name').notNull(),
 	rtspUrl: text('rtsp_url'),
 	containerIp: text('container_ip'),

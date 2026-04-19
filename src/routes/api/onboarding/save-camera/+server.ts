@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			width: width || 1280,
 			height: height || 720,
 			fps: fps || 20,
-			bitrate: bitrate || 5000,
+			bitrate: bitrate || 2000,
 			vmid
 		});
 

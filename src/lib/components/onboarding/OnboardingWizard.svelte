@@ -129,7 +129,7 @@
 	let width = $state(1280);
 	let height = $state(720);
 	let fps = $state(20);
-	let bitrate = $state(5000);
+	let bitrate = $state(2000);
 
 	// Name editing
 	let editingName = $state(false);

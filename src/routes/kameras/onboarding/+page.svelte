@@ -546,7 +546,7 @@
 			body: JSON.stringify({
 				name: cam.name || cam.ip, ip: cam.ip, username, password,
 				width: testData.width || 1280, height: testData.height || 720,
-				fps: testData.fps || 20, bitrate: testData.bitrate || 5000,
+				fps: testData.fps || 20, bitrate: testData.bitrate || 2000,
 				vmid: testData.nextVmid || data.nextVmid + idx, cameraType: cam.type
 			}),
 		});

@@ -299,7 +299,7 @@ describe('onboarding service', () => {
 			width: 1280,
 			height: 720,
 			fps: 20,
-			bitrate: 5000,
+			bitrate: 2000,
 			streamPath: '/stream0/mobotix.mjpeg',
 			containerIp: '10.0.0.5'
 		};

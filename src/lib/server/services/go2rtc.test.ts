@@ -34,7 +34,7 @@ describe('go2rtc service', () => {
 				width: 1280,
 				height: 720,
 				fps: 20,
-				bitrate: 5000
+				bitrate: 2000
 			});
 
 			expect(yaml).toContain('cam-200:');
@@ -54,7 +54,7 @@ describe('go2rtc service', () => {
 				width: 1280,
 				height: 720,
 				fps: 20,
-				bitrate: 5000
+				bitrate: 2000
 			});
 
 			expect(yaml).toContain('#hardware=vaapi');
@@ -69,10 +69,10 @@ describe('go2rtc service', () => {
 				width: 1280,
 				height: 720,
 				fps: 20,
-				bitrate: 5000
+				bitrate: 2000
 			});
 
-			expect(yaml).toContain('-bufsize 10000k');
+			expect(yaml).toContain('-bufsize 4000k');
 		});
 
 		it('uses HTTP MJPEG for video + RTSP audio passthrough with reconnect', () => {
@@ -84,7 +84,7 @@ describe('go2rtc service', () => {
 				width: 1280,
 				height: 720,
 				fps: 20,
-				bitrate: 5000
+				bitrate: 2000
 			});
 
 			// HTTP video source with reconnect
