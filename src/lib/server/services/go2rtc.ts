@@ -128,17 +128,15 @@ export function generateGo2rtcConfigBambu(params: {
 }): string {
 	const { streamName, printerIp, accessCode } = params;
 	const sourceUrl = `rtspx://bblp:${accessCode}@${printerIp}:322/streaming/live/1`;
-	// Two streams advertised to match the ONVIF config (HQ + LQ for Protect's
-	// grid thumbnails). The H2C only exposes one RTSP path, so `-low` is an
-	// alias to the same source — go2rtc de-duplicates producers internally
-	// (one connection to the printer, two named endpoints for consumers).
-	// The H2C single-connection limit is respected since both names share
-	// the same producer session.
+	// HQ: passthrough (no transcode, 1680x1080 h264 as-is from printer).
+	// LQ: VAAPI-accelerated downscale to 840x540 for Protect grid thumbnails.
+	// Both share one RTSPS connection to the printer (go2rtc pulls HQ once,
+	// LQ re-encodes from the local HQ restream via localhost:8554).
 	return `streams:
   ${streamName}:
     - ${sourceUrl}#video=copy#audio=copy
   ${streamName}-low:
-    - rtsp://127.0.0.1:8554/${streamName}
+    - ffmpeg:rtsp://127.0.0.1:8554/${streamName}#video=h264#hardware=vaapi#width=840#height=540#raw=-g 30#raw=-maxrate 500k#raw=-bufsize 1000k
 
 ffmpeg:
   bin: ffmpeg
