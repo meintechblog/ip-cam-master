@@ -103,7 +103,11 @@ export function matchCamerasToProtect(
 		const matchIp = cam.vmid > 0 ? cam.containerIp : cam.ip;
 		if (!matchIp) continue;
 
-		const match = protectCameras.find((p) => p.host === matchIp);
+		// Prefer adopted+connected cameras over disconnected ghosts at the same IP
+		const candidates = protectCameras.filter((p) => p.host === matchIp);
+		const match = candidates.find((p) => p.isAdopted && p.state === 'CONNECTED')
+			?? candidates.find((p) => p.isAdopted)
+			?? candidates[0];
 		if (match) {
 			matches.set(cam.id, {
 				protectId: match.id,
