@@ -88,7 +88,10 @@ export function generateGo2rtcConfigLoxone(params: {
 	const { streamName, width, height, fps, bitrate } = params;
 	const bufsize = bitrate * 2;
 	const sourceUrl = `http://localhost:8081/mjpg/video.mjpg`;
-	const vaapiBase = `#video=h264#raw=-r ${fps}#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 5`;
+	// Loxone Intercom natively streams at 25fps. Cap to 15fps — a doorbell
+	// camera doesn't need 20+fps, and fewer frames = less VAAPI encode work.
+	const cappedFps = Math.min(fps, 15);
+	const vaapiBase = `#video=h264#raw=-r ${cappedFps}#raw=-g ${cappedFps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 5`;
 
 	return `streams:
   ${streamName}:
