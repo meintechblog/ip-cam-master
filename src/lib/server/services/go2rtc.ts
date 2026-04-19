@@ -26,19 +26,15 @@ export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 	const hqVideo = `ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k`;
 	const audioSource = `ffmpeg:rtsp://${username}:${password}@${cameraIp}:554/stream0/mobotix.mjpeg#raw=-vn#audio=copy#raw=-rtsp_transport tcp`;
 
-	// LQ: half resolution, lower bitrate, no audio
-	const lqWidth = Math.round(width / 2);
-	const lqHeight = Math.round(height / 2);
-	const lqBitrate = Math.max(500, Math.round(bitrate / 5));
-	const lqBufsize = lqBitrate * 2;
-	const lqVideo = `ffmpeg:${sourceUrl}${vaapiBase}#width=${lqWidth}#height=${lqHeight}#raw=-maxrate ${lqBitrate}k#raw=-bufsize ${lqBufsize}k`;
-
+	// LQ: alias to HQ via local restream. Protect 1.20.7 only uses one stream
+	// and sometimes picks LQ — by pointing it at HQ, we guarantee full
+	// resolution regardless of which ONVIF profile Protect selects.
 	return `streams:
   ${streamName}:
     - ${hqVideo}
     - ${audioSource}
   ${streamName}-low:
-    - ${lqVideo}
+    - rtsp://127.0.0.1:8554/${streamName}
 
 ffmpeg:
   bin: ffmpeg
@@ -94,17 +90,11 @@ export function generateGo2rtcConfigLoxone(params: {
 	const sourceUrl = `http://localhost:8081/mjpg/video.mjpg`;
 	const vaapiBase = `#video=h264#raw=-r ${fps}#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2`;
 
-	// LQ: half resolution, lower bitrate
-	const lqWidth = Math.round(width / 2);
-	const lqHeight = Math.round(height / 2);
-	const lqBitrate = Math.max(500, Math.round(bitrate / 5));
-	const lqBufsize = lqBitrate * 2;
-
 	return `streams:
   ${streamName}:
     - ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k
   ${streamName}-low:
-    - ffmpeg:${sourceUrl}${vaapiBase}#width=${lqWidth}#height=${lqHeight}#raw=-maxrate ${lqBitrate}k#raw=-bufsize ${lqBufsize}k
+    - rtsp://127.0.0.1:8554/${streamName}
 
 ffmpeg:
   bin: ffmpeg
@@ -241,12 +231,12 @@ export function generateOnvifConfig(params: {
       bitrate: ${bitrate}
       quality: 4
     lowQuality:
-      rtsp: /${streamName}-low
+      rtsp: /${streamName}
       snapshot: /api/frame.jpeg?src=${streamName}
-      width: ${lqWidth}
-      height: ${lqHeight}
+      width: ${width}
+      height: ${height}
       framerate: ${fps}
-      bitrate: ${lqBitrate}
+      bitrate: ${bitrate}
       quality: 1
     target:
       hostname: localhost
