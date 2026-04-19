@@ -371,7 +371,9 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 		//
 		// Goal: Name="Terrasse", Model="MobotixS15D" in Protect UI
 		//   → Manufacturer="Terrasse", Model="" (empty), URI="MobotixS15D"
-		const safeName = camera.name.replace(/[^a-zA-Z0-9]/g, '');
+		const safeName = camera.name
+			.replace(/[Ää]/g, 'ae').replace(/[Öö]/g, 'oe').replace(/[Üü]/g, 'ue').replace(/ß/g, 'ss')
+			.replace(/[^a-zA-Z0-9]/g, '');
 		const isLoxone = camera.cameraType === 'loxone';
 		const isBambu = camera.cameraType === 'bambu';
 		const manufacturer = safeName; // Becomes the display name in Protect
