@@ -245,6 +245,7 @@
 					</div>
 				</div>
 				<p class="text-[11px] text-text-secondary/80">Zu finden im Printer-Display unter <span class="font-mono">Einstellungen → LAN</span>. Serial + Access Code werden bei der Bambu-Onboarding-Routine angeboten und dienen gleichzeitig als RTSP-Login für UniFi Protect.</p>
+				<p class="text-[11px] text-yellow-400/90">⚠ Tippfalle: Der Access Code enthält oft <span class="font-mono font-bold">0</span> (Null) und <span class="font-mono font-bold">O</span> (großes O) nebeneinander. Code nochmal am Drucker-Display verifizieren, auf dem Display sind beide Zeichen klar unterscheidbar.</p>
 			{/if}
 
 			{#if feedback}

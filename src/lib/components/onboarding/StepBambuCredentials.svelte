@@ -153,6 +153,7 @@
 				</button>
 			</div>
 			<p class="mt-1 text-xs text-text-secondary">Am Drucker-Display: Einstellungen → Netzwerk → Access Code</p>
+			<p class="mt-1 text-xs text-yellow-400/90">⚠ Tippfalle: Im Code können <span class="font-mono font-bold">0</span> (Null) und <span class="font-mono font-bold">O</span> (großes O) sehr ähnlich aussehen. Am Drucker-Display sind sie klar unterscheidbar — zur Sicherheit dort gegenprüfen.</p>
 		</div>
 	</div>
 
