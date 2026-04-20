@@ -119,11 +119,16 @@
 				id="bambu-serial"
 				type="text"
 				bind:value={serialNumber}
+				readonly={!!prefillSerial}
 				autocomplete="off"
 				placeholder="z.B. 31B8BP611201453"
-				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono"
+				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono {prefillSerial ? 'opacity-70 cursor-not-allowed' : ''}"
 			/>
-			<p class="mt-1 text-xs text-text-secondary">Am Drucker-Display: Einstellungen → Geräteinformationen</p>
+			{#if prefillSerial}
+				<p class="mt-1 text-xs text-green-400">Aus SSDP-Discovery übernommen — nicht mehr manuell zu tippen.</p>
+			{:else}
+				<p class="mt-1 text-xs text-text-secondary">Am Drucker-Display: Einstellungen → Geräteinformationen</p>
+			{/if}
 		</div>
 		<div>
 			<label for="bambu-code" class="block text-sm font-medium text-text-secondary mb-1">Access Code</label>

@@ -880,9 +880,11 @@
 						<input
 							type="text"
 							bind:value={credPromptSerial}
+							readonly={credPrompt.kind === 'bambu' && !!credPrompt.prefillSerial}
 							placeholder="Seriennummer"
 							autocomplete="off"
-							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono"
+							title={credPrompt.kind === 'bambu' && credPrompt.prefillSerial ? 'Aus SSDP-Discovery übernommen' : ''}
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono {credPrompt.kind === 'bambu' && credPrompt.prefillSerial ? 'opacity-70 cursor-not-allowed' : ''}"
 						/>
 						<input
 							type="password"
