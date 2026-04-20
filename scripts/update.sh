@@ -28,6 +28,20 @@ PRE_SCHEMA_HASH="${2:-}"
 LOG="${LOG:-/tmp/ip-cam-master-update-$(date +%s).log}"
 EXITCODE_FILE="${EXITCODE_FILE:-${LOG%.log}.exitcode}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/ip-cam-master}"
+LOCK_FILE="/run/ip-cam-master-deploy.lock"
+
+exec 9>"$LOCK_FILE" || {
+	echo "ERROR: cannot open lock file $LOCK_FILE" | tee -a "${LOG:-/dev/stderr}"
+	echo "=== UPDATE_RESULT: failed (lock open failed, nothing changed) ===" | tee -a "${LOG:-/dev/stderr}"
+	echo 1 > "$EXITCODE_FILE" 2>/dev/null || true
+	exit 1
+}
+if ! flock -n 9; then
+	echo "ERROR: another deploy/update is already running (lock held on $LOCK_FILE)" | tee -a "${LOG:-/dev/stderr}"
+	echo "=== UPDATE_RESULT: failed (deploy lock busy, nothing changed) ===" | tee -a "${LOG:-/dev/stderr}"
+	echo 1 > "$EXITCODE_FILE" 2>/dev/null || true
+	exit 1
+fi
 
 # Ensure log file exists without truncating — the Node caller may have
 # written pre-update lines (auto-backup status) that must be preserved.
