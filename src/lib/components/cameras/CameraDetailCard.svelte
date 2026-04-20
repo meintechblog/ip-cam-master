@@ -2,6 +2,7 @@
 	import type { CameraCardData } from '$lib/types';
 	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power, Lock, LockOpen, Eye, EyeOff } from 'lucide-svelte';
 	import AdoptionGuide from './AdoptionGuide.svelte';
+	import { copyToClipboard } from '$lib/utils/clipboard';
 
 	let { camera }: { camera: CameraCardData } = $props();
 	let copied = $state(false);
@@ -34,23 +35,25 @@
 		codec: string | null;
 	} | null>(null);
 
-	function copyRtsp() {
-		if (camera.rtspUrl) {
-			navigator.clipboard.writeText(camera.rtspUrl);
+	async function copyRtsp() {
+		if (!camera.rtspUrl) return;
+		if (await copyToClipboard(camera.rtspUrl)) {
 			copied = true;
 			setTimeout(() => { copied = false; }, 2000);
 		}
 	}
 
 	let onvifCopied = $state(false);
-	function copyOnvif() {
+	async function copyOnvif() {
 		if (!camera.containerIp) return;
-		navigator.clipboard.writeText(`${camera.containerIp}:8899`);
-		onvifCopied = true;
-		setTimeout(() => { onvifCopied = false; }, 2000);
+		if (await copyToClipboard(`${camera.containerIp}:8899`)) {
+			onvifCopied = true;
+			setTimeout(() => { onvifCopied = false; }, 2000);
+		}
 	}
 
-	// RTSP-Auth state — lazy-loaded on first reveal / toggle
+	// RTSP-Auth state — username loads on mount (visible by default),
+	// password stays in memory but is only rendered behind the eye-toggle.
 	let authCreds = $state<{ username: string; password: string } | null>(null);
 	let authLoading = $state(false);
 	let authError = $state<string | null>(null);
@@ -59,6 +62,14 @@
 	let authPwCopied = $state(false);
 	let authUrlCopied = $state(false);
 	let authToggleHint = $state<string | null>(null);
+
+	// Auto-fetch once when the card shows an auth-enabled camera — so the
+	// username is visible immediately instead of being gated behind a click.
+	$effect(() => {
+		if (camera.rtspAuthEnabled && !authCreds && !authLoading) {
+			void ensureAuthCreds();
+		}
+	});
 
 	async function ensureAuthCreds(): Promise<void> {
 		if (authCreds) return;
@@ -84,16 +95,18 @@
 	async function copyAuthUser() {
 		await ensureAuthCreds();
 		if (!authCreds) return;
-		navigator.clipboard.writeText(authCreds.username);
-		authUserCopied = true;
-		setTimeout(() => { authUserCopied = false; }, 2000);
+		if (await copyToClipboard(authCreds.username)) {
+			authUserCopied = true;
+			setTimeout(() => { authUserCopied = false; }, 2000);
+		}
 	}
 	async function copyAuthPw() {
 		await ensureAuthCreds();
 		if (!authCreds) return;
-		navigator.clipboard.writeText(authCreds.password);
-		authPwCopied = true;
-		setTimeout(() => { authPwCopied = false; }, 2000);
+		if (await copyToClipboard(authCreds.password)) {
+			authPwCopied = true;
+			setTimeout(() => { authPwCopied = false; }, 2000);
+		}
 	}
 	async function copyAuthRtspUrl() {
 		await ensureAuthCreds();
@@ -101,9 +114,10 @@
 		const u = encodeURIComponent(authCreds.username);
 		const p = encodeURIComponent(authCreds.password);
 		const withCreds = camera.rtspUrl.replace(/^rtsp:\/\//, `rtsp://${u}:${p}@`);
-		navigator.clipboard.writeText(withCreds);
-		authUrlCopied = true;
-		setTimeout(() => { authUrlCopied = false; }, 2000);
+		if (await copyToClipboard(withCreds)) {
+			authUrlCopied = true;
+			setTimeout(() => { authUrlCopied = false; }, 2000);
+		}
 	}
 
 	async function setRtspAuth(enabled: boolean) {
@@ -837,7 +851,7 @@
 						<div class="flex items-center gap-2 pt-1 border-t border-white/5">
 							<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">User</span>
 							<code class="text-xs text-text-primary font-mono flex-1 truncate">
-								{authCreds?.username ?? (authLoading ? '…' : '••••••')}
+								{authCreds?.username ?? (authLoading ? '…' : '')}
 							</code>
 							<button onclick={copyAuthUser} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Benutzername kopieren">
 								{#if authUserCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}

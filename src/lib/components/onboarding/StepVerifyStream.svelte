@@ -2,6 +2,7 @@
 	import InlineAlert from '$lib/components/ui/InlineAlert.svelte';
 	import { Loader2, CheckCircle, Copy, Check } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { copyToClipboard } from '$lib/utils/clipboard';
 
 	let {
 		loading = false,
@@ -27,12 +28,9 @@
 
 	async function copyRtspUrl() {
 		if (!rtspUrl) return;
-		try {
-			await navigator.clipboard.writeText(rtspUrl);
+		if (await copyToClipboard(rtspUrl)) {
 			copied = true;
 			setTimeout(() => { copied = false; }, 2000);
-		} catch {
-			// Fallback for non-secure contexts
 		}
 	}
 </script>
