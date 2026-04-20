@@ -16,7 +16,7 @@ vi.mock('$lib/server/db/schema', () => ({
 	cameras: {}
 }));
 
-import { generateGo2rtcConfig, generateSystemdUnit, getInstallCommands, checkStreamHealth } from './go2rtc';
+import { generateGo2rtcConfig, generateSystemdUnit, getInstallCommands, checkStreamHealth, generateGo2rtcConfigBambuA1 } from './go2rtc';
 
 describe('go2rtc service', () => {
 	beforeEach(() => {
@@ -154,6 +154,53 @@ describe('go2rtc service', () => {
 
 			expect(result.active).toBe(false);
 			expect(result.producers).toBe(0);
+		});
+	});
+
+	describe('generateGo2rtcConfigBambuA1 (Phase 18 / BAMBU-A1-08)', () => {
+		it('emits exec: source with env-var access code and kill signals', () => {
+			const yaml = generateGo2rtcConfigBambuA1({
+				streamName: 'bambu_a1_test',
+				printerIp: '192.168.3.195',
+				accessCode: 'abc12345'
+			});
+
+			expect(yaml).toContain('bambu_a1_test:');
+			expect(yaml).toContain('exec:env A1_ACCESS_CODE=abc12345');
+			expect(yaml).toContain('node /opt/ipcm/bambu-a1-camera.mjs');
+			expect(yaml).toContain('--ip=192.168.3.195');
+			expect(yaml).toContain('#killsignal=15');
+			expect(yaml).toContain('#killtimeout=5');
+			// Access code must NOT appear as --access-code= (ps-ax leak per Anti-Pattern 4)
+			expect(yaml).not.toContain('--access-code=');
+		});
+
+		it('includes the rtsp server block when rtspAuth is provided', () => {
+			const yaml = generateGo2rtcConfigBambuA1({
+				streamName: 'bambu_a1',
+				printerIp: '10.0.0.1',
+				accessCode: 'z',
+				rtspAuth: { username: 'bambu', password: 'z' }
+			});
+
+			expect(yaml).toContain('rtsp:');
+			expect(yaml).toContain("username: 'bambu'");
+		});
+	});
+
+	describe('getInstallCommands — Bambu A1 Node hoist (Phase 18 / Pitfall 5)', () => {
+		it('without forBambuA1 flag, installs the existing baseline (no Node)', () => {
+			const cmds = getInstallCommands();
+			expect(cmds.some((c) => c.includes('nodesource.com'))).toBe(false);
+		});
+
+		it('with forBambuA1=true, appends exactly one NodeSource Node 22 install line', () => {
+			const base = getInstallCommands();
+			const withA1 = getInstallCommands(true);
+
+			expect(withA1.length).toBe(base.length + 1);
+			expect(withA1[withA1.length - 1]).toMatch(/nodesource\.com\/setup_22\.x/);
+			expect(withA1[withA1.length - 1]).toContain('nodejs');
 		});
 	});
 });
