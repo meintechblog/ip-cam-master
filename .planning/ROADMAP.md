@@ -23,7 +23,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 - [ ] **Phase 15: Docs & Installer Validation** — README for LAN Mode setup, firmware caveats, Bambu Studio trade-off; installer confirmed unchanged
 - [ ] **Phase 16: Deploy Flow — .git/HEAD Sync** — rsync-Deploy muss `.git/HEAD` auf der VM auf den deployten Commit setzen, damit der In-App-Updater nicht durch false-positive dirty-tree blockiert wird (TBD plans)
 - [ ] **Phase 17: RTSP Auth + Bambu Credentials Management** — go2rtc RTSP-Auth pro Kamera mit Original-Credentials (Mobotix/Loxone: username/password, Bambu: serial/access_code); Bambu-Credentials-Verwaltung in Settings; In-UI Display der Adoption-Creds; RTSP-URL mit embedded Creds für Copy-Paste (TBD plans)
-- [ ] **Phase 18: Bambu Lab A1 Camera Integration** — Add A1 as a fourth `camera_type` branch alongside H2C: reuses SSDP discovery + MQTT subscriber + credentials + Protect adoption; adds JPEG-over-TLS :6000 ingestion (auth + frame parser + ffmpeg pipe), model-split preflight, A1 go2rtc yaml variant, UI gates for A1-irrelevant H2C fields. Feasibility proven by `.planning/spikes/001-004`. (TBD plans)
+- [ ] **Phase 18: Bambu Lab A1 Camera Integration** — Add A1 as a fourth `camera_type` branch alongside H2C: reuses SSDP discovery + MQTT subscriber + credentials + Protect adoption; adds JPEG-over-TLS :6000 ingestion (auth + frame parser + ffmpeg pipe), model-split preflight, A1 go2rtc yaml variant, UI gates for A1-irrelevant H2C fields. Feasibility proven by `.planning/spikes/001-004`. (6 plans, planned 2026-04-20)
 
 ## Phase Details
 
@@ -113,7 +113,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 ### Phase 18: Bambu Lab A1 Camera Integration
 **Goal**: User can onboard a Bambu Lab A1 printer end-to-end — discovery → credentials → preflight → LXC provisioning → stream transcoding → UniFi Protect adoption — with the H2C branch's reusable pieces reused unchanged and only the A1-specific JPEG-over-TLS ingestion path added.
 **Depends on**: Phase 11 (Bambu foundation: SSDP + credentials + preflight skeleton), Phase 12 (go2rtc output wiring + LXC template), Phase 13 (Protect adoption flow). A1 is additive on top of the H2C branch.
-**Requirements**: TBD — new BAMBU-A1-* IDs will be coined in `/gsd:spec-phase 18` or `/gsd:discuss-phase 18` and merged into REQUIREMENTS.md.
+**Requirements**: BAMBU-A1-01, BAMBU-A1-02, BAMBU-A1-03, BAMBU-A1-04, BAMBU-A1-05, BAMBU-A1-06, BAMBU-A1-07, BAMBU-A1-08, BAMBU-A1-09, BAMBU-A1-10, BAMBU-A1-11, BAMBU-A1-12 (12 / 12 mapped; added to REQUIREMENTS.md on 2026-04-20)
 **Success Criteria** (what must be TRUE):
   1. User can discover their Bambu A1 in the onboarding wizard labeled "Bambu Lab A1" (SSDP already allowlists `A1` — see `bambu-discovery.ts:27`; no change needed for discovery itself)
   2. User sees a preflight verdict specific to A1 — TCP:8883 MQTT auth + TCP:6000 camera TLS handshake pass; the H2C-only RTSPS:322 check is skipped (currently mis-diagnoses A1 as "LAN Mode off" — see spike 002)
@@ -122,7 +122,13 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
   5. MQTT subscriber (`bambu-mqtt.ts`) serves A1 subscribers with zero code changes (verified byte-for-byte compatible in spike 003)
   6. Auth-packet byte encoding is unit-tested — exact 80-byte output asserted — so the silent-failure mode documented in spike 004 §2 can never regress
   7. If the A1 reports `tutk_server: "enable"` (cloud-mode active), the user receives a helpful preflight hint explaining LAN-only mode is required, rather than a cryptic timeout
-**Plans**: TBD — see `.planning/spikes/MANIFEST.md` for the consolidated reuse-vs-new breakdown (~260 LOC new A1-specific code; MQTT/discovery/credentials reused unchanged).
+**Plans**: 6 plans
+- [ ] 18-01-PLAN.md — Schema + capabilities foundation (cameras.model + PRINTER_CAPABILITIES export + Drizzle push) — Wave 1
+- [ ] 18-02-PLAN.md — bambu-a1-auth.ts (TDD): buildAuth + golden fixture + regression test — Wave 1
+- [ ] 18-03-PLAN.md — LXC Node script + generateBambuA1Go2rtcYaml + onboarding A1 branch + Node-install hoist — Wave 2
+- [ ] 18-04-PLAN.md — Model-aware preflight + checkTls6000Real + checkTutkDisabledReal + route model threading — Wave 2
+- [ ] 18-05-PLAN.md — MQTT TUTK runtime watch (edge-trigger + conditional reset) — Wave 2
+- [ ] 18-06-PLAN.md — Snapshot endpoint + saveCameraRecord model + capability-gated UI + manual UAT checkpoint — Wave 3
 **Spike evidence**: `.planning/spikes/001-a1-port-surface/`, `002-a1-rtsps-native/`, `003-a1-mqtt-lan/`, `004-a1-stream-fallback/`. Live proof frame at `004-.../frame-001.jpg`.
 
 ## Progress
@@ -137,4 +143,4 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 | 15. Docs & Installer Validation | 0/? | Not started | - |
 | 16. Deploy Flow — .git/HEAD Sync | 0/? | Not started | - |
 | 17. RTSP Auth + Bambu Credentials Management | 0/? | Not started | - |
-| 18. Bambu Lab A1 Camera Integration | 0/? | Not started | - |
+| 18. Bambu Lab A1 Camera Integration | 0/6 | Planned | - |

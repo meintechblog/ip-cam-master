@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "Bambu Lab H2C Kamera-Integration"
 status: roadmap_complete
-stopped_at: "Phase 18 context gathered (.planning/phases/18-bambu-a1-camera-integration/18-CONTEXT.md), ready for /gsd:plan-phase 18"
-last_updated: "2026-04-20T15:05:00.000Z"
+stopped_at: "Phase 18 planned — 6 plans in 3 waves (18-01 through 18-06). Requirements BAMBU-A1-01..12 added to REQUIREMENTS.md. Ready for /gsd:execute-phase 18"
+last_updated: "2026-04-20T16:30:00.000Z"
 last_activity: 2026-04-20
 progress:
   total_phases: 7
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 
 ## Current Position
 
-Phase: 10 — H2C Hardware Validation Spike (not yet planned)
-Plan: —
-Status: Roadmap complete, awaiting `/gsd:plan-phase 10`
-Last activity: 2026-04-13 — Roadmap drafted for v1.2 (Phases 10–15, 26 requirements, 100% coverage)
+Phase: 18 — Bambu Lab A1 Camera Integration (planning complete)
+Plan: 6 plans authored (18-01..18-06), 3 waves, ready for execution
+Status: Planning complete, awaiting `/gsd:execute-phase 18`
+Last activity: 2026-04-20 — Phase 18 planned: schema+capabilities (Plan 01 BLOCKING drizzle-push), auth lib+fixture (Plan 02 TDD), LXC script+yaml+onboarding (Plan 03), model-aware preflight (Plan 04), MQTT TUTK watch (Plan 05), snapshot endpoint+UI+UAT checkpoint (Plan 06). Requirements BAMBU-A1-01..12 coined and merged into REQUIREMENTS.md. v1.2 Phases 10–17 remain unplanned.
 
 Phase numbering: continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10.
 
@@ -84,6 +84,11 @@ Shipped milestones:
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- Phase 18 plan: 6 plans in 3 waves. Wave 1 = Plans 01+02 (schema+capabilities, auth lib) with no deps. Wave 2 = Plans 03+04+05 (LXC script, preflight, MQTT watch) depending on 01/02. Wave 3 = Plan 06 (snapshot endpoint + UI + UAT) depending on 01/02/04/05. Plans 03 and 05 have no file overlap with each other → can run parallel in Wave 2; Plan 04 overlaps only in test-file extensions with 03/05 → sequential within-wave scheduling OK.
+- Phase 18 plan: Plan 02 is TDD (buildAuth regression test is the whole point per D-08). Plan 03 task 1 is TDD-flavored (tdd=true on the LXC .mjs script creation task; byte-layout test lives in Plan 02).
+- Phase 18 plan: Plan 01 Task 2 is [BLOCKING] drizzle-kit push — the Drizzle schema change alone passes tsc/build but would fail at runtime when querying cameras.model, so the push task is mandatory.
+- Phase 18 plan: Plan 06 ends with a blocking `checkpoint:human-verify` against real A1 @ 192.168.3.195 — the 7 ROADMAP Success Criteria cannot be satisfied without live hardware (spike evidence only covers protocol correctness, not Protect adoption and UI gating).
+- Phase 18 plan: Security threat model reused verbatim from RESEARCH §Security Threat Model (9 threats, all mitigated or accepted under LAN trust boundary; zero HIGH-severity unmitigated; CN-pinning deferred per CONTEXT.md).
 - v1.2 Roadmap: 6 phases (10–15) derived from 26 BAMBU-* requirements, standard granularity
 - v1.2 Roadmap: Phase 10 is an **investigation spike** against real H2C (not a build phase) — deliverable is `.planning/research/H2C-FIELD-NOTES.md`; Phases 11+ gate on its findings
 - v1.2 Roadmap: Cloud-Auth **dropped from v1.2 scope** — LAN-only; `transport` schema stub added in Phase 11 to keep the v1.3+ door open
@@ -155,6 +160,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last activity: 2026-04-13
-Stopped at: Roadmap complete for v1.2 (Phases 10–15), ready to run `/gsd:plan-phase 10`
+Last activity: 2026-04-20
+Stopped at: Phase 18 planning complete (6 plans, 3 waves). Ready to run `/gsd:execute-phase 18`.
 Resume file: None
