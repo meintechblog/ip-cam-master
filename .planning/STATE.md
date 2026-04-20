@@ -7,7 +7,7 @@ stopped_at: "Roadmap drafted for v1.2 (Phases 10–15), ready for /gsd:plan-phas
 last_updated: "2026-04-13T00:00:00.000Z"
 last_activity: 2026-04-13
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -73,6 +73,10 @@ Shipped milestones:
 | Phase 05 P01 | 6min | 2 tasks | 16 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- 2026-04-20: Phase 16 added — Deploy Flow — .git/HEAD Sync (maintenance/infra, parallel-track zu v1.2 Bambu-Phasen). Ausgelöst durch false-positive "Update blockiert" im Settings-UI am 2026-04-20: VM HEAD hing 38 Commits hinter main, weil rsync-Deploys `.git/HEAD` nicht mit-aktualisieren.
 
 ### Decisions
 

@@ -21,6 +21,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 - [ ] **Phase 13: UniFi Protect Adoption + Dashboard Error Taxonomy** — End-to-end adoption verified; Bambu-specific error states on dashboard; inline Access Code update
 - [ ] **Phase 14: Adaptive Stream Mode + Wizard UI Polish** — User-proposed differentiator: live-during-print / snapshot-during-idle driven by MQTT; polished Bambu credential wizard
 - [ ] **Phase 15: Docs & Installer Validation** — README for LAN Mode setup, firmware caveats, Bambu Studio trade-off; installer confirmed unchanged
+- [ ] **Phase 16: Deploy Flow — .git/HEAD Sync** — rsync-Deploy muss `.git/HEAD` auf der VM auf den deployten Commit setzen, damit der In-App-Updater nicht durch false-positive dirty-tree blockiert wird (TBD plans)
 
 ## Phase Details
 
@@ -95,6 +96,18 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
   3. The existing one-line installer is re-run end-to-end on a clean VM and provisions v1.2 with no Bambu-specific changes to `install.sh`
 **Plans**: TBD
 
+### Phase 16: Deploy Flow — .git/HEAD Sync
+**Goal**: Nach jedem Deploy zeigt `/opt/ip-cam-master/.git/HEAD` auf den tatsächlich deployten Commit, sodass der In-App-Updater (`src/lib/server/services/version.ts` + `/api/update/run`) zuverlässig funktioniert und das Settings-UI die echte installierte Version anzeigt — statt eines false-positive "Lokale Änderungen — Update blockiert" nach jedem rsync-Deploy
+**Depends on**: Nothing (maintenance/infra, kann parallel zu v1.2 Bambu-Phasen laufen)
+**Requirements**: —
+**Success Criteria** (what must be TRUE):
+  1. Nach einem regulären Deploy meldet `git describe --tags --always --dirty` auf der VM kein `-dirty`-Suffix allein aufgrund des Deploys (d.h. HEAD == deployter Commit, Working-Copy clean)
+  2. `/api/update/status` zeigt `isDirty: false` und das korrekte Tag/SHA-Label (z.B. `v1.1 (f0d4801)`) direkt nach jedem Deploy
+  3. `/api/update/run` akzeptiert ein legitimes Update und blockiert nicht mit `dirty_tree` wegen Deploy-Artefakten
+  4. Die gewählte Lösung ist im Deploy-Script, Installer und/oder README dokumentiert, sodass künftige Installationen die Synchronisation automatisch erben
+  5. Einmalig dokumentierte Recovery-Prozedur für Altinstallationen mit bereits driftendem HEAD (z.B. als Note im README oder als Script)
+**Plans**: TBD — Ansatz-Entscheidung in `/gsd:discuss-phase 16`. Optionen: (a) rsync-Deploy-Script erweitert um `git fetch && git reset --hard <sha>` auf der VM, (b) Deploy ersetzt rsync durch git-basiertes Pull auf der VM, (c) SHA-Marker-File (z.B. `.deployed-sha`) das `version.ts` statt `git describe` liest
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -105,3 +118,4 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 | 13. UniFi Protect Adoption + Dashboard Error Taxonomy | 0/? | Not started | - |
 | 14. Adaptive Stream Mode + Wizard UI Polish | 0/? | Not started | - |
 | 15. Docs & Installer Validation | 0/? | Not started | - |
+| 16. Deploy Flow — .git/HEAD Sync | 0/? | Not started | - |
