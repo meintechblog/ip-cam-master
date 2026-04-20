@@ -417,6 +417,18 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 
 		await pushFileToContainer(ssh, camera.vmid, yamlContent, '/etc/go2rtc/go2rtc.yaml');
 
+		// Phase 18 / CR-02: Bambu go2rtc.yaml carries the decrypted access code
+		// in two places (exec env var + rtsp password block). pushFileToContainer
+		// leaves files at mode 644, so any non-root process inside the LXC could
+		// read it. Lock to 600. The container is minimal-privilege (root + go2rtc
+		// systemd unit runs as root), so 600 keeps the secret on disk without
+		// breaking the service. Mobotix/Loxone configs carry only the camera
+		// password which is already exposed via the RTSP URL in the file — still
+		// worth hardening as a follow-up but out of scope for this fix.
+		if (camera.cameraType === 'bambu') {
+			await executeOnContainer(ssh, camera.vmid, 'chmod 600 /etc/go2rtc/go2rtc.yaml');
+		}
+
 		const unitContent = generateSystemdUnit();
 		await pushFileToContainer(ssh, camera.vmid, unitContent, '/etc/systemd/system/go2rtc.service');
 
