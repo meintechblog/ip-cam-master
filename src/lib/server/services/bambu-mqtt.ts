@@ -175,10 +175,21 @@ function attachHandlers(sub: Subscriber): void {
 		handleMqttMessage(sub, payload);
 	});
 
-	client.on('error', (err) => {
+	client.on('error', (err: Error & { code?: number | string }) => {
 		const msg = err.message.toLowerCase();
-		// MQTT return codes: 4 = bad username/password, 5 = not authorized
-		if (msg.includes('not authorized') || msg.includes('bad user') || msg.includes('connack') && msg.includes('4') || msg.includes('connack') && msg.includes('5')) {
+		// Phase 18 / WR-04: Prefer the mqtt library's numeric CONNACK return code
+		// over substring matching. Codes 4 (bad username/password) and 5 (not
+		// authorized) both indicate wrong access code for the A1 LAN broker.
+		// Fall back to narrow substring matches on 'bad user'/'not authorized'
+		// for brokers that surface only a textual reason. The old broad match
+		// against 'connack' + '4'/'5' was prone to matching MQTT v5 broker
+		// strings like "connack version 5" unrelated to authentication.
+		const code = typeof err.code === 'number' ? err.code : undefined;
+		const isAuthFailure =
+			code === 4 ||
+			code === 5 ||
+			/\b(?:bad user name or password|not authorized)\b/i.test(err.message);
+		if (isAuthFailure) {
 			sub.lastError = 'WRONG_ACCESS_CODE';
 			// Stop auto-reconnect to avoid hammering the printer with bad credentials.
 			// addBambuSubscriber() will re-create the client with new credentials.
