@@ -26,7 +26,20 @@ type BambuConnectionError =
 	| 'WRONG_ACCESS_CODE'
 	| 'LAN_MODE_OFF'
 	| 'PRINTER_UNREACHABLE'
-	| 'MQTT_DISCONNECTED';
+	| 'MQTT_DISCONNECTED'
+	| 'A1_CLOUD_MODE_ACTIVE';
+
+/**
+ * Narrow subscriber shape for the pure `handleMqttMessage` helper. Exported so
+ * the MQTT message handler can be unit-tested without spinning up a full MQTT
+ * client or touching the DB. The live `Subscriber` interface extends this with
+ * connection-lifecycle fields (client, serial, lastGroup, reconnectAttempts).
+ */
+export interface SubscriberLike {
+	cameraId: number;
+	lastError: BambuConnectionError | null;
+	lastMessageAt: number;
+}
 
 interface Subscriber {
 	cameraId: number;
@@ -90,6 +103,63 @@ async function handleStateChange(
 	}
 }
 
+/**
+ * Pure message handler: mutates `sub` based on the inbound MQTT payload.
+ *
+ * Reads two fields from the printer's `device/<serial>/report` topic:
+ *  - `print.gcode_state` — drives adaptive-mode go2rtc toggling (unchanged)
+ *  - `print.ipcam.tutk_server` — runtime TUTK watch (D-06 / BAMBU-A1-06)
+ *
+ * Edge-trigger semantics for `tutk_server`:
+ *  - `disable → enable` (or first-seen-as-enable) sets `lastError = 'A1_CLOUD_MODE_ACTIVE'`
+ *  - `enable → disable` clears `lastError` ONLY when the current value is
+ *    `A1_CLOUD_MODE_ACTIVE` (never clobbers other errors)
+ *  - Steady-state repeat of the same value is a no-op (no log spam)
+ *  - Delta messages without `ipcam.tutk_server` do not toggle the flag
+ *
+ * Conditional reset: `lastError = null` on message arrival fires only for
+ * transient connection errors (WRONG_ACCESS_CODE, LAN_MODE_OFF, etc.). The
+ * printer-state error `A1_CLOUD_MODE_ACTIVE` must persist across regular
+ * messages — it's cleared only by explicit `tutk_server='disable'`.
+ *
+ * Exported for unit testing (`SubscriberLike` is the narrow contract).
+ */
+export function handleMqttMessage(sub: SubscriberLike, payload: Buffer | string): void {
+	sub.lastMessageAt = Date.now();
+	// Conditional clear — preserve printer-state errors (TUTK) across message arrival;
+	// only transient connection errors auto-clear on successful message.
+	if (sub.lastError && sub.lastError !== 'A1_CLOUD_MODE_ACTIVE') {
+		sub.lastError = null;
+	}
+	let msg: any;
+	try {
+		msg = JSON.parse(typeof payload === 'string' ? payload : payload.toString());
+	} catch {
+		return;
+	}
+
+	// Existing: gcode_state → adaptive-mode state machine.
+	// Only invoked for live Subscribers (has the extra fields `handleStateChange`
+	// needs). Pure-handler callers use SubscriberLike and never set gcode_state.
+	const gcodeState = msg?.print?.gcode_state;
+	if (typeof gcodeState === 'string' && gcodeState) {
+		void handleStateChange(sub as Subscriber, gcodeState);
+	}
+
+	// NEW (Phase 18 / D-06 / BAMBU-A1-06): TUTK cloud-mode runtime watch.
+	// Edge-trigger only — logs and flips lastError only on transitions.
+	const tutkServer = msg?.print?.ipcam?.tutk_server;
+	if (typeof tutkServer === 'string') {
+		if (tutkServer === 'enable' && sub.lastError !== 'A1_CLOUD_MODE_ACTIVE') {
+			sub.lastError = 'A1_CLOUD_MODE_ACTIVE';
+			console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=enable → CLOUD_MODE_ACTIVE`);
+		} else if (tutkServer === 'disable' && sub.lastError === 'A1_CLOUD_MODE_ACTIVE') {
+			sub.lastError = null;
+			console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=disable → cleared`);
+		}
+	}
+}
+
 function attachHandlers(sub: Subscriber): void {
 	const { client, serial, cameraId } = sub;
 
@@ -102,18 +172,7 @@ function attachHandlers(sub: Subscriber): void {
 	});
 
 	client.on('message', (_topic, payload) => {
-		sub.lastMessageAt = Date.now();
-		sub.lastError = null;
-		let msg: any;
-		try {
-			msg = JSON.parse(payload.toString());
-		} catch {
-			return;
-		}
-		const gcodeState = msg?.print?.gcode_state;
-		if (typeof gcodeState === 'string' && gcodeState) {
-			void handleStateChange(sub, gcodeState);
-		}
+		handleMqttMessage(sub, payload);
 	});
 
 	client.on('error', (err) => {
