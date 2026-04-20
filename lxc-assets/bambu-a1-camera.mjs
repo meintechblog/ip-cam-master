@@ -81,6 +81,14 @@ socket.on('secureConnect', () => {
 	socket.write(buildAuth('bblp', code));
 });
 
+// Phase 18 / WR-05: Hard cap on the in-memory frame buffer. The per-frame
+// guard at `size > 5_000_000` blocks absurd sizes but does not defend against
+// a stream of mid-size headers (e.g. 4 MB each) that never commit a valid
+// JPEG. Without this cap a hostile printer on the LAN can pin hundreds of MB
+// of Node heap across reconnects. 10 MB is well above the single-frame ceiling
+// so it only trips on accumulated-without-commit pathologies.
+const BUF_RUNAWAY_CAP = 10_000_000;
+
 socket.on('data', (chunk) => {
 	buf = Buffer.concat([buf, chunk]);
 	// Frame parser kernel — kept verbatim from spike 004 probe.mjs:103-113.
@@ -89,6 +97,14 @@ socket.on('data', (chunk) => {
 	// go2rtc's magic.Open() binds to the pipe by reading the FF D8 SOI
 	// (RESEARCH §Gap 1). Wrapping would break go2rtc's MJPEG detection.
 	while (buf.length >= 16) {
+		// Phase 18 / WR-05: abort on sustained buffer growth without a valid
+		// frame commit. Checked before size-parse so no partial header can
+		// keep extending `buf` past the cap.
+		if (buf.length > BUF_RUNAWAY_CAP) {
+			process.stderr.write(`[a1-cam] buffer runaway (${buf.length} bytes); abort\n`);
+			socket.destroy();
+			return;
+		}
 		const size = buf.readUInt32LE(0);
 		if (size === 0 || size > 5_000_000) {
 			process.stderr.write(`[a1-cam] suspicious size=${size}; abort\n`);
