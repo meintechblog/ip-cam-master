@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { parseNotifyPayload, BAMBU_MODEL_ALLOWLIST } from './bambu-discovery';
+import {
+	parseNotifyPayload,
+	BAMBU_MODEL_ALLOWLIST,
+	PRINTER_CAPABILITIES
+} from './bambu-discovery';
 
 // Canonical H2C NOTIFY payload, verbatim from
 // .planning/research/H2C-FIELD-NOTES.md §SSDP (validated 2026-04-15).
@@ -95,5 +99,26 @@ describe('parseNotifyPayload', () => {
 		expect([...BAMBU_MODEL_ALLOWLIST].sort()).toEqual(
 			['A1', 'H2C', 'H2D', 'O1C2', 'P1S', 'X1C'].sort()
 		);
+	});
+});
+
+describe('PRINTER_CAPABILITIES (Phase 18 / D-07)', () => {
+	it('declares all six Bambu models', () => {
+		const keys = Object.keys(PRINTER_CAPABILITIES).sort();
+		expect(keys).toEqual(['A1', 'H2C', 'H2D', 'O1C2', 'P1S', 'X1C']);
+	});
+	it('A1 uses jpeg-tls-6000 camera transport (drives preflight split)', () => {
+		expect(PRINTER_CAPABILITIES.A1.cameraTransport).toBe('jpeg-tls-6000');
+	});
+	it('H2C-family uses rtsps-322 camera transport (existing behavior preserved)', () => {
+		expect(PRINTER_CAPABILITIES.H2C.cameraTransport).toBe('rtsps-322');
+		expect(PRINTER_CAPABILITIES.O1C2.cameraTransport).toBe('rtsps-322');
+	});
+	it('A1 declares lite AMS and has chamberHeater off (spike 003 telemetry facts)', () => {
+		expect(PRINTER_CAPABILITIES.A1.ams).toBe('lite');
+		expect(PRINTER_CAPABILITIES.A1.chamberHeater).toBe(false);
+	});
+	it('A1 xcamFeatures is exactly [buildplateMarkerDetector]', () => {
+		expect(PRINTER_CAPABILITIES.A1.xcamFeatures).toEqual(['buildplateMarkerDetector']);
 	});
 });
