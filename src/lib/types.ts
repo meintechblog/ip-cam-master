@@ -1,5 +1,13 @@
+import type { CameraType } from '$lib/server/db/schema';
+
 export type ContainerStatus = 'running' | 'stopped' | 'error' | 'unknown';
-export type CameraType = 'mobotix' | 'mobotix-onvif' | 'loxone' | 'onvif' | 'bambu' | 'other';
+// Phase 18 / WR-03: Re-export CameraType from the DB schema so both layers
+// share one source of truth. The previous local declaration had two extra
+// variants ('onvif', 'other') that were never produced by any writer; keeping
+// them around meant consumer code had unreachable branches that diverged from
+// reality. `import type` is erased at compile time, so re-exporting from the
+// server-only schema module is safe for client bundles.
+export type { CameraType };
 
 export interface ProxmoxSettings {
 	proxmox_host: string;
