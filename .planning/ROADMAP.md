@@ -123,8 +123,8 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
   6. Auth-packet byte encoding is unit-tested — exact 80-byte output asserted — so the silent-failure mode documented in spike 004 §2 can never regress
   7. If the A1 reports `tutk_server: "enable"` (cloud-mode active), the user receives a helpful preflight hint explaining LAN-only mode is required, rather than a cryptic timeout
 **Plans**: 6 plans
-- [ ] 18-01-PLAN.md — Schema + capabilities foundation (cameras.model + PRINTER_CAPABILITIES export + Drizzle push) — Wave 1
-- [ ] 18-02-PLAN.md — bambu-a1-auth.ts (TDD): buildAuth + golden fixture + regression test — Wave 1
+- [x] 18-01-PLAN.md — Schema + capabilities foundation (cameras.model + PRINTER_CAPABILITIES export + Drizzle push) — Wave 1
+- [x] 18-02-PLAN.md — bambu-a1-auth.ts (TDD): buildAuth + golden fixture + regression test — Wave 1
 - [ ] 18-03-PLAN.md — LXC Node script + generateBambuA1Go2rtcYaml + onboarding A1 branch + Node-install hoist — Wave 2
 - [ ] 18-04-PLAN.md — Model-aware preflight + checkTls6000Real + checkTutkDisabledReal + route model threading — Wave 2
 - [ ] 18-05-PLAN.md — MQTT TUTK runtime watch (edge-trigger + conditional reset) — Wave 2
@@ -143,4 +143,4 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 | 15. Docs & Installer Validation | 0/? | Not started | - |
 | 16. Deploy Flow — .git/HEAD Sync | 0/? | Not started | - |
 | 17. RTSP Auth + Bambu Credentials Management | 0/? | Not started | - |
-| 18. Bambu Lab A1 Camera Integration | 0/6 | Planned | - |
+| 18. Bambu Lab A1 Camera Integration | 2/6 | In progress | - |

@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: "Bambu Lab H2C Kamera-Integration"
-status: roadmap_complete
-stopped_at: "Phase 18 planned — 6 plans in 3 waves (18-01 through 18-06). Requirements BAMBU-A1-01..12 added to REQUIREMENTS.md. Ready for /gsd:execute-phase 18"
-last_updated: "2026-04-20T16:30:00.000Z"
-last_activity: 2026-04-20
+milestone: v1.0
+milestone_name: milestone
+status: executing
+stopped_at: "Phase 18 planning complete (6 plans, 3 waves). Ready to run `/gsd:execute-phase 18`."
+last_updated: "2026-04-20T15:16:51.538Z"
+last_activity: 2026-04-20 -- Phase null execution started
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 6
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -20,18 +21,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** v1.2 — Bambu Lab H2C Kamera-Integration. Integrate the H2C as a third `camera_type` alongside Mobotix and Loxone with SSDP discovery, LAN-mode Access Code + Serial credentials, go2rtc RTSPS passthrough, and UniFi Protect adoption. Includes user-proposed Adaptive Stream Mode (live during print, snapshot during idle) to protect the printer's fragile Live555 server.
+**Current focus:** Phase null
 
 ## Current Position
 
-Phase: 18 — Bambu Lab A1 Camera Integration (planning complete)
-Plan: 6 plans authored (18-01..18-06), 3 waves, ready for execution
-Status: Planning complete, awaiting `/gsd:execute-phase 18`
-Last activity: 2026-04-20 — Phase 18 planned: schema+capabilities (Plan 01 BLOCKING drizzle-push), auth lib+fixture (Plan 02 TDD), LXC script+yaml+onboarding (Plan 03), model-aware preflight (Plan 04), MQTT TUTK watch (Plan 05), snapshot endpoint+UI+UAT checkpoint (Plan 06). Requirements BAMBU-A1-01..12 coined and merged into REQUIREMENTS.md. v1.2 Phases 10–17 remain unplanned.
+Phase: null — EXECUTING
+Plan: 1 of ?
+Status: Executing Phase null
+Last activity: 2026-04-20 -- Phase null execution started
 
 Phase numbering: continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10.
 
 Shipped milestones:
+
 - v1.0 — One-click camera onboarding (2026-03-23)
 - v1.1 — Self-Maintenance & Polish (2026-04-10)
 
