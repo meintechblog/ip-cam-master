@@ -77,6 +77,7 @@ Shipped milestones:
 ### Roadmap Evolution
 
 - 2026-04-20: Phase 16 added — Deploy Flow — .git/HEAD Sync (maintenance/infra, parallel-track zu v1.2 Bambu-Phasen). Ausgelöst durch false-positive "Update blockiert" im Settings-UI am 2026-04-20: VM HEAD hing 38 Commits hinter main, weil rsync-Deploys `.git/HEAD` nicht mit-aktualisieren.
+- 2026-04-20: Phase 18 added — Bambu Lab A1 Camera Integration (additive on top of v1.2 H2C branch). Added after live-hardware spikes 001–004 (`.planning/spikes/`) against user's A1 at 192.168.3.195 proved: (a) A1 has no RTSPS:322 (closes port), (b) A1 MQTT LAN is byte-for-byte H2C-compatible, (c) A1 camera streams JPEG-over-TLS on :6000 at 1536×1080 / ~0.45 fps idle with an 80-byte auth handshake. Reuses SSDP/MQTT/credentials from Phase 11 and go2rtc+Protect adoption from Phase 12–13; adds ~260 LOC A1-specific ingestion path. Depends on Phases 11–13 being done.
 
 ### Decisions
 
