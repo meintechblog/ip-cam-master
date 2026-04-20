@@ -36,7 +36,10 @@ export const POST: RequestHandler = async ({ request }) => {
 					streamPath: '/mjpg/video.mjpg'
 				});
 			} else if (code === '401') {
-				return json({ success: false, error: 'Authentifizierung fehlgeschlagen — Passwort prüfen' });
+				return json({
+					success: false,
+					error: 'Authentifizierung fehlgeschlagen. Mögliche Ursachen: (1) Passwort falsch, oder (2) Intercom ist bereits mit einem anderen System verbunden (Loxone Miniserver, anderer Rekorder) — die Intercom erlaubt nur eine aktive Video-Verbindung gleichzeitig. Trenne die bestehende Verbindung und probiere es erneut.'
+				});
 			}
 			return json({ success: false, error: `Intercom nicht erreichbar (HTTP ${code})` });
 		}
