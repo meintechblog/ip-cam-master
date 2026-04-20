@@ -19,6 +19,7 @@
 	let loadingSaved = $state(true);
 	let picking = $state(false);
 	let selectedId = $state<number | null>(null);
+	let autoMatchedName = $state<string | null>(null);
 
 	let canSubmit = $derived(serialNumber.trim().length > 0 && accessCode.trim().length > 0);
 
@@ -31,6 +32,17 @@
 				savedBambu = rows
 					.filter((r) => r.type === 'bambu' && r.serialNumber)
 					.map((r) => ({ id: r.id, name: r.name, serialNumber: r.serialNumber ?? '' }));
+
+				// Auto-apply saved creds when the discovered serial matches an
+				// entry. No clicks needed — the wizard skips straight to the
+				// "Weiter" button with serial + access code already filled in.
+				if (prefillSerial && !accessCode) {
+					const match = savedBambu.find((c) => c.serialNumber === prefillSerial);
+					if (match) {
+						autoMatchedName = match.name;
+						await applySaved(match.id);
+					}
+				}
 			} finally {
 				loadingSaved = false;
 			}
@@ -74,7 +86,11 @@
 		</div>
 	{:else if savedBambu.length > 0}
 		<div class="bg-bg-input/50 border border-border rounded-lg p-3 space-y-2">
-			<p class="text-xs text-text-secondary">Gespeicherte Bambu-Logins — übernehmen statt tippen:</p>
+			{#if autoMatchedName}
+				<p class="text-xs text-green-400">Gespeicherten Login „{autoMatchedName}" automatisch übernommen (Seriennummer passt).</p>
+			{:else}
+				<p class="text-xs text-text-secondary">Gespeicherte Bambu-Logins — übernehmen statt tippen:</p>
+			{/if}
 			<div class="flex flex-wrap gap-2">
 				{#each savedBambu as cred (cred.id)}
 					<button
