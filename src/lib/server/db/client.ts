@@ -48,6 +48,7 @@ function ensureColumn(table: string, column: string, definition: string): void {
 }
 
 ensureColumn('cameras', 'rtsp_auth_enabled', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('cameras', 'model', 'TEXT');
 ensureColumn('credentials', 'type', "TEXT NOT NULL DEFAULT 'mobotix'");
 ensureColumn('credentials', 'access_code', 'TEXT');
 ensureColumn('credentials', 'serial_number', 'TEXT');
