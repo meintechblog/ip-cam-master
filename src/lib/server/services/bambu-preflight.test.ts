@@ -26,13 +26,25 @@ describe('runBambuPreflight orchestrator', () => {
 		expect(deps.checkMqtt).toHaveBeenCalledTimes(1);
 	});
 
-	it('returns PRINTER_UNREACHABLE and short-circuits when TCP fails', async () => {
-		const deps = makeDeps({ checkTcp: vi.fn(async () => ({ ok: false as const })) });
+	it('returns PRINTER_UNREACHABLE and short-circuits when TCP times out', async () => {
+		const deps = makeDeps({ checkTcp: vi.fn(async () => ({ ok: false as const, reason: 'TIMEOUT' as const })) });
 		const result = await runBambuPreflight(INPUT, deps);
 		expect(result).toEqual({
 			ok: false,
 			error: 'PRINTER_UNREACHABLE',
 			hint: PREFLIGHT_HINTS_DE.PRINTER_UNREACHABLE
+		});
+		expect(deps.checkRtsps).not.toHaveBeenCalled();
+		expect(deps.checkMqtt).not.toHaveBeenCalled();
+	});
+
+	it('returns LAN_MODE_OFF when TCP is refused (printer alive, port closed)', async () => {
+		const deps = makeDeps({ checkTcp: vi.fn(async () => ({ ok: false as const, reason: 'REFUSED' as const })) });
+		const result = await runBambuPreflight(INPUT, deps);
+		expect(result).toEqual({
+			ok: false,
+			error: 'LAN_MODE_OFF',
+			hint: PREFLIGHT_HINTS_DE.LAN_MODE_OFF
 		});
 		expect(deps.checkRtsps).not.toHaveBeenCalled();
 		expect(deps.checkMqtt).not.toHaveBeenCalled();

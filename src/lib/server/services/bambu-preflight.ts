@@ -40,7 +40,7 @@ export interface PreflightInput {
 }
 
 export type CheckOk = { ok: true };
-export type TcpFail = { ok: false };
+export type TcpFail = { ok: false; reason: 'REFUSED' | 'TIMEOUT' | 'UNREACHABLE' };
 export type RtspsFail = { ok: false; reason: 'AUTH' | 'TIMEOUT' | 'REFUSED' };
 export type MqttFail = { ok: false; reason: 'AUTH' | 'TIMEOUT' };
 
@@ -59,7 +59,13 @@ export async function runBambuPreflight(
 	deps: PreflightDeps
 ): Promise<PreflightResult> {
 	const tcp = await deps.checkTcp(input.ip, 322, 3000);
-	if (!tcp.ok) return fail('PRINTER_UNREACHABLE');
+	if (!tcp.ok) {
+		// ECONNREFUSED = printer is on the network but port 322 is closed =
+		// LAN Mode disabled. TIMEOUT/UNREACHABLE = no such host or blocked
+		// by firewall = genuine unreachability.
+		if (tcp.reason === 'REFUSED') return fail('LAN_MODE_OFF');
+		return fail('PRINTER_UNREACHABLE');
+	}
 
 	const rtsps = await deps.checkRtsps(input.ip, input.accessCode, 12000);
 	if (!rtsps.ok) {
@@ -90,7 +96,7 @@ async function checkTcpReal(
 	return new Promise((resolve) => {
 		const sock = net.connect({ host: ip, port });
 		let settled = false;
-		const finish = (ok: boolean): void => {
+		const finish = (result: CheckOk | TcpFail): void => {
 			if (settled) return;
 			settled = true;
 			try {
@@ -98,17 +104,21 @@ async function checkTcpReal(
 			} catch {
 				/* noop */
 			}
-			resolve(ok ? { ok: true } : { ok: false });
+			resolve(result);
 		};
-		const timer = setTimeout(() => finish(false), timeoutMs);
+		const timer = setTimeout(() => finish({ ok: false, reason: 'TIMEOUT' }), timeoutMs);
 		timer.unref();
 		sock.once('connect', () => {
 			clearTimeout(timer);
-			finish(true);
+			finish({ ok: true });
 		});
-		sock.once('error', () => {
+		sock.once('error', (err: NodeJS.ErrnoException) => {
 			clearTimeout(timer);
-			finish(false);
+			// Printer alive on the network but the port has no listener =
+			// LAN Mode disabled. Distinguishing this from a genuinely
+			// unreachable host makes the preflight hint actionable.
+			if (err && err.code === 'ECONNREFUSED') return finish({ ok: false, reason: 'REFUSED' });
+			finish({ ok: false, reason: 'UNREACHABLE' });
 		});
 	});
 }
