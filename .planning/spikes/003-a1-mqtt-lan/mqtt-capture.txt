@@ -1,0 +1,15 @@
+[probe] connecting mqtts://192.168.3.195:8883 as bblp ...
+[probe] CONNACK ok — subscribing to device/03919A3B0100254/report
+[probe] publishing pushall → device/03919A3B0100254/request
+[msg 1] keys=print — {"print":{"nozzle_temper":29,"nozzle_target_temper":0,"bed_temper":28.46875,"bed_target_temper":0,"chamber_temper":5,"mc_print_stage":"1","heatbreak_fan_speed":"0","cooling_fan_speed":"0","big_fan1_speed":"0","big_fan2_speed":"0","mc_percent":0,"mc_remaining_time":0,"ams_status":0,"ams_rfid_status":0,"hw_switch_state":0,"spd_mag":100,"spd_lvl":2,"print_error":0,"lifecycle":"product","wifi_signal":"-53dBm","gcode_state":"IDLE","gcode_file_prepare_percent":"0","queue_number":0,"queue_total":0,"queue_est":0,"queue_sts":0,"project_id":"0","profile_id":"0","task_id":"0","subtask_id":"0","subtask_name":"","gcode_file":"","stg":[],"stg_cur":0,"print_type":"idle","home_flag":847070616,"mc_print_line_number":"0","mc_print_sub_stage":0,"sdcard":true,"force_upgrade":false,"mess_production_state":"act…
+[probe] wrote full pushall to pushall-full.json
+[msg 2] keys=print — {"print":{"bed_temper":28.4375,"command":"push_status","msg":1,"sequence_id":"1871"}}
+[msg 3] keys=print — {"print":{"bed_temper":28.40625,"command":"push_status","msg":1,"sequence_id":"1872"}}
+[msg 4] keys=print — {"print":{"wifi_signal":"-52dBm","command":"push_status","msg":1,"sequence_id":"1873"}}
+[msg 5] keys=print — {"print":{"wifi_signal":"-53dBm","command":"push_status","msg":1,"sequence_id":"1874"}}
+[msg 6] keys=print — {"print":{"bed_temper":28.46875,"wifi_signal":"-52dBm","command":"push_status","msg":1,"sequence_id":"1875"}}
+
+=== SUMMARY ===
+messages: 6
+top-level keys observed: print
+  .print → subkeys: nozzle_temper, nozzle_target_temper, bed_temper, bed_target_temper, chamber_temper, mc_print_stage, heatbreak_fan_speed, cooling_fan_speed, big_fan1_speed, big_fan2_speed, mc_percent, mc_remaining_time, ams_status, ams_rfid_status, hw_switch_state, spd_mag, spd_lvl, print_error, lifecycle, wifi_signal, gcode_state, gcode_file_prepare_percent, queue_number, queue_total, queue_est, queue_sts, project_id, profile_id, task_id, subtask_id
