@@ -37,3 +37,17 @@ sqlite.exec(`
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)
 `);
+
+// Idempotent ADD COLUMN migrations. SQLite throws on duplicate adds,
+// so we check PRAGMA table_info first. Keeps dev-deploys reproducible
+// without requiring a separate `drizzle-kit push` step on the VM.
+function ensureColumn(table: string, column: string, definition: string): void {
+	const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+	if (rows.some((r) => r.name === column)) return;
+	sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+ensureColumn('cameras', 'rtsp_auth_enabled', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('credentials', 'type', "TEXT NOT NULL DEFAULT 'mobotix'");
+ensureColumn('credentials', 'access_code', 'TEXT');
+ensureColumn('credentials', 'serial_number', 'TEXT');

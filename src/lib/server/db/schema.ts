@@ -49,6 +49,7 @@ export const cameras = sqliteTable('cameras', {
 	serialNumber: text('serial_number'),
 	printState: text('print_state'),
 	streamMode: text('stream_mode').default('adaptive'),
+	rtspAuthEnabled: integer('rtsp_auth_enabled', { mode: 'boolean' }).notNull().default(false),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
@@ -57,11 +58,16 @@ export const cameras = sqliteTable('cameras', {
 		.$defaultFn(() => new Date().toISOString())
 });
 
+export type CredentialType = 'mobotix' | 'bambu';
+
 export const credentials = sqliteTable('credentials', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	name: text('name').notNull(),
+	type: text('type').notNull().default('mobotix'),
 	username: text('username').notNull(),
 	password: text('password').notNull(),
+	accessCode: text('access_code'),
+	serialNumber: text('serial_number'),
 	priority: integer('priority').notNull().default(0),
 	createdAt: text('created_at')
 		.notNull()
