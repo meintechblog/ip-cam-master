@@ -47,6 +47,10 @@ export const cameras = sqliteTable('cameras', {
 	status: text('status').notNull().default('pending'),
 	accessCode: text('access_code'),
 	serialNumber: text('serial_number'),
+	// Bambu model code from SSDP (e.g. 'A1', 'H2C', 'O1C2'). Nullable:
+	// null = assume H2C for backward-compat with pre-Phase-18 rows (per BAMBU-A1-02).
+	// Used by preflight model-split (Plan 04) and UI capability gating (Plan 06).
+	model: text('model'),
 	printState: text('print_state'),
 	streamMode: text('stream_mode').default('adaptive'),
 	rtspAuthEnabled: integer('rtsp_auth_enabled', { mode: 'boolean' }).notNull().default(false),
