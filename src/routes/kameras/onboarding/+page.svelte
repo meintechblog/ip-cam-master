@@ -8,6 +8,9 @@
 
 	let selectedIp = $state<string | null>(null);
 	let selectedSerial = $state<string>('');
+	// Phase 18: SSDP-captured Bambu model, passed through to the wizard so
+	// preflight + save-camera see the correct model string.
+	let selectedModel = $state<string>('');
 	let discovered = $state<{
 		ip: string;
 		type: 'mobotix' | 'mobotix-onvif' | 'loxone' | 'bambu' | 'unknown';
@@ -281,10 +284,17 @@
 		registerLoading = false;
 	}
 
-	async function selectCamera(ip: string, name?: string | null, type?: string, serialNumber?: string) {
+	async function selectCamera(
+		ip: string,
+		name?: string | null,
+		type?: string,
+		serialNumber?: string,
+		model?: string
+	) {
 		prefillName = name || '';
 		selectedCameraType = type || 'mobotix';
 		selectedSerial = serialNumber || '';
+		selectedModel = model || '';
 		if (selectedCameraType !== 'bambu') {
 			const cred = await fetchCredentials(ip, selectedCameraType);
 			if (cred.success) {
@@ -732,7 +742,7 @@
 	 */
 	async function batchOnboardBambu(
 		idx: number,
-		cam: { ip: string; name: string | null; type: string; serialNumber?: string },
+		cam: { ip: string; name: string | null; type: string; serialNumber?: string; model?: string },
 		bambuCredMap: Map<string, { id: number; name: string }>
 	) {
 		let stepNum = 0;
@@ -771,7 +781,8 @@
 				name: cam.name || `Bambu Lab ${serialNumber.slice(-6)}`,
 				ip: cam.ip,
 				serialNumber,
-				accessCode
+				accessCode,
+				model: cam.model ?? ''
 			})
 		});
 		const saveData = await saveRes.json();
@@ -1111,7 +1122,7 @@
 			Login "{prefillCredName}" automatisch erkannt und vorausgefüllt.
 		</div>
 	{/if}
-	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} prefillSerial={selectedSerial} />
+	<OnboardingWizard nextVmid={data.nextVmid} prefillIp={selectedIp} prefillUsername={prefillUser} prefillPassword={prefillPass} prefillName={prefillName} cameraType={selectedCameraType} prefillSerial={selectedSerial} prefillModel={selectedModel} />
 {:else}
 	<!-- Manual entry -->
 	<div class="mb-6 space-y-4">
@@ -1227,7 +1238,7 @@
 								</button>
 							{:else if cam.type === 'bambu'}
 								<button
-									onclick={() => selectCamera(cam.ip, cam.name ?? 'Bambu Lab H2C', 'bambu', cam.serialNumber)}
+									onclick={() => selectCamera(cam.ip, cam.name ?? 'Bambu Lab H2C', 'bambu', cam.serialNumber, cam.model)}
 									class="bg-orange-500 text-white rounded-lg px-4 py-2 hover:bg-orange-600 transition-colors text-sm cursor-pointer"
 								>
 									Einrichten

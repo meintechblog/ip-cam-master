@@ -103,6 +103,21 @@ export interface StreamInfo {
 	unifiStreams?: number;
 }
 
+/**
+ * Per-model capability matrix (Phase 18 / D-07).
+ * Mirrors the server-side `PRINTER_CAPABILITIES` export in
+ * `src/lib/server/services/bambu-discovery.ts`. The server attaches this
+ * to the Bambu camera payload so the dashboard can gate UI panels without
+ * hardcoded model checks.
+ */
+export interface PrinterCapabilities {
+	chamberHeater: boolean;
+	ams: 'none' | 'lite' | 'full';
+	xcamFeatures: readonly string[];
+	cameraResolution: '480p' | '1080p' | '4k';
+	cameraTransport: 'rtsps-322' | 'jpeg-tls-6000';
+}
+
 export interface CameraCardData {
 	// Camera DB info
 	id: number;
@@ -143,6 +158,10 @@ export interface CameraCardData {
 	streamMode?: string | null;
 	bambuError?: string | null;
 	bambuMqttConnected?: boolean;
+	// Phase 18 / BAMBU-A1-11: capability-gated UI.
+	// Present only for Bambu cameras (derived from cameras.model via
+	// PRINTER_CAPABILITIES in the /api/cameras/status endpoint).
+	capabilities?: PrinterCapabilities;
 }
 
 export interface ProtectCamera {

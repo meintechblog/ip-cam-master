@@ -14,7 +14,8 @@
 		prefillPassword = '',
 		prefillName = '',
 		cameraType = 'mobotix',
-		prefillSerial = ''
+		prefillSerial = '',
+		prefillModel = ''
 	}: {
 		nextVmid: number;
 		prefillIp?: string;
@@ -23,17 +24,26 @@
 		prefillName?: string;
 		cameraType?: string;
 		prefillSerial?: string;
+		/** Phase 18: SSDP-discovered Bambu model (e.g. 'A1', 'O1C2'). Drives
+		 * model-aware preflight + A1-specific wizard copy. */
+		prefillModel?: string;
 	} = $props();
 
 	// ── Bambu branch state (parallel to the Mobotix/Loxone state below) ──
 	let bambuIp = $state(prefillIp);
 	let bambuSerial = $state(prefillSerial);
 	let bambuAccessCode = $state('');
+	let bambuModel = $state(prefillModel || 'H2C');
 	let bambuStep = $state<'credentials' | 'preflight' | 'done'>('credentials');
 
-	function handleBambuCredentialsSubmit(result: { serialNumber: string; accessCode: string }) {
+	function handleBambuCredentialsSubmit(result: {
+		serialNumber: string;
+		accessCode: string;
+		model: string;
+	}) {
 		bambuSerial = result.serialNumber;
 		bambuAccessCode = result.accessCode;
+		bambuModel = result.model;
 		bambuStep = 'preflight';
 	}
 
@@ -61,7 +71,8 @@
 					name: name || `Bambu Lab ${bambuSerial.slice(-6)}`,
 					ip: bambuIp,
 					serialNumber: bambuSerial,
-					accessCode: bambuAccessCode
+					accessCode: bambuAccessCode,
+					model: bambuModel
 				})
 			});
 			const data = await res.json();
@@ -695,6 +706,7 @@
 				<StepBambuCredentials
 					ip={bambuIp}
 					prefillSerial={bambuSerial}
+					model={bambuModel}
 					onSubmit={handleBambuCredentialsSubmit}
 				/>
 			{:else if bambuStep === 'preflight'}
@@ -702,6 +714,7 @@
 					ip={bambuIp}
 					serialNumber={bambuSerial}
 					accessCode={bambuAccessCode}
+					model={bambuModel}
 					onDone={handleBambuPreflightDone}
 					onRetry={handleBambuPreflightRetry}
 				/>

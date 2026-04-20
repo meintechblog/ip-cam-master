@@ -4,11 +4,18 @@
 	let {
 		ip,
 		prefillSerial = '',
+		model = 'H2C',
 		onSubmit
 	}: {
 		ip: string;
 		prefillSerial?: string;
-		onSubmit: (result: { serialNumber: string; accessCode: string }) => void;
+		/**
+		 * SSDP-discovered printer model (Phase 18 / BAMBU-A1-11). Drives A1-specific
+		 * copy below. Default 'H2C' keeps the pre-Phase-18 wording for manual-add
+		 * flows where no model is known yet.
+		 */
+		model?: string;
+		onSubmit: (result: { serialNumber: string; accessCode: string; model: string }) => void;
 	} = $props();
 
 	type SavedBambu = { id: number; name: string; serialNumber: string };
@@ -68,7 +75,7 @@
 
 	function handleSubmit() {
 		if (!canSubmit) return;
-		onSubmit({ serialNumber: serialNumber.trim(), accessCode: accessCode.trim() });
+		onSubmit({ serialNumber: serialNumber.trim(), accessCode: accessCode.trim(), model });
 	}
 </script>
 
@@ -165,6 +172,12 @@
 	<div class="bg-bg-input/50 border border-border rounded-lg p-3 text-xs text-text-secondary">
 		Hinweis: Für die Pre-Flight-Prüfung muss <span class="text-text-primary">LAN Mode</span> am Drucker aktiviert sein
 		(Einstellungen → Netzwerk → LAN Mode).
+		{#if model === 'A1'}
+			<p class="text-xs text-text-secondary mt-2">
+				Hinweis: A1 streamt nur während des Drucks (Toolhead-Kamera, 1080p).
+				Dashboard zeigt im Idle ein letztes Standbild.
+			</p>
+		{/if}
 	</div>
 
 	<div class="flex justify-end">
