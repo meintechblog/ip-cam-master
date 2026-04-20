@@ -116,7 +116,14 @@ socket.on('data', (chunk) => {
 		buf = buf.subarray(16 + size);
 		// Sanity: must start FF D8. Skip frame if not (don't crash).
 		if (jpeg[0] === 0xff && jpeg[1] === 0xd8) {
-			process.stdout.write(jpeg);
+			// Phase 18 / IN-04: Respect stdout back-pressure. If go2rtc's
+			// consumer side stalls (rare during magic.Open() re-detection),
+			// pause TLS reads until the pipe drains so the Node heap does
+			// not silently buffer JPEGs at ~100-500 KB/s sustained.
+			if (!process.stdout.write(jpeg)) {
+				socket.pause();
+				process.stdout.once('drain', () => socket.resume());
+			}
 		}
 	}
 });
