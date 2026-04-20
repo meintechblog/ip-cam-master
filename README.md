@@ -300,7 +300,19 @@ Each camera LXC container uses minimal resources:
 
 ### Credentials
 
-Standard logins tried in priority order when onboarding cameras. Stored AES-256-GCM encrypted.
+Standard logins tried in priority order when onboarding cameras. Stored AES-256-GCM encrypted. Two credential types supported:
+
+- **Mobotix/Loxone (HTTP Basic)** — username + password, used for camera discovery and go2rtc stream auth
+- **Bambu Lab (Serial + Access Code)** — offered during H2C onboarding as a one-click pre-fill; the access code doubles as the RTSP password on the printer's container
+
+### RTSP Stream Auth
+
+Every container's go2rtc can lock its RTSP-Server (`:8554`) with the camera's own credentials. Enable per camera from the detail card ("RTSP-Auth aktivieren"):
+
+- **Mobotix/Loxone:** container uses the camera's HTTP login as the RTSP user/pass
+- **Bambu:** container uses the printer's serial as username and the access code as password
+
+When enabled, the card shows the credentials you need in UniFi Protect's adoption dialog (ONVIF tab) and provides a one-click copy of the full `rtsp://user:pass@host:8554/stream` URL for VLC/ffmpeg testing. New onboardings opt in automatically; existing cameras require a manual re-adoption in Protect after flipping the switch.
 
 ## Background & References
 
