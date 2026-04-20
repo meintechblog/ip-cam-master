@@ -22,6 +22,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 - [ ] **Phase 14: Adaptive Stream Mode + Wizard UI Polish** — User-proposed differentiator: live-during-print / snapshot-during-idle driven by MQTT; polished Bambu credential wizard
 - [ ] **Phase 15: Docs & Installer Validation** — README for LAN Mode setup, firmware caveats, Bambu Studio trade-off; installer confirmed unchanged
 - [ ] **Phase 16: Deploy Flow — .git/HEAD Sync** — rsync-Deploy muss `.git/HEAD` auf der VM auf den deployten Commit setzen, damit der In-App-Updater nicht durch false-positive dirty-tree blockiert wird (TBD plans)
+- [ ] **Phase 17: RTSP Auth + Bambu Credentials Management** — go2rtc RTSP-Auth pro Kamera mit Original-Credentials (Mobotix/Loxone: username/password, Bambu: serial/access_code); Bambu-Credentials-Verwaltung in Settings; In-UI Display der Adoption-Creds; RTSP-URL mit embedded Creds für Copy-Paste (TBD plans)
 
 ## Phase Details
 
