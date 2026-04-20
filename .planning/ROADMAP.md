@@ -128,7 +128,7 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 - [x] 18-03-PLAN.md — LXC Node script + generateBambuA1Go2rtcYaml + onboarding A1 branch + Node-install hoist — Wave 2
 - [x] 18-04-PLAN.md — Model-aware preflight + checkTls6000Real + checkTutkDisabledReal + route model threading — Wave 2
 - [x] 18-05-PLAN.md — MQTT TUTK runtime watch (edge-trigger + conditional reset) — Wave 2
-- [ ] 18-06-PLAN.md — Snapshot endpoint + saveCameraRecord model + capability-gated UI + manual UAT checkpoint — Wave 3
+- [x] 18-06-PLAN.md — Snapshot endpoint + saveCameraRecord model + capability-gated UI + manual UAT checkpoint — Wave 3
 **Spike evidence**: `.planning/spikes/001-a1-port-surface/`, `002-a1-rtsps-native/`, `003-a1-mqtt-lan/`, `004-a1-stream-fallback/`. Live proof frame at `004-.../frame-001.jpg`.
 
 ## Progress
@@ -143,4 +143,4 @@ Phase numbering continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10
 | 15. Docs & Installer Validation | 0/? | Not started | - |
 | 16. Deploy Flow — .git/HEAD Sync | 0/? | Not started | - |
 | 17. RTSP Auth + Bambu Credentials Management | 0/? | Not started | - |
-| 18. Bambu Lab A1 Camera Integration | 5/6 | In progress | - |
+| 18. Bambu Lab A1 Camera Integration | 6/6 | Complete | 2026-04-20 |
