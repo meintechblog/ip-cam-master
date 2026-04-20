@@ -38,6 +38,73 @@ const MODEL_LABELS: Record<string, string> = {
 	A1: 'Bambu Lab A1'
 };
 
+/**
+ * Per-model capability matrix (Phase 18 / D-07).
+ * Frontend reads these to hide/show panels without hardcoded model checks.
+ * Adding a future model = one entry here; UI auto-adapts.
+ *
+ * `cameraTransport` is the sole driver of the preflight branch split:
+ *   - `rtsps-322` → existing H2C-family check against RTSPS on port 322
+ *   - `jpeg-tls-6000` → A1 JPEG-over-TLS handshake on port 6000 (spike 004)
+ *
+ * xcamFeatures is empty for non-A1 models in this phase — only A1 needs its
+ * own gate. Future phases can fill the H2C/X1C feature list without breaking
+ * A1 consumers.
+ */
+export const PRINTER_CAPABILITIES: Record<
+	string,
+	{
+		chamberHeater: boolean;
+		ams: 'none' | 'lite' | 'full';
+		xcamFeatures: readonly string[];
+		cameraResolution: '480p' | '1080p' | '4k';
+		cameraTransport: 'rtsps-322' | 'jpeg-tls-6000';
+	}
+> = {
+	O1C2: {
+		chamberHeater: true,
+		ams: 'full',
+		xcamFeatures: [],
+		cameraResolution: '1080p',
+		cameraTransport: 'rtsps-322'
+	},
+	H2C: {
+		chamberHeater: true,
+		ams: 'full',
+		xcamFeatures: [],
+		cameraResolution: '1080p',
+		cameraTransport: 'rtsps-322'
+	},
+	H2D: {
+		chamberHeater: true,
+		ams: 'full',
+		xcamFeatures: [],
+		cameraResolution: '1080p',
+		cameraTransport: 'rtsps-322'
+	},
+	X1C: {
+		chamberHeater: true,
+		ams: 'full',
+		xcamFeatures: [],
+		cameraResolution: '1080p',
+		cameraTransport: 'rtsps-322'
+	},
+	P1S: {
+		chamberHeater: false,
+		ams: 'full',
+		xcamFeatures: [],
+		cameraResolution: '1080p',
+		cameraTransport: 'rtsps-322'
+	},
+	A1: {
+		chamberHeater: false,
+		ams: 'lite',
+		xcamFeatures: ['buildplateMarkerDetector'],
+		cameraResolution: '1080p',
+		cameraTransport: 'jpeg-tls-6000'
+	}
+};
+
 const BAMBU_URN = 'urn:bambulab-com:device:3dprinter:1';
 
 /**
