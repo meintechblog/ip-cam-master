@@ -3,6 +3,22 @@ import type { RequestHandler } from './$types';
 import { runBambuPreflight, realDeps } from '$lib/server/services/bambu-preflight';
 import { BAMBU_MODEL_ALLOWLIST } from '$lib/server/services/bambu-discovery';
 
+/**
+ * IPv4 dotted-quad validation with per-octet range check (0-255).
+ *
+ * Phase 18 / CR-01 defence-in-depth: refuses anything that could carry
+ * shell/YAML meta-characters into downstream go2rtc config (save-camera
+ * enforces the same invariant; this keeps preflight honest so a caller
+ * cannot reach TLS handshakes with a malformed IP).
+ */
+function isValidIPv4(value: string): boolean {
+	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(value)) return false;
+	return value.split('.').every((octet) => {
+		const n = Number(octet);
+		return Number.isInteger(n) && n >= 0 && n <= 255;
+	});
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json().catch(() => ({}) as Record<string, unknown>);
 	const ip = typeof body?.ip === 'string' ? body.ip.trim() : '';
@@ -22,6 +38,33 @@ export const POST: RequestHandler = async ({ request }) => {
 				ok: false,
 				error: 'INVALID_INPUT',
 				hint: 'IP, Seriennummer und Access Code sind erforderlich.'
+			},
+			{ status: 400 }
+		);
+	}
+
+	// Phase 18 / CR-01: IPv4 dotted-quad only (LAN scope). Match save-camera
+	// so preflight cannot be the weaker gate that sends raw user input into
+	// the TLS stack or downstream go2rtc config generation.
+	if (!isValidIPv4(ip)) {
+		return json(
+			{
+				ok: false,
+				error: 'INVALID_INPUT',
+				hint: 'IP muss eine gültige IPv4-Adresse sein.'
+			},
+			{ status: 400 }
+		);
+	}
+	// Phase 18 / CR-01 + IN-01: Bambu access codes are exactly 8 digits.
+	// save-camera already enforces this — mirror here so the preflight surface
+	// cannot accept wider alphabets in a later regression.
+	if (!/^[0-9]{8}$/.test(accessCode)) {
+		return json(
+			{
+				ok: false,
+				error: 'INVALID_INPUT',
+				hint: 'Access Code muss 8 Ziffern sein.'
 			},
 			{ status: 400 }
 		);

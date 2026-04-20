@@ -162,11 +162,11 @@ describe('go2rtc service', () => {
 			const yaml = generateGo2rtcConfigBambuA1({
 				streamName: 'bambu_a1_test',
 				printerIp: '192.168.3.195',
-				accessCode: 'abc12345'
+				accessCode: '12345678'
 			});
 
 			expect(yaml).toContain('bambu_a1_test:');
-			expect(yaml).toContain('exec:env A1_ACCESS_CODE=abc12345');
+			expect(yaml).toContain('exec:env A1_ACCESS_CODE=12345678');
 			expect(yaml).toContain('node /opt/ipcm/bambu-a1-camera.mjs');
 			expect(yaml).toContain('--ip=192.168.3.195');
 			expect(yaml).toContain('#killsignal=15');
@@ -179,12 +179,65 @@ describe('go2rtc service', () => {
 			const yaml = generateGo2rtcConfigBambuA1({
 				streamName: 'bambu_a1',
 				printerIp: '10.0.0.1',
-				accessCode: 'z',
-				rtspAuth: { username: 'bambu', password: 'z' }
+				accessCode: '00000001',
+				rtspAuth: { username: 'bambu', password: '00000001' }
 			});
 
 			expect(yaml).toContain('rtsp:');
 			expect(yaml).toContain("username: 'bambu'");
+		});
+
+		// Phase 18 / CR-01: Defence-in-depth validation at the generator.
+		// The route handler is the primary gate, but if a future caller
+		// bypasses it, the generator must still refuse unsafe input.
+		it('throws on non-digit access code (shell injection guard)', () => {
+			expect(() =>
+				generateGo2rtcConfigBambuA1({
+					streamName: 'bambu_a1',
+					printerIp: '10.0.0.1',
+					accessCode: 'abcd1234'
+				})
+			).toThrow(/8 digits/);
+		});
+
+		it('throws on access code with whitespace', () => {
+			expect(() =>
+				generateGo2rtcConfigBambuA1({
+					streamName: 'bambu_a1',
+					printerIp: '10.0.0.1',
+					accessCode: '12345 67'
+				})
+			).toThrow(/8 digits/);
+		});
+
+		it('throws on access code shorter than 8 chars', () => {
+			expect(() =>
+				generateGo2rtcConfigBambuA1({
+					streamName: 'bambu_a1',
+					printerIp: '10.0.0.1',
+					accessCode: '1234567'
+				})
+			).toThrow(/8 digits/);
+		});
+
+		it('throws on IP with shell meta-character', () => {
+			expect(() =>
+				generateGo2rtcConfigBambuA1({
+					streamName: 'bambu_a1',
+					printerIp: '10.0.0.1; rm -rf /',
+					accessCode: '12345678'
+				})
+			).toThrow(/IPv4 dotted-quad/);
+		});
+
+		it('throws on IP with out-of-range octet', () => {
+			expect(() =>
+				generateGo2rtcConfigBambuA1({
+					streamName: 'bambu_a1',
+					printerIp: '999.1.1.1',
+					accessCode: '12345678'
+				})
+			).toThrow(/0-255/);
 		});
 	});
 

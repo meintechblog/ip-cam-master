@@ -11,6 +11,23 @@ import { CAMERA_STATUS } from '$lib/types';
 // container and update vmid). vmid=0 is the sentinel for "awaiting provisioning".
 const BAMBU_PENDING_VMID = 0;
 
+/**
+ * IPv4 dotted-quad validation with per-octet range check (0-255).
+ *
+ * Phase 18 / CR-01: This is the security gate that keeps user-supplied IPs
+ * from flowing into the go2rtc `exec:` command line unescaped. A naive
+ * `/^(\d{1,3}\.){3}\d{1,3}$/` would accept "999.999.999.999"; we additionally
+ * assert every octet is 0-255 so the value cannot carry arbitrary digits or
+ * overflow a downstream parser.
+ */
+function isValidIPv4(value: string): boolean {
+	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(value)) return false;
+	return value.split('.').every((octet) => {
+		const n = Number(octet);
+		return Number.isInteger(n) && n >= 0 && n <= 255;
+	});
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const { name, ip, serialNumber, accessCode, model } = await request.json();
 
@@ -23,6 +40,24 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (typeof accessCode !== 'string' || accessCode.length !== 8) {
 		return json(
 			{ success: false, error: 'Access Code muss 8 Zeichen lang sein' },
+			{ status: 400 }
+		);
+	}
+	// Phase 18 / CR-01: Bambu access codes are 8 digits. Enforce server-side so
+	// the value cannot flow into the go2rtc exec: line as a shell/YAML-injection
+	// sink (see generateGo2rtcConfigBambuA1 in src/lib/server/services/go2rtc.ts).
+	if (!/^[0-9]{8}$/.test(accessCode)) {
+		return json(
+			{ success: false, error: 'Access Code muss 8 Ziffern sein' },
+			{ status: 400 }
+		);
+	}
+	// Phase 18 / CR-01: IP must be an IPv4 dotted-quad with per-octet range check.
+	// Refuses whitespace, shell meta-characters, YAML fence (#), and bogus
+	// quads like 999.999.999.999 that could leak past a naive regex.
+	if (typeof ip !== 'string' || !isValidIPv4(ip)) {
+		return json(
+			{ success: false, error: 'IP muss eine gültige IPv4-Adresse sein' },
 			{ status: 400 }
 		);
 	}

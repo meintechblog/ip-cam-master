@@ -212,6 +212,26 @@ export function generateGo2rtcConfigBambuA1(params: {
 	rtspAuth?: RtspAuth;
 }): string {
 	const { streamName, printerIp, accessCode, rtspAuth } = params;
+	// Phase 18 / CR-01: Belt-and-braces — the route handler
+	// (src/routes/api/onboarding/bambu/save-camera/+server.ts) is the primary
+	// validation gate, but enforce the same invariants here so any future
+	// caller that bypasses the route cannot reintroduce the injection sink.
+	// Access codes are exactly 8 digits; IPs are IPv4 dotted-quads. Both are
+	// interpolated into a shell-like go2rtc exec: string, so whitespace or
+	// shell/YAML meta-characters must be rejected before the concat happens.
+	if (!/^[0-9]{8}$/.test(accessCode)) {
+		throw new Error('A1 access code must be exactly 8 digits');
+	}
+	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(printerIp)) {
+		throw new Error('A1 printer IP must be IPv4 dotted-quad');
+	}
+	const octetsOk = printerIp.split('.').every((o) => {
+		const n = Number(o);
+		return Number.isInteger(n) && n >= 0 && n <= 255;
+	});
+	if (!octetsOk) {
+		throw new Error('A1 printer IP octets must be 0-255');
+	}
 	const execCmd = `exec:env A1_ACCESS_CODE=${accessCode} node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}#killsignal=15#killtimeout=5`;
 	return `streams:
   ${streamName}:
