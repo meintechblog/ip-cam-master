@@ -1,0 +1,15 @@
+Host: 192.168.3.195
+Timestamp: 2026-04-20T12:20:48Z
+
+PORT   STATE  LABEL
+----   -----  -----
+80     closed HTTP
+443    closed HTTPS
+322    closed Bambu RTSPS (H2C chamber cam)
+554    closed standard RTSP
+990    OPEN   FTPS (Bambu SD-card)
+1984   closed go2rtc health
+6000   OPEN   suspected A1 proprietary stream
+8883   OPEN   Bambu MQTT (LAN mode)
+8553   closed unconfirmed
+8554   closed RTSP alt
