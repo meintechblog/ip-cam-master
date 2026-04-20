@@ -119,40 +119,40 @@
 
 ### Schema & Foundation (Phase 18)
 
-- [ ] **BAMBU-A1-01**: SSDP discovery labels A1 correctly (already allowlisted in `BAMBU_MODEL_ALLOWLIST`); `PRINTER_CAPABILITIES` export added next to `MODEL_LABELS` in `bambu-discovery.ts` so frontend/preflight can read per-model capabilities without hardcoded model checks (D-07)
-- [ ] **BAMBU-A1-02**: `cameras.model` column added to Drizzle schema (nullable TEXT — null = assume H2C for backward-compat); populated from SSDP on adoption; threaded through preflight route, `saveCameraRecord`, and API responses
-- [ ] **BAMBU-A1-03**: `PRINTER_CAPABILITIES` map shape exported per D-07 (chamberHeater, ams, xcamFeatures, cameraResolution, cameraTransport) for all six models (O1C2, H2C, H2D, X1C, P1S, A1); API responses for Bambu cameras include `capabilities` field
+- [x] **BAMBU-A1-01**: SSDP discovery labels A1 correctly (already allowlisted in `BAMBU_MODEL_ALLOWLIST`); `PRINTER_CAPABILITIES` export added next to `MODEL_LABELS` in `bambu-discovery.ts` so frontend/preflight can read per-model capabilities without hardcoded model checks (D-07)
+- [x] **BAMBU-A1-02**: `cameras.model` column added to Drizzle schema (nullable TEXT — null = assume H2C for backward-compat); populated from SSDP on adoption; threaded through preflight route, `saveCameraRecord`, and API responses
+- [x] **BAMBU-A1-03**: `PRINTER_CAPABILITIES` map shape exported per D-07 (chamberHeater, ams, xcamFeatures, cameraResolution, cameraTransport) for all six models (O1C2, H2C, H2D, X1C, P1S, A1); API responses for Bambu cameras include `capabilities` field
 
 ### Auth & Stream Ingestion (Phase 18)
 
-- [ ] **BAMBU-A1-04**: Model-aware preflight (`runBambuPreflight(input, deps, model)`): for A1, skip RTSPS:322 + run TCP:6000 + TLS-auth probe; for H2C path, preserve existing behavior
-- [ ] **BAMBU-A1-05**: New preflight error `A1_CLOUD_MODE_ACTIVE` + German hint fires when `print.ipcam.tutk_server == "enable"` (D-05); extends `PreflightError` enum + `PREFLIGHT_HINTS_DE`
-- [ ] **BAMBU-A1-06**: MQTT runtime watch (`bambu-mqtt.ts:104-136`): transitions `BambuConnectionError` on `ipcam.tutk_server` edge changes (disable→enable sets error; enable→disable auto-clears); `lastError` unconditional-clear becomes conditional (D-06)
-- [ ] **BAMBU-A1-07**: Auth-packet byte builder (`buildAuth`) + golden fixture (80-byte `a1-auth-packet.bin`) + Vitest regression test asserting exact 80-byte layout (catches 0x30 vs 0x3000 silent-fail per D-08)
-- [ ] **BAMBU-A1-08**: `generateGo2rtcConfigBambuA1()` emits yaml with `exec:env A1_ACCESS_CODE=... node /opt/ipcm/bambu-a1-camera.mjs --ip=...#killsignal=15#killtimeout=5` — env-var creds (not CLI arg), mandatory kill flags
-- [ ] **BAMBU-A1-09**: Ingestion Node script at `lxc-assets/bambu-a1-camera.mjs` deployed to `/opt/ipcm/bambu-a1-camera.mjs` via `pushFileToContainer`; uses only Node stdlib (`tls`, `fs`, `process`); handles SIGTERM with graceful `socket.end()` + 500ms exit delay; emits raw concatenated JPEGs on stdout
+- [x] **BAMBU-A1-04**: Model-aware preflight (`runBambuPreflight(input, deps, model)`): for A1, skip RTSPS:322 + run TCP:6000 + TLS-auth probe; for H2C path, preserve existing behavior
+- [x] **BAMBU-A1-05**: New preflight error `A1_CLOUD_MODE_ACTIVE` + German hint fires when `print.ipcam.tutk_server == "enable"` (D-05); extends `PreflightError` enum + `PREFLIGHT_HINTS_DE`
+- [x] **BAMBU-A1-06**: MQTT runtime watch (`bambu-mqtt.ts:104-136`): transitions `BambuConnectionError` on `ipcam.tutk_server` edge changes (disable→enable sets error; enable→disable auto-clears); `lastError` unconditional-clear becomes conditional (D-06)
+- [x] **BAMBU-A1-07**: Auth-packet byte builder (`buildAuth`) + golden fixture (80-byte `a1-auth-packet.bin`) + Vitest regression test asserting exact 80-byte layout (catches 0x30 vs 0x3000 silent-fail per D-08)
+- [x] **BAMBU-A1-08**: `generateGo2rtcConfigBambuA1()` emits yaml with `exec:env A1_ACCESS_CODE=... node /opt/ipcm/bambu-a1-camera.mjs --ip=...#killsignal=15#killtimeout=5` — env-var creds (not CLI arg), mandatory kill flags
+- [x] **BAMBU-A1-09**: Ingestion Node script at `lxc-assets/bambu-a1-camera.mjs` deployed to `/opt/ipcm/bambu-a1-camera.mjs` via `pushFileToContainer`; uses only Node stdlib (`tls`, `fs`, `process`); handles SIGTERM with graceful `socket.end()` + 500ms exit delay; emits raw concatenated JPEGs on stdout
 
 ### Endpoint & UI (Phase 18)
 
-- [ ] **BAMBU-A1-10**: Snapshot endpoint `GET /api/cameras/:id/a1-snapshot` returns JPEG from on-demand TLS+auth+first-frame pull; 2-second in-memory cache per camera ID (DoS mitigation); `Content-Type: image/jpeg`; 404 if not Bambu, 400 if not A1, 502 if fetch fails (D-04)
-- [ ] **BAMBU-A1-11**: UI gates `chamber_temper`, AMS panel, xcam features via `camera.capabilities` (CameraDetailCard.svelte) instead of hardcoded `model === 'H2C'` branches; wizard (StepBambuCredentials.svelte) shows A1-specific copy when `model === 'A1'`
-- [ ] **BAMBU-A1-12**: End-to-end A1 onboarding through existing wizard → preflight → provision → adoption (manual UAT against real A1 @ 192.168.3.195)
+- [x] **BAMBU-A1-10**: Snapshot endpoint `GET /api/cameras/:id/a1-snapshot` returns JPEG from on-demand TLS+auth+first-frame pull; 2-second in-memory cache per camera ID (DoS mitigation); `Content-Type: image/jpeg`; 404 if not Bambu, 400 if not A1, 502 if fetch fails (D-04)
+- [x] **BAMBU-A1-11**: UI gates `chamber_temper`, AMS panel, xcam features via `camera.capabilities` (CameraDetailCard.svelte) instead of hardcoded `model === 'H2C'` branches; wizard (StepBambuCredentials.svelte) shows A1-specific copy when `model === 'A1'`
+- [x] **BAMBU-A1-12**: End-to-end A1 onboarding through existing wizard → preflight → provision → adoption (manual UAT against real A1 @ 192.168.3.195)
 
 ### Traceability Addendum
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BAMBU-A1-01 | Phase 18 | Pending |
-| BAMBU-A1-02 | Phase 18 | Pending |
-| BAMBU-A1-03 | Phase 18 | Pending |
-| BAMBU-A1-04 | Phase 18 | Pending |
-| BAMBU-A1-05 | Phase 18 | Pending |
-| BAMBU-A1-06 | Phase 18 | Pending |
-| BAMBU-A1-07 | Phase 18 | Pending |
-| BAMBU-A1-08 | Phase 18 | Pending |
-| BAMBU-A1-09 | Phase 18 | Pending |
-| BAMBU-A1-10 | Phase 18 | Pending |
-| BAMBU-A1-11 | Phase 18 | Pending |
-| BAMBU-A1-12 | Phase 18 | Pending |
+| BAMBU-A1-01 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-02 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-03 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-04 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-05 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-06 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-07 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-08 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-09 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-10 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-11 | Phase 18 | Done (2026-04-20) |
+| BAMBU-A1-12 | Phase 18 | Done (2026-04-20) |
 
 **Phase 18 coverage:** 12 / 12 BAMBU-A1 requirements mapped (100%).
