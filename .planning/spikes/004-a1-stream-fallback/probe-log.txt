@@ -1,0 +1,48 @@
+[probe] TLS-connecting 192.168.3.195:6000 ...
+[probe] TLS up (authorized=false, protocol=TLSv1.2)
+[probe] peer cert subject: {"CN":"03919A3B0100254"}
+[probe] peer cert issuer:  {"C":"CN","O":"BBL Technologies Co., Ltd","CN":"BBL CA"}
+[probe] peer cert valid:   Nov  5 11:05:21 2023 GMT → Nov  2 11:05:21 2033 GMT
+[probe] sending 80-byte auth (bblp + access_code)
+[probe] frame 1: size=198982 bytes, JPEG_ok=true, EOI_ok=true, dims=1536x1080 → saved .planning/spikes/004-a1-stream-fallback/frame-001.jpg
+[probe] frame 2: size=189032 bytes, dims=1536x1080
+[probe] frame 3: size=181441 bytes, dims=1536x1080
+[probe] frame 4: size=178162 bytes, dims=1536x1080
+[probe] frame 5: size=221600 bytes, dims=1536x1080
+[probe] frame 6: size=148892 bytes, dims=1536x1080
+[probe] frame 7: size=178000 bytes, dims=1536x1080
+[probe] frame 8: size=190294 bytes, dims=1536x1080
+[probe] frame 9: size=174856 bytes, dims=1536x1080
+[probe] frame 10: size=162872 bytes, dims=1536x1080
+[probe] frame 11: size=178614 bytes, dims=1536x1080
+[probe] frame 12: size=191716 bytes, dims=1536x1080
+[probe] frame 13: size=178765 bytes, dims=1536x1080
+[probe] frame 14: size=173820 bytes, dims=1536x1080
+[probe] frame 15: size=178646 bytes, dims=1536x1080
+[probe] frame 16: size=173514 bytes, dims=1536x1080
+[probe] frame 17: size=179249 bytes, dims=1536x1080
+[probe] frame 18: size=173534 bytes, dims=1536x1080
+[probe] frame 19: size=179067 bytes, dims=1536x1080
+[probe] frame 20: size=192132 bytes, dims=1536x1080
+[probe] frame 21: size=179316 bytes, dims=1536x1080
+[probe] frame 22: size=192131 bytes, dims=1536x1080
+[probe] frame 23: size=179381 bytes, dims=1536x1080
+[probe] frame 24: size=192240 bytes, dims=1536x1080
+[probe] frame 25: size=179410 bytes, dims=1536x1080
+[probe] frame 26: size=191989 bytes, dims=1536x1080
+[probe] frame 27: size=178908 bytes, dims=1536x1080
+[probe] frame 28: size=191851 bytes, dims=1536x1080
+[probe] frame 29: size=179122 bytes, dims=1536x1080
+[probe] frame 30: size=191705 bytes, dims=1536x1080
+[probe] frame 31: size=179031 bytes, dims=1536x1080
+[probe] frame 32: size=191936 bytes, dims=1536x1080
+[probe] frame 33: size=178641 bytes, dims=1536x1080
+[probe] frame 34: size=191680 bytes, dims=1536x1080
+[probe] frame 35: size=178574 bytes, dims=1536x1080
+[probe] frame 36: size=191146 bytes, dims=1536x1080
+[probe] frame 37: size=178202 bytes, dims=1536x1080
+[probe] frame 38: size=191302 bytes, dims=1536x1080
+[probe] frame 39: size=177983 bytes, dims=1536x1080
+[probe] frame 40: size=191099 bytes, JPEG_ok=true, EOI_ok=true, dims=1536x1080 → saved .planning/spikes/004-a1-stream-fallback/frame-040.jpg
+[probe] captured 40 frames in 87.45s → ~0.45 fps
+[probe] connection closed. auth_sent=true frames_received=40
