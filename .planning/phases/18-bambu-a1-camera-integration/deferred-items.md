@@ -26,6 +26,10 @@ Failing test files (12 tests across 2 files):
 **Disposition:** OUT OF SCOPE for Phase 18. Pre-existing pattern; do not fix in this phase.
 Files relevant to Phase 18 (`src/lib/server/db/schema.ts`, `src/lib/server/services/bambu-discovery.ts`, `src/lib/server/services/bambu-discovery.test.ts`) are green — all 10 bambu-discovery tests pass, plus svelte-check reports 0 errors.
 
+## IN-03: Migration strategy reconciliation (Code-Review 2026-04-20)
+
+**Source:** Phase 18 code-review finding IN-03 (`18-REVIEW.md`). The reviewer flagged that `src/lib/server/db/client.ts` boot-time `ensureColumn` ALTERs and the drizzle-kit migration in `drizzle/0001_add_camera_model.sql` do the same schema work twice. Out of scope for Phase 18; carry into a future phase to pick one system and retire the other.
+
 ## Plan 18-05 re-verification (2026-04-20)
 
 Re-confirmed during Plan 18-05 execution that the same set of pre-existing failures
