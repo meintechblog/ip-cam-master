@@ -179,7 +179,10 @@ export async function saveCameraRecord(params: {
 			fps: params.fps || 20,
 			bitrate: params.bitrate || 2000,
 			streamName,
-			status: CAMERA_STATUS.PENDING
+			status: CAMERA_STATUS.PENDING,
+			// New Mobotix/Loxone onboardings lock RTSP with the user-provided
+			// camera credentials. Protect will prompt for them during adoption.
+			rtspAuthEnabled: true
 		})
 		.run();
 

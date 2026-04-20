@@ -48,7 +48,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			streamName: `bambu-${serialNumber.slice(-6)}`,
 			status: CAMERA_STATUS.PENDING,
 			accessCode: encrypt(accessCode),
-			serialNumber
+			serialNumber,
+			// Bambu go2rtc locks RTSP with serial as username + access code
+			// as password — exactly the pair the user types in UniFi Protect.
+			rtspAuthEnabled: true
 		})
 		.run();
 
