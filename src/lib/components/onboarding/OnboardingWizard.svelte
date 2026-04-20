@@ -35,6 +35,12 @@
 	let bambuAccessCode = $state('');
 	let bambuModel = $state(prefillModel || 'H2C');
 	let bambuStep = $state<'credentials' | 'preflight' | 'done'>('credentials');
+	// Phase 18 / IN-02: Dedicated name state for the Bambu branch. Previously
+	// the Mobotix-branch `name` leaked across if a user filled in the Mobotix
+	// form, backed out, and switched to a Bambu flow. `bambuName` is seeded
+	// from the same `prefillName` prop so discovery-matched names still land
+	// on save-camera, but Mobotix keystrokes no longer pollute the Bambu body.
+	let bambuName = $state(prefillName);
 
 	function handleBambuCredentialsSubmit(result: {
 		serialNumber: string;
@@ -68,7 +74,9 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					name: name || `Bambu Lab ${bambuSerial.slice(-6)}`,
+					// Phase 18 / IN-02: `bambuName` is the Bambu-branch state,
+					// not the Mobotix-branch `name`. See $state declaration above.
+					name: bambuName || `Bambu Lab ${bambuSerial.slice(-6)}`,
 					ip: bambuIp,
 					serialNumber: bambuSerial,
 					accessCode: bambuAccessCode,
