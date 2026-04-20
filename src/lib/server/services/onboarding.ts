@@ -1,5 +1,5 @@
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, type RtspAuth } from './go2rtc';
 import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
@@ -7,6 +7,37 @@ import { cameras } from '$lib/server/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { Camera, StreamInfo } from '$lib/types';
 import { CAMERA_STATUS } from '$lib/types';
+
+/**
+ * Build RTSP auth credentials for a camera's go2rtc server, if opt-in is active.
+ * - Mobotix/Loxone: camera.username + decrypt(camera.password)
+ * - Bambu: camera.serial_number + decrypt(camera.access_code)
+ *   (mirrors what the user enters in UniFi Protect during adoption)
+ *
+ * Returns undefined when rtsp_auth_enabled is false or required fields are
+ * missing, so the generator emits an unauthenticated go2rtc.yaml (legacy
+ * behavior) without risking a broken deploy.
+ */
+export function buildRtspAuth(
+	camera: {
+		cameraType: string;
+		rtspAuthEnabled?: boolean;
+		username: string;
+		password: string;
+		accessCode?: string | null;
+		serialNumber?: string | null;
+	}
+): RtspAuth | undefined {
+	if (!camera.rtspAuthEnabled) return undefined;
+
+	if (camera.cameraType === 'bambu') {
+		if (!camera.serialNumber || !camera.accessCode) return undefined;
+		return { username: camera.serialNumber, password: decrypt(camera.accessCode) };
+	}
+
+	if (!camera.username || !camera.password) return undefined;
+	return { username: camera.username, password: decrypt(camera.password) };
+}
 
 /**
  * Tests connectivity to a Mobotix camera by probing its RTSP stream via ffprobe over SSH.
@@ -278,6 +309,12 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 			}
 		}
 
+		// RTSP-auth creds for the go2rtc rtsp: block, when opted-in on the camera.
+		// Mobotix/Loxone reuse the camera's own HTTP credentials; Bambu uses
+		// serial_number as user + access_code as password (matches the flow the
+		// user expects in Protect's adoption dialog).
+		const rtspAuth = buildRtspAuth(camera);
+
 		let yamlContent: string;
 
 		if (camera.cameraType === 'bambu') {
@@ -288,19 +325,19 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 			yamlContent = generateGo2rtcConfigBambu({
 				streamName: camera.streamName,
 				printerIp: camera.ip,
-				accessCode
+				accessCode,
+				rtspAuth
 			});
 		} else if (camera.cameraType === 'loxone') {
 			// Loxone: go2rtc reads from local nginx proxy
-			const _password = decrypt(camera.password);
 			yamlContent = generateGo2rtcConfigLoxone({
 				streamName: camera.streamName,
 				width: camera.width,
 				height: camera.height,
 				fps: camera.fps,
-				bitrate: camera.bitrate
+				bitrate: camera.bitrate,
+				rtspAuth
 			});
-			void _password;
 		} else {
 			// Mobotix: go2rtc reads directly from camera RTSP
 			const decryptedPassword = decrypt(camera.password);
@@ -313,7 +350,8 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 				height: camera.height,
 				fps: camera.fps,
 				bitrate: camera.bitrate,
-				streamPath: camera.streamPath
+				streamPath: camera.streamPath,
+				rtspAuth
 			});
 		}
 

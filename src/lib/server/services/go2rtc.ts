@@ -1,5 +1,27 @@
 import type { StreamInfo } from '$lib/types';
 
+/**
+ * Credentials that enable RTSP auth on go2rtc's port 8554.
+ * When present, the generated go2rtc.yaml includes an `rtsp:` block
+ * that requires clients (including UniFi Protect adoption) to
+ * authenticate. Single quoted-YAML so `$ " \` etc. pass through literally.
+ */
+export type RtspAuth = { username: string; password: string };
+
+function yamlSingleQuote(s: string): string {
+	return `'${s.replace(/'/g, "''")}'`;
+}
+
+function rtspServerBlock(auth?: RtspAuth): string {
+	if (!auth) return '';
+	return `
+rtsp:
+  listen: ":8554"
+  username: ${yamlSingleQuote(auth.username)}
+  password: ${yamlSingleQuote(auth.password)}
+`;
+}
+
 export interface Go2rtcConfigParams {
 	streamName: string;
 	cameraIp: string;
@@ -10,6 +32,7 @@ export interface Go2rtcConfigParams {
 	fps: number;
 	bitrate: number;
 	streamPath?: string; // deprecated — HTTP MJPEG URL is now generated automatically
+	rtspAuth?: RtspAuth;
 }
 
 /**
@@ -17,7 +40,7 @@ export interface Go2rtcConfigParams {
  * Works for both Mobotix (HTTP MJPEG + RTSP audio) and Loxone (nginx proxy, no audio).
  */
 export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
-	const { streamName, cameraIp, username, password, width, height, fps, bitrate } = params;
+	const { streamName, cameraIp, username, password, width, height, fps, bitrate, rtspAuth } = params;
 	const bufsize = bitrate * 2;
 	const sourceUrl = `http://${username}:${password}@${cameraIp}/control/faststream.jpg?stream=full&fps=${fps}&needlength`;
 	const vaapiBase = `#video=h264#raw=-g ${fps}#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 5`;
@@ -29,13 +52,14 @@ export function generateGo2rtcConfig(params: Go2rtcConfigParams): string {
 	// LQ: alias to HQ via local restream. Protect 1.20.7 only uses one stream
 	// and sometimes picks LQ — by pointing it at HQ, we guarantee full
 	// resolution regardless of which ONVIF profile Protect selects.
+	// go2rtc bypasses RTSP auth for localhost, so the loopback needs no creds.
 	return `streams:
   ${streamName}:
     - ${hqVideo}
     - ${audioSource}
   ${streamName}-low:
     - rtsp://127.0.0.1:8554/${streamName}
-
+${rtspServerBlock(rtspAuth)}
 ffmpeg:
   bin: ffmpeg
 
@@ -84,8 +108,9 @@ export function generateGo2rtcConfigLoxone(params: {
 	height: number;
 	fps: number;
 	bitrate: number;
+	rtspAuth?: RtspAuth;
 }): string {
-	const { streamName, width, height, fps, bitrate } = params;
+	const { streamName, width, height, fps, bitrate, rtspAuth } = params;
 	const bufsize = bitrate * 2;
 	const sourceUrl = `http://localhost:8081/mjpg/video.mjpg`;
 	// Loxone Intercom natively streams at 25fps. Cap to 15fps — a doorbell
@@ -98,7 +123,7 @@ export function generateGo2rtcConfigLoxone(params: {
     - ffmpeg:${sourceUrl}${vaapiBase}#width=${width}#height=${height}#raw=-maxrate ${bitrate}k#raw=-bufsize ${bufsize}k
   ${streamName}-low:
     - rtsp://127.0.0.1:8554/${streamName}
-
+${rtspServerBlock(rtspAuth)}
 ffmpeg:
   bin: ffmpeg
 
@@ -118,8 +143,9 @@ export function generateGo2rtcConfigBambu(params: {
 	streamName: string;
 	printerIp: string;
 	accessCode: string;
+	rtspAuth?: RtspAuth;
 }): string {
-	const { streamName, printerIp, accessCode } = params;
+	const { streamName, printerIp, accessCode, rtspAuth } = params;
 	const sourceUrl = `rtspx://bblp:${accessCode}@${printerIp}:322/streaming/live/1`;
 	// HQ: passthrough (no transcode, 1680x1080 h264 as-is from printer).
 	// LQ: VAAPI-accelerated downscale to 840x540 for Protect grid thumbnails.
@@ -130,7 +156,7 @@ export function generateGo2rtcConfigBambu(params: {
     - ${sourceUrl}#video=copy#audio=copy#reconnect_timeout=30
   ${streamName}-low:
     - ffmpeg:rtsp://127.0.0.1:8554/${streamName}#video=h264#hardware=vaapi#width=840#height=540#raw=-g 30#raw=-maxrate 500k#raw=-bufsize 1000k
-
+${rtspServerBlock(rtspAuth)}
 ffmpeg:
   bin: ffmpeg
 
