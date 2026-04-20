@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: "Phase 18 planning complete (6 plans, 3 waves). Ready to run `/gsd:execute-phase 18`."
-last_updated: "2026-04-20T15:16:51.538Z"
-last_activity: 2026-04-20 -- Phase null execution started
+milestone: v1.2
+milestone_name: "Bambu Lab H2C Kamera-Integration"
+status: phase_complete
+stopped_at: "Phase 18 complete (6/6 plans, 12/12 reqs, 11/11 review findings fixed). VERIFICATION.md status=human_needed for 5 manual UAT items requiring browser/Bambu-app/Protect."
+last_updated: "2026-04-20T19:30:00.000Z"
+last_activity: 2026-04-20 — Phase 18 execution + verification complete
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 8
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** Phase null
+**Current focus:** v1.2 — Bambu Lab H2C Kamera-Integration. Phase 18 (Bambu Lab A1 Camera Integration) abgeschlossen: 6/6 Plans, 12/12 Requirements, 11/11 Code-Review Findings gefixt, live UAT gegen A1 @ 192.168.3.195 für Preflight + Snapshot-Errorpaths verifiziert. 5 manuelle UAT-Schritte (Wizard/Provisioning/Protect/Cloud-Mode-Toggle) bleiben für den User offen.
 
 ## Current Position
 
-Phase: null — EXECUTING
-Plan: 1 of ?
-Status: Executing Phase null
-Last activity: 2026-04-20 -- Phase null execution started
+Phase: 18 — Bambu Lab A1 Camera Integration (COMPLETE)
+Plan: 6/6 plans complete
+Status: Phase verified, awaiting next-phase routing
+Last activity: 2026-04-20 — Phase 18 closed: code-review-fix (11/11), verifier (status: human_needed for live UAT), tracking-files synced
 
 Phase numbering: continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10.
 
