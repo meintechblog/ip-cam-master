@@ -31,6 +31,12 @@ const JPEG_HEADERS = {
 const cache = new Map<number, { buf: Buffer; expiresAt: number }>();
 const CACHE_TTL_MS = 2000;
 
+// Phase 18 / WR-01: Per-camera in-flight promise coalescing. Concurrent
+// cache misses all await the same `fetchA1SnapshotJpeg` promise so the
+// printer sees exactly one TLS session per 2 s per camera, honouring the
+// DoS-mitigation invariant documented on the cache contract.
+const inflight = new Map<number, Promise<Buffer | null>>();
+
 export const GET: RequestHandler = async ({ params }) => {
 	const id = Number.parseInt(params.id ?? '', 10);
 	if (!Number.isInteger(id) || id <= 0) {
@@ -68,9 +74,25 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response('A1 access code could not be decrypted', { status: 500 });
 	}
 
-	const buf = await fetchA1SnapshotJpeg(cam.ip, accessCode, 8000);
+	// Phase 18 / WR-01: If another request is already mid-handshake for this
+	// camera, await the same promise instead of opening a second TLS session.
+	// Populate the cache exactly once when the first in-flight call resolves.
+	let pending = inflight.get(id);
+	if (!pending) {
+		pending = fetchA1SnapshotJpeg(cam.ip, accessCode, 8000)
+			.then((buf) => {
+				if (buf) {
+					cache.set(id, { buf, expiresAt: Date.now() + CACHE_TTL_MS });
+				}
+				return buf;
+			})
+			.finally(() => {
+				inflight.delete(id);
+			});
+		inflight.set(id, pending);
+	}
+	const buf = await pending;
 	if (!buf) return new Response('Snapshot unavailable', { status: 502 });
 
-	cache.set(id, { buf, expiresAt: Date.now() + CACHE_TTL_MS });
 	return new Response(new Uint8Array(buf), { headers: JPEG_HEADERS });
 };

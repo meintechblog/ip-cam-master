@@ -105,6 +105,32 @@ describe('GET /api/cameras/:id/a1-snapshot (Phase 18 / BAMBU-A1-10)', () => {
 		expect(fetchA1SnapshotJpeg).toHaveBeenCalledTimes(1);
 	});
 
+	// Phase 18 / WR-01: Concurrent cache misses must coalesce onto a single
+	// in-flight TLS session. The DoS-mitigation invariant is ≤1 TLS handshake
+	// per 2 s per camera, regardless of simultaneous request count.
+	it('coalesces concurrent misses into one fetchA1SnapshotJpeg call', async () => {
+		selectGet.mockReturnValue({
+			id: 123,
+			cameraType: 'bambu',
+			model: 'A1',
+			accessCode: 'enc',
+			ip: '1.2.3.4'
+		});
+		const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+		let resolveFetch!: (v: Buffer) => void;
+		fetchA1SnapshotJpeg.mockReturnValueOnce(
+			new Promise<Buffer>((r) => {
+				resolveFetch = r;
+			})
+		);
+		// Two overlapping requests — must share the single in-flight promise.
+		const p1 = call('123');
+		const p2 = call('123');
+		resolveFetch(jpeg);
+		await Promise.all([p1, p2]);
+		expect(fetchA1SnapshotJpeg).toHaveBeenCalledTimes(1);
+	});
+
 	it('never includes the access code in the response body or headers', async () => {
 		selectGet.mockReturnValue({
 			id: 99,
