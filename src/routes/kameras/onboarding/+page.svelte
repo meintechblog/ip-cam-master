@@ -649,6 +649,13 @@
 		// Snapshot already pre-loaded in parallel at batch start
 
 		// Save camera
+		// Phase 18 / WR-02: Require a fresh VMID from test-connection per camera.
+		// The page-load `data.nextVmid + idx` fallback could collide on back-to-back
+		// batches because pending batch cameras aren't yet in the DB when the second
+		// page loads. Fail loudly rather than silently reuse a stale VMID.
+		if (!testData.nextVmid) {
+			throw new Error('VMID konnte nicht ermittelt werden — erneut versuchen');
+		}
 		const saveRes = await fetch('/api/onboarding/save-camera', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -656,7 +663,7 @@
 				name: cam.name || cam.ip, ip: cam.ip, username, password,
 				width: testData.width || 1280, height: testData.height || 720,
 				fps: testData.fps || 20, bitrate: testData.bitrate || 2000,
-				vmid: testData.nextVmid || data.nextVmid + idx, cameraType: cam.type
+				vmid: testData.nextVmid, cameraType: cam.type
 			}),
 		});
 		const saveData = await saveRes.json();
