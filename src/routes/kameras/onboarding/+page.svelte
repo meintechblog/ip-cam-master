@@ -996,6 +996,8 @@
 									<span class="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">ONVIF</span>
 								{:else if cam.type === 'loxone'}
 									<span class="text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">Loxone</span>
+								{:else if cam.type === 'bambu'}
+									<span class="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">Bambu Lab</span>
 								{:else}
 									<span class="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Mobotix</span>
 								{/if}
