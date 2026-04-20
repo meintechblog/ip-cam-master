@@ -32,12 +32,12 @@ export const POST: RequestHandler = async ({ request }) => {
 	const rawModel = typeof body?.model === 'string' ? body.model.trim() : '';
 	const model = (BAMBU_MODEL_ALLOWLIST as readonly string[]).includes(rawModel) ? rawModel : 'H2C';
 
-	if (!ip || !serialNumber || !accessCode) {
+	if (!ip || !serialNumber || !accessCode || accessCode.length !== 8) {
 		return json(
 			{
 				ok: false,
 				error: 'INVALID_INPUT',
-				hint: 'IP, Seriennummer und Access Code sind erforderlich.'
+				hint: 'IP, Seriennummer und Access Code (8 Zeichen) sind erforderlich.'
 			},
 			{ status: 400 }
 		);
