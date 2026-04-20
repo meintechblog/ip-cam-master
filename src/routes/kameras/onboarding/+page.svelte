@@ -77,19 +77,30 @@
 	}
 
 	// Credential prompt during batch (pauses batch until user provides credentials)
-	let credPrompt = $state<{
+	type BasicPrompt = {
+		kind: 'basic';
 		camIdx: number;
 		ip: string;
 		cameraType: string;
 		resolve: (cred: { username: string; password: string } | null) => void;
-	} | null>(null);
+	};
+	type BambuPrompt = {
+		kind: 'bambu';
+		camIdx: number;
+		ip: string;
+		prefillSerial: string;
+		resolve: (cred: { serialNumber: string; accessCode: string } | null) => void;
+	};
+	let credPrompt = $state<BasicPrompt | BambuPrompt | null>(null);
 	let credPromptName = $state('');
 	let credPromptUser = $state('');
 	let credPromptPass = $state('');
+	let credPromptSerial = $state('');
+	let credPromptAccessCode = $state('');
 	let credPromptSaving = $state(false);
 	let credPromptError = $state<string | null>(null);
 
-	/** Pause the batch and show credential input for a camera. Returns credentials or null (skip). */
+	/** Pause the batch and show credential input for a Mobotix/Loxone camera. */
 	function promptForCredentials(camIdx: number, ip: string, cameraType: string): Promise<{ username: string; password: string } | null> {
 		return new Promise((resolve) => {
 			credPromptName = '';
@@ -97,29 +108,61 @@
 			credPromptPass = '';
 			credPromptError = null;
 			credPromptSaving = false;
-			credPrompt = { camIdx, ip, cameraType, resolve };
+			credPrompt = { kind: 'basic', camIdx, ip, cameraType, resolve };
+		});
+	}
+
+	/** Pause the batch and show serial + access-code input for a Bambu printer. */
+	function promptForBambuCredentials(camIdx: number, ip: string, prefillSerial: string): Promise<{ serialNumber: string; accessCode: string } | null> {
+		return new Promise((resolve) => {
+			credPromptName = '';
+			credPromptSerial = prefillSerial || '';
+			credPromptAccessCode = '';
+			credPromptError = null;
+			credPromptSaving = false;
+			credPrompt = { kind: 'bambu', camIdx, ip, prefillSerial, resolve };
 		});
 	}
 
 	async function submitCredPrompt() {
 		if (!credPrompt) return;
-		if (!credPromptUser || !credPromptPass) {
-			credPromptError = 'Benutzername und Passwort erforderlich';
-			return;
-		}
 		credPromptSaving = true;
 		credPromptError = null;
 		try {
-			// Save as new credential if name provided
-			if (credPromptName.trim()) {
-				await fetch('/api/credentials', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ name: credPromptName.trim(), username: credPromptUser, password: credPromptPass })
-				});
+			if (credPrompt.kind === 'bambu') {
+				if (!credPromptSerial.trim() || credPromptAccessCode.length !== 8) {
+					credPromptError = 'Seriennummer und 8-stelliger Access Code erforderlich';
+					credPromptSaving = false;
+					return;
+				}
+				if (credPromptName.trim()) {
+					await fetch('/api/credentials', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							name: credPromptName.trim(),
+							type: 'bambu',
+							serialNumber: credPromptSerial.trim(),
+							accessCode: credPromptAccessCode
+						})
+					});
+				}
+				credPrompt.resolve({ serialNumber: credPromptSerial.trim(), accessCode: credPromptAccessCode });
+			} else {
+				if (!credPromptUser || !credPromptPass) {
+					credPromptError = 'Benutzername und Passwort erforderlich';
+					credPromptSaving = false;
+					return;
+				}
+				if (credPromptName.trim()) {
+					await fetch('/api/credentials', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ name: credPromptName.trim(), type: 'mobotix', username: credPromptUser, password: credPromptPass })
+					});
+				}
+				credPrompt.resolve({ username: credPromptUser, password: credPromptPass });
 			}
-			const cred = { username: credPromptUser, password: credPromptPass };
-			credPrompt.resolve(cred);
 			credPrompt = null;
 		} catch (err: any) {
 			credPromptError = err.message || 'Fehler beim Speichern';
@@ -134,9 +177,40 @@
 		credPrompt = null;
 	}
 
+	/**
+	 * Load all saved Bambu credentials, keyed by serialNumber.
+	 * Used by the batch pipeline to auto-match printers to saved logins
+	 * without a per-camera round-trip.
+	 */
+	async function loadBambuCredMap(): Promise<Map<string, { id: number; name: string }>> {
+		const map = new Map<string, { id: number; name: string }>();
+		try {
+			const res = await fetch('/api/credentials');
+			if (!res.ok) return map;
+			const rows = (await res.json()) as Array<{ id: number; name: string; type: string; serialNumber?: string }>;
+			for (const r of rows) {
+				if (r.type === 'bambu' && r.serialNumber) {
+					map.set(r.serialNumber, { id: r.id, name: r.name });
+				}
+			}
+		} catch { /* ignore */ }
+		return map;
+	}
+
+	async function fetchBambuCredentialById(id: number): Promise<{ serialNumber: string; accessCode: string } | null> {
+		try {
+			const res = await fetch(`/api/credentials/${id}`);
+			if (!res.ok) return null;
+			const data = await res.json();
+			if (data.type !== 'bambu' || !data.serialNumber || !data.accessCode) return null;
+			return { serialNumber: data.serialNumber, accessCode: data.accessCode };
+		} catch { return null; }
+	}
+
 	// Pipeline cameras that need the wizard
 	let pipelineCameras = $derived(discovered.filter(c => c.type === 'mobotix' || c.type === 'loxone'));
 	let onvifCameras = $derived(discovered.filter(c => c.type === 'mobotix-onvif'));
+	let bambuCameras = $derived(discovered.filter(c => c.type === 'bambu'));
 
 	async function runDiscovery() {
 		scanning = true;
@@ -341,6 +415,23 @@
 		];
 	}
 
+	function makeBambuSteps(): BatchStep[] {
+		return [
+			{ label: 'Zugangsdaten', status: 'pending', subs: [
+				{ label: 'Gespeicherte Bambu-Logins prüfen', status: 'pending' },
+				{ label: 'Seriennummer mit Access Code abgleichen', status: 'pending' },
+			]},
+			{ label: 'Kamera speichern', status: 'pending', subs: [
+				{ label: 'Datensatz anlegen', status: 'pending' },
+			]},
+			{ label: 'LXC provisionieren', status: 'pending', subs: [
+				{ label: 'Container aus Template klonen', status: 'pending' },
+				{ label: 'go2rtc YAML generieren (RTSPS-Passthrough)', status: 'pending' },
+				{ label: 'systemd Service starten', status: 'pending' },
+			]},
+		];
+	}
+
 	// Animate sub-steps while an API call is running
 	let subStepTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -392,12 +483,15 @@
 
 		batchResults = [
 			...onvifCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makeOnvifSteps(), expanded: false })),
-			...pipelineCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makePipelineSteps(c.type), expanded: false }))
+			...pipelineCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makePipelineSteps(c.type), expanded: false })),
+			...bambuCameras.map(c => ({ ip: c.ip, name: c.name || c.ip, type: c.type, status: 'pending' as const, steps: makeBambuSteps(), expanded: false }))
 		];
 
 		// Pre-load all snapshots in parallel (fire-and-forget, fills thumbnails while queue runs)
+		// Skip for Bambu — snapshots come from go2rtc after container provisioning.
 		for (let i = 0; i < batchResults.length; i++) {
 			const cam = batchResults[i];
+			if (cam.type === 'bambu') continue;
 			fetchCredentials(cam.ip, cam.type === 'mobotix-onvif' ? 'mobotix-onvif' : cam.type).then(async (cred) => {
 				if (!cred.success) return;
 				try {
@@ -415,6 +509,9 @@
 			});
 		}
 
+		// Load saved Bambu credentials once for the whole batch run.
+		const bambuCredMap = await loadBambuCredMap();
+
 		for (let i = 0; i < batchResults.length; i++) {
 			if (batchCancelled) {
 				for (let j = i; j < batchResults.length; j++) batchResults[j].status = 'skipped';
@@ -431,6 +528,8 @@
 			try {
 				if (cam?.type === 'mobotix-onvif') {
 					await batchRegisterOnvif(i, cam);
+				} else if (cam?.type === 'bambu') {
+					await batchOnboardBambu(i, cam, bambuCredMap);
 				} else {
 					await batchOnboardPipeline(i, cam!);
 				}
@@ -622,6 +721,82 @@
 		if (!verData.success) throw new Error('Stream-Verifikation fehlgeschlagen');
 		setStep(idx, stepNum, 'done', 'RTSP Stream OK');
 	}
+
+	/**
+	 * Batch onboarding for a single Bambu printer.
+	 * Matches saved credentials by serial number first; falls back to
+	 * a Bambu-shaped credential prompt if no match. Uses the two
+	 * Bambu-specific endpoints (save-camera + provision) — no
+	 * test-connection/verify-stream roundtrips because go2rtc inside
+	 * the container handles the RTSPS pull end-to-end.
+	 */
+	async function batchOnboardBambu(
+		idx: number,
+		cam: { ip: string; name: string | null; type: string; serialNumber?: string },
+		bambuCredMap: Map<string, { id: number; name: string }>
+	) {
+		let stepNum = 0;
+
+		// Step 0: credentials — auto-match by serial, else prompt
+		setStep(idx, stepNum, 'active');
+		let serialNumber = (cam.serialNumber || '').trim();
+		let accessCode = '';
+
+		if (serialNumber && bambuCredMap.has(serialNumber)) {
+			const hit = bambuCredMap.get(serialNumber)!;
+			const creds = await fetchBambuCredentialById(hit.id);
+			if (creds) {
+				serialNumber = creds.serialNumber;
+				accessCode = creds.accessCode;
+				setStep(idx, stepNum, 'done', `gespeichert: ${hit.name}`);
+			}
+		}
+
+		if (!accessCode) {
+			const manual = await promptForBambuCredentials(idx, cam.ip, serialNumber);
+			if (!manual) throw new Error('Übersprungen — kein Access Code');
+			serialNumber = manual.serialNumber;
+			accessCode = manual.accessCode;
+			setStep(idx, stepNum, 'done', `manuell (${serialNumber.slice(-6)})`);
+		}
+
+		stepNum++;
+
+		// Step 1: save-camera row (Bambu-specific endpoint)
+		setStep(idx, stepNum, 'active');
+		const saveRes = await fetch('/api/onboarding/bambu/save-camera', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				name: cam.name || `Bambu Lab ${serialNumber.slice(-6)}`,
+				ip: cam.ip,
+				serialNumber,
+				accessCode
+			})
+		});
+		const saveData = await saveRes.json();
+		if (!saveRes.ok || !saveData.success) {
+			throw new Error(saveData.error || 'Speichern fehlgeschlagen');
+		}
+		const cameraId = saveData.cameraId;
+		setStep(idx, stepNum, 'done', `ID ${cameraId}`);
+		stepNum++;
+
+		// Step 2: provision LXC + go2rtc (long-running, 4-5 min first time)
+		setStep(idx, stepNum, 'active');
+		const provisionRes = await fetch('/api/onboarding/bambu/provision', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ cameraId }),
+			signal: AbortSignal.timeout(300000)
+		});
+		const provisionData = await provisionRes.json();
+		if (!provisionRes.ok || !provisionData.success) {
+			throw new Error(provisionData.error || 'LXC-Provisionierung fehlgeschlagen');
+		}
+		if (provisionData.containerIp) batchResults[idx].containerIp = provisionData.containerIp;
+		setStep(idx, stepNum, 'done', provisionData.containerIp ? `go2rtc @ ${provisionData.containerIp}` : 'fertig');
+	}
 </script>
 
 <h1 class="text-2xl font-bold text-text-primary mb-6">Kamera einrichten</h1>
@@ -677,38 +852,72 @@
 			<div class="bg-yellow-500/10 border border-yellow-500/40 rounded-lg p-4 space-y-3">
 				<div class="flex items-center gap-2">
 					<KeyRound class="w-5 h-5 text-yellow-400" />
-					<h3 class="text-sm font-bold text-yellow-400">Zugangsdaten benötigt</h3>
+					<h3 class="text-sm font-bold text-yellow-400">
+						{credPrompt.kind === 'bambu' ? 'Bambu-Zugang benötigt' : 'Zugangsdaten benötigt'}
+					</h3>
 				</div>
 				<p class="text-sm text-text-secondary">
-					Für <span class="text-text-primary font-mono">{credPrompt.ip}</span> wurden keine passenden Zugangsdaten gefunden.
-					Gib Benutzername und Passwort ein. Optional einen Namen vergeben, um die Zugangsdaten für zukünftige Kameras zu speichern.
+					{#if credPrompt.kind === 'bambu'}
+						Für den Drucker auf <span class="text-text-primary font-mono">{credPrompt.ip}</span> gibt es keinen passenden gespeicherten Login.
+						Seriennummer und Access Code (Einstellungen → Netzwerk) am Drucker ablesen. Optional einen Namen vergeben, um den Login künftig wiederzuverwenden.
+					{:else}
+						Für <span class="text-text-primary font-mono">{credPrompt.ip}</span> wurden keine passenden Zugangsdaten gefunden.
+						Gib Benutzername und Passwort ein. Optional einen Namen vergeben, um die Zugangsdaten für zukünftige Kameras zu speichern.
+					{/if}
 				</p>
 				{#if credPromptError}
 					<div class="text-red-400 text-xs">{credPromptError}</div>
 				{/if}
-				<div class="grid grid-cols-3 gap-3">
-					<input
-						type="text"
-						bind:value={credPromptName}
-						placeholder="Name (optional, z.B. Mobotix Standard)"
-						autocomplete="off"
-						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-					/>
-					<input
-						type="text"
-						bind:value={credPromptUser}
-						placeholder="Benutzername"
-						autocomplete="off"
-						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-					/>
-					<input
-						type="password"
-						bind:value={credPromptPass}
-						placeholder="Passwort"
-						autocomplete="off"
-						class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-					/>
-				</div>
+				{#if credPrompt.kind === 'bambu'}
+					<div class="grid grid-cols-3 gap-3">
+						<input
+							type="text"
+							bind:value={credPromptName}
+							placeholder="Name (optional)"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+						/>
+						<input
+							type="text"
+							bind:value={credPromptSerial}
+							placeholder="Seriennummer"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono"
+						/>
+						<input
+							type="password"
+							bind:value={credPromptAccessCode}
+							placeholder="Access Code (8 Zeichen)"
+							maxlength="8"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono tracking-widest"
+						/>
+					</div>
+				{:else}
+					<div class="grid grid-cols-3 gap-3">
+						<input
+							type="text"
+							bind:value={credPromptName}
+							placeholder="Name (optional, z.B. Mobotix Standard)"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+						/>
+						<input
+							type="text"
+							bind:value={credPromptUser}
+							placeholder="Benutzername"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+						/>
+						<input
+							type="password"
+							bind:value={credPromptPass}
+							placeholder="Passwort"
+							autocomplete="off"
+							class="bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+						/>
+					</div>
+				{/if}
 				<div class="flex gap-2">
 					<button
 						onclick={submitCredPrompt}

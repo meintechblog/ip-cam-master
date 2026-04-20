@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Loader2 } from 'lucide-svelte';
+	import { Loader2, Eye, EyeOff } from 'lucide-svelte';
 
 	let {
 		ip,
@@ -20,6 +20,7 @@
 	let picking = $state(false);
 	let selectedId = $state<number | null>(null);
 	let autoMatchedName = $state<string | null>(null);
+	let accessCodeVisible = $state(false);
 
 	let canSubmit = $derived(serialNumber.trim().length > 0 && accessCode.trim().length > 0);
 
@@ -126,16 +127,31 @@
 		</div>
 		<div>
 			<label for="bambu-code" class="block text-sm font-medium text-text-secondary mb-1">Access Code</label>
-			<input
-				id="bambu-code"
-				type="text"
-				bind:value={accessCode}
-				autocomplete="off"
-				inputmode="text"
-				maxlength="8"
-				placeholder="z.B. 12345678"
-				class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono tracking-widest"
-			/>
+			<div class="relative">
+				<input
+					id="bambu-code"
+					type={accessCodeVisible ? 'text' : 'password'}
+					bind:value={accessCode}
+					autocomplete="off"
+					inputmode="text"
+					maxlength="8"
+					placeholder="z.B. 12345678"
+					class="w-full bg-bg-input border border-border rounded-lg px-3 py-2 pr-10 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent font-mono tracking-widest"
+				/>
+				<button
+					type="button"
+					onclick={() => (accessCodeVisible = !accessCodeVisible)}
+					class="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary cursor-pointer p-1"
+					title={accessCodeVisible ? 'Verbergen' : 'Anzeigen'}
+					aria-label={accessCodeVisible ? 'Access Code verbergen' : 'Access Code anzeigen'}
+				>
+					{#if accessCodeVisible}
+						<EyeOff class="w-4 h-4" />
+					{:else}
+						<Eye class="w-4 h-4" />
+					{/if}
+				</button>
+			</div>
 			<p class="mt-1 text-xs text-text-secondary">Am Drucker-Display: Einstellungen → Netzwerk → Access Code</p>
 		</div>
 	</div>
