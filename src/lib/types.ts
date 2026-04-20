@@ -76,6 +76,10 @@ export interface Camera {
 	status: CameraStatus;
 	accessCode: string | null;
 	serialNumber: string | null;
+	// Bambu model code from SSDP (e.g. 'A1', 'H2C', 'O1C2'). Nullable:
+	// null = assume H2C for pre-Phase-18 rows. Mirrors the schema column added
+	// in Plan 18-01; used by the Phase 18 A1 branch in configureGo2rtc.
+	model: string | null;
 	printState: string | null;
 	streamMode: string | null;
 	createdAt: string;

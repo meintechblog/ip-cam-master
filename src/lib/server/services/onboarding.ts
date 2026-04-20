@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, type RtspAuth } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateGo2rtcConfigBambuA1, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, type RtspAuth } from './go2rtc';
 import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
@@ -313,9 +314,14 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 	const ssh = await connectToProxmox();
 
 	try {
+		// Bambu A1 needs Node installed during this step so the exec:node ingestion
+		// script can start (Phase 18 RESEARCH §Pitfall 5). Other paths keep the
+		// pre-Phase-18 baseline (Node lands later via getOnvifInstallCommands).
+		const isBambuA1 = camera.cameraType === 'bambu' && camera.model === 'A1';
+
 		// Skip package installation if cloned from template (already has ffmpeg + go2rtc)
 		if (!skipInstall) {
-			const installCmds = getInstallCommands();
+			const installCmds = getInstallCommands(isBambuA1);
 			for (const cmd of installCmds) {
 				await executeOnContainer(ssh, camera.vmid, cmd);
 			}
@@ -330,16 +336,48 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 		let yamlContent: string;
 
 		if (camera.cameraType === 'bambu') {
-			// Bambu: go2rtc pulls RTSPS from the printer (rtspx:// skips TLS verify),
-			// passthrough h264. Access Code is stored in access_code, not password.
+			// Bambu: access code is the shared secret; stored in access_code,
+			// not password. H2C/O1C2/H2D/X1C/P1S use rtspx://...:322 (TLS passthrough);
+			// A1 has no RTSPS and uses JPEG-over-TLS:6000 via a Node ingestion
+			// script deployed to /opt/ipcm/ (Phase 18 D-01 / D-02).
 			const accessCode = camera.accessCode ? decrypt(camera.accessCode) : '';
 			if (!accessCode) throw new Error('Bambu camera missing access_code');
-			yamlContent = generateGo2rtcConfigBambu({
-				streamName: camera.streamName,
-				printerIp: camera.ip,
-				accessCode,
-				rtspAuth
-			});
+
+			if (camera.model === 'A1') {
+				// A1: deploy ingestion script to /opt/ipcm/ before writing go2rtc.yaml,
+				// then emit the exec: yaml that spawns it (Phase 18 RESEARCH §Gap 3).
+				// Path is relative to this compiled file; import.meta.url resolves
+				// from the file location. onboarding.ts is 4 levels under repo root
+				// (src/lib/server/services/), matching the Loxone nginx pushFileToContainer
+				// pattern already used in this file.
+				const scriptContent = readFileSync(
+					new URL('../../../../lxc-assets/bambu-a1-camera.mjs', import.meta.url),
+					'utf8'
+				);
+				await executeOnContainer(ssh, camera.vmid, 'mkdir -p /opt/ipcm');
+				await pushFileToContainer(
+					ssh,
+					camera.vmid,
+					scriptContent,
+					'/opt/ipcm/bambu-a1-camera.mjs'
+				);
+
+				yamlContent = generateGo2rtcConfigBambuA1({
+					streamName: camera.streamName,
+					printerIp: camera.ip,
+					accessCode,
+					rtspAuth
+				});
+			} else {
+				// H2C / O1C2 / H2D / X1C / P1S / null (pre-Phase-18 rows assume H2C):
+				// existing RTSPS:322 path with rtspx:// (skips TLS verify on self-signed).
+				yamlContent = generateGo2rtcConfigBambu({
+					streamName: camera.streamName,
+					printerIp: camera.ip,
+					accessCode,
+					rtspAuth
+				});
+			}
 		} else if (camera.cameraType === 'loxone') {
 			// Loxone: go2rtc reads from local nginx proxy
 			yamlContent = generateGo2rtcConfigLoxone({
