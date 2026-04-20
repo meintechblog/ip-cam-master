@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { encrypt } from '$lib/server/services/crypto';
+import { BAMBU_MODEL_ALLOWLIST } from '$lib/server/services/bambu-discovery';
 import { CAMERA_STATUS } from '$lib/types';
 
 // Bambu cameras are saved BEFORE LXC provisioning (Phase 12 will create the
@@ -11,7 +12,7 @@ import { CAMERA_STATUS } from '$lib/types';
 const BAMBU_PENDING_VMID = 0;
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { name, ip, serialNumber, accessCode } = await request.json();
+	const { name, ip, serialNumber, accessCode, model } = await request.json();
 
 	if (!name || !ip || !serialNumber || !accessCode) {
 		return json(
@@ -25,6 +26,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			{ status: 400 }
 		);
 	}
+
+	// Phase 18 / BAMBU-A1-02: SSDP-discovered model drives the capability matrix.
+	// Validated against allowlist — an attacker-crafted model cannot flow into
+	// `PRINTER_CAPABILITIES[model]` as an arbitrary key (T-18-29). Unknown or
+	// absent → null, and the UI/preflight fall back to H2C defaults.
+	const rawModel = typeof model === 'string' ? model.trim() : '';
+	const validatedModel = (BAMBU_MODEL_ALLOWLIST as readonly string[]).includes(rawModel)
+		? rawModel
+		: null;
 
 	const existing = db.select().from(cameras).where(eq(cameras.ip, ip)).get();
 	if (existing) {
@@ -49,6 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			status: CAMERA_STATUS.PENDING,
 			accessCode: encrypt(accessCode),
 			serialNumber,
+			model: validatedModel,
 			// Bambu go2rtc locks RTSP with serial as username + access code
 			// as password — exactly the pair the user types in UniFi Protect.
 			rtspAuthEnabled: true
