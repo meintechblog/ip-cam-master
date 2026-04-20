@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Loader2 } from 'lucide-svelte';
+
 	let {
 		ip,
 		prefillSerial = '',
@@ -9,10 +11,47 @@
 		onSubmit: (result: { serialNumber: string; accessCode: string }) => void;
 	} = $props();
 
+	type SavedBambu = { id: number; name: string; serialNumber: string };
+
 	let serialNumber = $state(prefillSerial);
 	let accessCode = $state('');
+	let savedBambu = $state<SavedBambu[]>([]);
+	let loadingSaved = $state(true);
+	let picking = $state(false);
+	let selectedId = $state<number | null>(null);
 
 	let canSubmit = $derived(serialNumber.trim().length > 0 && accessCode.trim().length > 0);
+
+	$effect(() => {
+		(async () => {
+			try {
+				const res = await fetch('/api/credentials');
+				if (!res.ok) return;
+				const rows = (await res.json()) as Array<{ id: number; name: string; type: string; serialNumber?: string }>;
+				savedBambu = rows
+					.filter((r) => r.type === 'bambu' && r.serialNumber)
+					.map((r) => ({ id: r.id, name: r.name, serialNumber: r.serialNumber ?? '' }));
+			} finally {
+				loadingSaved = false;
+			}
+		})();
+	});
+
+	async function applySaved(id: number) {
+		picking = true;
+		selectedId = id;
+		try {
+			const res = await fetch(`/api/credentials/${id}`);
+			if (!res.ok) return;
+			const data = await res.json();
+			if (data.type === 'bambu') {
+				serialNumber = data.serialNumber ?? '';
+				accessCode = data.accessCode ?? '';
+			}
+		} finally {
+			picking = false;
+		}
+	}
 
 	function handleSubmit() {
 		if (!canSubmit) return;
@@ -27,6 +66,34 @@
 			Drucker-IP: <span class="font-mono text-text-primary">{ip}</span>
 		</p>
 	</div>
+
+	{#if loadingSaved}
+		<div class="flex items-center gap-2 text-xs text-text-secondary">
+			<Loader2 class="w-3.5 h-3.5 animate-spin" />
+			<span>Gespeicherte Bambu-Logins laden...</span>
+		</div>
+	{:else if savedBambu.length > 0}
+		<div class="bg-bg-input/50 border border-border rounded-lg p-3 space-y-2">
+			<p class="text-xs text-text-secondary">Gespeicherte Bambu-Logins — übernehmen statt tippen:</p>
+			<div class="flex flex-wrap gap-2">
+				{#each savedBambu as cred (cred.id)}
+					<button
+						type="button"
+						onclick={() => applySaved(cred.id)}
+						disabled={picking}
+						class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50
+							{selectedId === cred.id ? 'bg-accent text-white' : 'bg-bg-input text-text-secondary hover:text-text-primary'}"
+						title="SN {cred.serialNumber}"
+					>
+						{#if picking && selectedId === cred.id}
+							<Loader2 class="w-3 h-3 animate-spin inline mr-1" />
+						{/if}
+						{cred.name}
+					</button>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 		<div>
