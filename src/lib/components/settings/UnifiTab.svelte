@@ -4,8 +4,13 @@
 
 	let {
 		initialValues = {},
-		udmSshKeyPath: initialKeyPath = '/opt/ip-cam-master/data/udm_key'
-	}: { initialValues: Partial<UnifiSettings>; udmSshKeyPath?: string } = $props();
+		udmSshKeyPath: initialKeyPath = '/opt/ip-cam-master/data/udm_key',
+		udmSshPassword: initialSshPassword = ''
+	}: {
+		initialValues: Partial<UnifiSettings>;
+		udmSshKeyPath?: string;
+		udmSshPassword?: string;
+	} = $props();
 
 	let unifi_host = $state(initialValues.unifi_host ?? '');
 	let unifi_username = $state(initialValues.unifi_username ?? '');
@@ -18,9 +23,10 @@
 	let protectTesting = $state(false);
 	let protectFeedback: { type: 'success' | 'error'; message: string } | null = $state(null);
 
-	// SSH state
+	// SSH state — prefilled from stored password so the input shows bullets
+	// when a password is already saved (same pattern as the UniFi password).
 	let udm_ssh_key_path = $state(initialKeyPath);
-	let udm_ssh_password = $state('');
+	let udm_ssh_password = $state(initialSshPassword);
 	let sshGenerating = $state(false);
 	let sshTesting = $state(false);
 	let sshPublicKey = $state('');

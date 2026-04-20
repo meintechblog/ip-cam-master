@@ -7,11 +7,15 @@ export const load: PageServerLoad = async () => {
 	const proxmox = await getSettings('proxmox_');
 	const unifi = await getSettings('unifi_');
 	const udmSshKeyPath = await getSetting('udm_ssh_key_path');
+	const udmSshPassword = await getSetting('udm_ssh_password');
 	const user = getUser();
 	return {
 		proxmox,
 		unifi,
 		udmSshKeyPath: udmSshKeyPath ?? '/opt/ip-cam-master/data/udm_key',
+		// Prefill the SSH root-password input so the user sees "✓ saved" (as bullets)
+		// just like the UDM Host password field a few rows above.
+		udmSshPassword: udmSshPassword ?? '',
 		hasUser: user !== null,
 		authUsername: user?.username ?? null,
 		isYolo: isYoloMode()
