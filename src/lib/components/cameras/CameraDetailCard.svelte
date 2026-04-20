@@ -42,6 +42,14 @@
 		}
 	}
 
+	let onvifCopied = $state(false);
+	function copyOnvif() {
+		if (!camera.containerIp) return;
+		navigator.clipboard.writeText(`${camera.containerIp}:8899`);
+		onvifCopied = true;
+		setTimeout(() => { onvifCopied = false; }, 2000);
+	}
+
 	let actionLoading = $state(false);
 	let showDeleteConfirm = $state(false);
 
@@ -689,6 +697,24 @@
 					{/if}
 				</button>
 			</div>
+
+			<!-- Manuelle Protect-Adoption (ONVIF) -->
+			{#if !isNativeOnvif && camera.containerIp}
+				<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2 mt-2">
+					<span class="text-xs text-text-secondary shrink-0">ONVIF</span>
+					<code class="text-xs text-text-primary font-mono flex-1 truncate">{camera.containerIp}:8899</code>
+					<span class="text-[10px] text-text-secondary/70 shrink-0 hidden sm:inline" title="Third-Party Cameras → ONVIF in UniFi Protect, keine Credentials">
+						für manuelle Adoption (ohne Login)
+					</span>
+					<button onclick={copyOnvif} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Kopieren">
+						{#if onvifCopied}
+							<Check class="w-4 h-4 text-green-400" />
+						{:else}
+							<Copy class="w-4 h-4" />
+						{/if}
+					</button>
+				</div>
+			{/if}
 		{/if}
 	</div>
 	{/if}
