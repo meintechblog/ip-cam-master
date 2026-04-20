@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "Bambu Lab H2C Kamera-Integration"
 status: roadmap_complete
-stopped_at: "Roadmap drafted for v1.2 (Phases 10–15), ready for /gsd:plan-phase 10"
-last_updated: "2026-04-13T00:00:00.000Z"
-last_activity: 2026-04-13
+stopped_at: "Phase 18 context gathered (.planning/phases/18-bambu-a1-camera-integration/18-CONTEXT.md), ready for /gsd:plan-phase 18"
+last_updated: "2026-04-20T15:05:00.000Z"
+last_activity: 2026-04-20
 progress:
   total_phases: 7
   completed_phases: 0
