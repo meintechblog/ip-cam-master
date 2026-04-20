@@ -8,6 +8,7 @@ import { decrypt } from '$lib/server/services/crypto';
 import { getProtectStatus } from '$lib/server/services/protect';
 import { getFlappingCameras } from '$lib/server/services/events';
 import { getBambuState } from '$lib/server/services/bambu-mqtt';
+import { PRINTER_CAPABILITIES } from '$lib/server/services/bambu-discovery';
 import type { CameraCardData, ProtectCameraMatch } from '$lib/types';
 
 export const GET: RequestHandler = async () => {
@@ -144,7 +145,16 @@ export const GET: RequestHandler = async () => {
 					printState: cam.cameraType === 'bambu' ? (cam.printState ?? null) : null,
 					streamMode: cam.cameraType === 'bambu' ? (cam.streamMode ?? 'adaptive') : null,
 					bambuError: cam.cameraType === 'bambu' ? (getBambuState(cam.id).error ?? null) : null,
-					bambuMqttConnected: cam.cameraType === 'bambu' ? getBambuState(cam.id).connected : undefined
+					bambuMqttConnected: cam.cameraType === 'bambu' ? getBambuState(cam.id).connected : undefined,
+					// Phase 18 / BAMBU-A1-11: per-model capability matrix so the
+					// dashboard can hide A1-irrelevant H2C fields (chamber temp,
+					// full AMS, unsupported xcam features) without hardcoded model
+					// branches. Legacy rows with null `model` fall back to H2C
+					// capabilities (pre-Phase-18 default).
+					capabilities:
+						cam.cameraType === 'bambu'
+							? (PRINTER_CAPABILITIES[cam.model ?? 'H2C'] ?? PRINTER_CAPABILITIES['H2C'])
+							: undefined
 				} satisfies CameraCardData;
 			})
 		);

@@ -157,6 +157,12 @@ function parseProbeResult(stdout: string): { resolution?: string; fps?: number }
 
 /**
  * Saves a camera record to the database.
+ *
+ * `model` (Phase 18 / BAMBU-A1-02) is optional. For Bambu cameras this is
+ * the SSDP-captured DevModel (e.g. 'A1', 'H2C', 'O1C2') which drives the
+ * per-model capability matrix downstream (`PRINTER_CAPABILITIES`). Nullable:
+ * legacy rows and non-Bambu cameras pass null and the UI falls back to H2C
+ * capabilities for any pre-Phase-18 Bambu rows.
  */
 export async function saveCameraRecord(params: {
 	name: string;
@@ -171,6 +177,7 @@ export async function saveCameraRecord(params: {
 	bitrate?: number;
 	vmid: number;
 	streamName?: string;
+	model?: string | null;
 }): Promise<number> {
 	const encryptedPassword = encrypt(params.password);
 	const streamName = params.streamName || `cam-${params.vmid}`;
@@ -192,7 +199,10 @@ export async function saveCameraRecord(params: {
 			status: CAMERA_STATUS.PENDING,
 			// New Mobotix/Loxone onboardings lock RTSP with the user-provided
 			// camera credentials. Protect will prompt for them during adoption.
-			rtspAuthEnabled: true
+			rtspAuthEnabled: true,
+			// Phase 18 / BAMBU-A1-02: persist SSDP-captured model for Bambu rows
+			// so downstream capability checks (UI + preflight) have real data.
+			model: params.model ?? null
 		})
 		.run();
 

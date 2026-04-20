@@ -1,29 +1,47 @@
 <script lang="ts">
 	import { Loader2, CheckCircle, XCircle } from 'lucide-svelte';
 
-	type PreflightError = 'PRINTER_UNREACHABLE' | 'LAN_MODE_OFF' | 'WRONG_ACCESS_CODE' | 'RTSPS_HANDSHAKE_HUNG' | 'INVALID_INPUT';
+	type PreflightError =
+		| 'PRINTER_UNREACHABLE'
+		| 'LAN_MODE_OFF'
+		| 'WRONG_ACCESS_CODE'
+		| 'RTSPS_HANDSHAKE_HUNG'
+		| 'A1_CLOUD_MODE_ACTIVE'
+		| 'INVALID_INPUT';
 
 	let {
 		ip,
 		serialNumber,
 		accessCode,
+		model = 'H2C',
 		onDone,
 		onRetry
 	}: {
 		ip: string;
 		serialNumber: string;
 		accessCode: string;
+		/**
+		 * SSDP-discovered model (Phase 18 / BAMBU-A1-04). Threaded through to the
+		 * preflight route so the server picks the A1 TLS:6000 branch vs. the H2C
+		 * RTSPS:322 branch. Default 'H2C' preserves pre-Phase-18 behaviour for
+		 * manual-add flows where model is unknown.
+		 */
+		model?: string;
 		onDone: (ok: boolean) => void;
 		onRetry: () => void;
 	} = $props();
 
 	// Fallback hints duplicated from src/lib/server/services/bambu-preflight.ts PREFLIGHT_HINTS_DE
-	// (server sends the hint on the wire; this map only covers the case where we can't read it)
+	// (server sends the hint on the wire; this map only covers the case where we can't read it).
+	// Phase 18 / D-05: A1_CLOUD_MODE_ACTIVE wording must match the server-side
+	// PREFLIGHT_HINTS_DE entry byte-for-byte — keep these two maps in sync.
 	const HINTS_DE: Record<PreflightError, string> = {
 		PRINTER_UNREACHABLE: 'Drucker nicht erreichbar. IP-Adresse und Netzwerkverbindung prüfen.',
 		LAN_MODE_OFF: 'LAN Mode scheint deaktiviert. Am Drucker: Einstellungen → Netzwerk → LAN Mode aktivieren.',
 		WRONG_ACCESS_CODE: 'Access Code abgelehnt. Am Drucker-Display aktuellen Code ablesen (Einstellungen → Netzwerk → Access Code).',
 		RTSPS_HANDSHAKE_HUNG: 'RTSPS-Server antwortet nicht (Live555 hängt). Drucker bitte kurz aus- und wieder einschalten.',
+		A1_CLOUD_MODE_ACTIVE:
+			'Cloud-Modus ist aktiv. Bambu Handy App → Gerät → "LAN Mode only" aktivieren und Cloud-Verbindung deaktivieren.',
 		INVALID_INPUT: 'Ungültige Eingabe. Seriennummer und Access Code prüfen.'
 	};
 
@@ -47,7 +65,7 @@
 			const res = await fetch('/api/onboarding/bambu/preflight', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ip, serialNumber, accessCode }),
+				body: JSON.stringify({ ip, serialNumber, accessCode, model }),
 				signal: controller.signal
 			});
 			clearTimeout(timeoutId);

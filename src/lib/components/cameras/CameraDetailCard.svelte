@@ -532,6 +532,37 @@
 							<option value="always_snapshot">Immer Aus</option>
 						</select>
 					</div>
+
+					<!-- Phase 18 / BAMBU-A1-11: capability-gated model-specific panels.
+					     Chamber heater panel hidden on A1 + P1S (chamberHeater=false).
+					     A1 reports chamber_temper=5 as a sentinel — don't display
+					     that value (CONTEXT.md Sharp Edge #4). -->
+					{#if camera.capabilities?.chamberHeater}
+						<div class="flex items-center justify-between text-xs">
+							<span class="text-text-secondary">Kammertemperatur</span>
+							<span class="text-text-secondary">—</span>
+						</div>
+					{/if}
+
+					<!-- AMS panel: hidden when ams='none', labelled 'AMS Lite' on A1,
+					     'AMS' for full. -->
+					{#if camera.capabilities && camera.capabilities.ams !== 'none'}
+						<div class="flex items-center justify-between text-xs">
+							<span class="text-text-secondary shrink-0">
+								{camera.capabilities.ams === 'lite' ? 'AMS Lite' : 'AMS'}
+							</span>
+							<span class="text-text-secondary">—</span>
+						</div>
+					{/if}
+
+					<!-- Xcam feature toggles: only render toggles for features the
+					     model actually supports. A1 exposes only buildplateMarkerDetector. -->
+					{#if camera.capabilities?.xcamFeatures?.includes('buildplateMarkerDetector')}
+						<div class="flex items-center justify-between text-xs">
+							<span class="text-text-secondary shrink-0">Bauplatten-Marker</span>
+							<span class="text-text-secondary">xcam</span>
+						</div>
+					{/if}
 				</div>
 			{/if}
 
