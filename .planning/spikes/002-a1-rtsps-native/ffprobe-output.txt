@@ -1,0 +1,13 @@
+=== A1 ffprobe rtsps:// attempt ===
+Timestamp: 2026-04-20T12:22:03Z
+Command: ffprobe -hide_banner -rtsp_transport tcp -tls_verify 0 -i rtsps://bblp:<ACCESS_CODE>@192.168.3.195:322/streaming/live/1
+
+[tcp @ 0xbaac640a0] Connection to tcp://192.168.3.195:322?timeout=0 failed: Connection refused
+rtsps://bblp:<ACCESS_CODE>@192.168.3.195:322/streaming/live/1: Connection refused
+Exit: 1
+
+=== A1 ffprobe rtspx:// (go2rtc-style) attempt ===
+Command: ffprobe -hide_banner -rtsp_transport tcp -i rtspx://bblp:<ACCESS_CODE>@192.168.3.195:322/streaming/live/1
+
+rtspx://bblp:<ACCESS_CODE>@192.168.3.195:322/streaming/live/1: Protocol not found
+Exit: 1
