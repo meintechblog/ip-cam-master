@@ -1,10 +1,10 @@
 ---
 phase: 18-bambu-a1-camera-integration
-fixed_at: 2026-04-20T19:20:00Z
+fixed_at: 2026-04-20T19:25:00Z
 review_path: .planning/phases/18-bambu-a1-camera-integration/18-REVIEW.md
-iteration: 1
-findings_in_scope: 7
-fixed: 7
+iteration: 2
+findings_in_scope: 11
+fixed: 11
 skipped: 0
 status: all_fixed
 ---
@@ -71,6 +71,38 @@ None.
 
 ---
 
-_Fixed: 2026-04-20T19:20:00Z_
+## Iteration 2: Info findings (2026-04-20T19:25:00Z)
+
+**Scope:** IN-01, IN-02, IN-03, IN-04 (all 4 Info findings from 18-REVIEW.md).
+**Status:** 3 fixed (IN-01, IN-02, IN-04) + 1 deferred-by-design (IN-03, per reviewer's own disposition).
+**Verification:** `npx tsc --noEmit` 0 errors; `npm run check` 0 errors (25 pre-existing warnings unchanged); `npm run test:unit -- --run` 12 failures / 210 passed — matches the documented baseline in `deferred-items.md` exactly (8 onboarding + 4 proxmox failures), zero regressions.
+
+### IN-01: Access code length validation on preflight route
+
+**Files modified:** `src/routes/api/onboarding/bambu/preflight/+server.ts`, `src/routes/api/onboarding/bambu/preflight/server.test.ts`
+**Commit:** 2a3aaa1
+**Applied fix:** Added `accessCode.length !== 8` to the preflight presence gate so 7- and 9-digit codes fail fast with HTTP 400, matching what save-camera enforces at its first gate. Updated the German hint copy to reference the 8-character requirement. The stricter `/^[0-9]{8}$/` regex gate from iteration 1 (CR-01) remains intact as a second layer. Added a new `server.test.ts` with two vitest cases asserting 7-digit and 9-digit inputs short-circuit before `runBambuPreflight` is called.
+
+### IN-02: `OnboardingWizard.svelte` Bambu name state leaks from Mobotix form
+
+**Files modified:** `src/lib/components/onboarding/OnboardingWizard.svelte`
+**Commit:** 676df08
+**Applied fix:** Introduced a dedicated `let bambuName = $state(prefillName)` on the Bambu branch alongside the existing `bambuIp` / `bambuSerial` / `bambuAccessCode` state. Replaced the `name || ...` fallback at the save-camera fetch body with `bambuName || ...`. `prefillName` prop wiring still seeds the Bambu branch (discovery-matched names still land on save-camera), but Mobotix-form keystrokes can no longer leak across when a user backs out and switches flows. svelte-check passes with 0 errors; the "state_referenced_locally" warning on line 43 follows the same pattern already used by every other `prefill*` $state initializer in the file.
+
+### IN-03: Migration-strategy reconciliation (deferred by design)
+
+**Files modified:** `.planning/phases/18-bambu-a1-camera-integration/deferred-items.md`
+**Commit:** 19f470b
+**Applied fix:** Per the reviewer's own disposition ("Out of scope for Phase 18 review — flag as a migration-strategy cleanup task for a later phase"), added a backlog entry to `deferred-items.md` describing the `client.ts` boot-time ALTERs vs `drizzle/0001_add_camera_model.sql` duplication. No source-code change applied — the correct answer is to defer the architectural decision to a future phase that can pick one system and retire the other.
+
+### IN-04: Back-pressure on `stdout.write` in `bambu-a1-camera.mjs`
+
+**Files modified:** `lxc-assets/bambu-a1-camera.mjs`
+**Commit:** d8074b2
+**Applied fix:** Replaced the fire-and-forget `process.stdout.write(jpeg)` with the standard Node TCP→pipe back-pressure idiom: on a falsy write, `socket.pause()` and `process.stdout.once('drain', () => socket.resume())`. Six-line change, placed inside the existing `FF D8` sanity guard so only validated JPEGs trigger pause/resume. `node --check` passes.
+
+---
+
+_Fixed: 2026-04-20T19:25:00Z_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2_
