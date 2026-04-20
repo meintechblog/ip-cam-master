@@ -121,6 +121,7 @@ export const GET: RequestHandler = async () => {
 					streamName: cam.streamName,
 					rtspUrl: containerIp ? `rtsp://${containerIp}:8554/${cam.streamName}` : null,
 					status: cam.status,
+					rtspAuthEnabled: Boolean(cam.rtspAuthEnabled),
 					width: cam.width,
 					height: cam.height,
 					fps: cam.fps,

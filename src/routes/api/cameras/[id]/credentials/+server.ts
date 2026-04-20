@@ -3,11 +3,48 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { encrypt } from '$lib/server/services/crypto';
+import { encrypt, decrypt } from '$lib/server/services/crypto';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
+
+/**
+ * Return the credentials used for UniFi Protect adoption.
+ * Mobotix/Loxone: the camera's HTTP login.
+ * Bambu: serial as username, access code as password.
+ * Also indicates whether RTSP auth is currently enforced on go2rtc.
+ *
+ * Only called from the session-authenticated detail card; never cached.
+ */
+export const GET: RequestHandler = async ({ params }) => {
+	const cameraId = parseInt(params.id);
+	const camera = db.select().from(cameras).where(eq(cameras.id, cameraId)).get();
+	if (!camera) {
+		return json({ error: 'Kamera nicht gefunden' }, { status: 404 });
+	}
+
+	let username = '';
+	let password = '';
+	try {
+		if (camera.cameraType === 'bambu') {
+			username = camera.serialNumber || '';
+			password = camera.accessCode ? decrypt(camera.accessCode) : '';
+		} else {
+			username = camera.username;
+			password = camera.password ? decrypt(camera.password) : '';
+		}
+	} catch (err) {
+		return json({ error: `Entschlüsselung fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
+	}
+
+	return json({
+		username,
+		password,
+		rtspAuthEnabled: Boolean(camera.rtspAuthEnabled),
+		cameraType: camera.cameraType
+	});
+};
 
 export const PUT: RequestHandler = async ({ params, request }) => {
 	const cameraId = parseInt(params.id);

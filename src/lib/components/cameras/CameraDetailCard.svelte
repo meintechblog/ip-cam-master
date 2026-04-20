@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CameraCardData } from '$lib/types';
-	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power } from 'lucide-svelte';
+	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power, Lock, LockOpen, Eye, EyeOff } from 'lucide-svelte';
 	import AdoptionGuide from './AdoptionGuide.svelte';
 
 	let { camera }: { camera: CameraCardData } = $props();
@@ -48,6 +48,87 @@
 		navigator.clipboard.writeText(`${camera.containerIp}:8899`);
 		onvifCopied = true;
 		setTimeout(() => { onvifCopied = false; }, 2000);
+	}
+
+	// RTSP-Auth state — lazy-loaded on first reveal / toggle
+	let authCreds = $state<{ username: string; password: string } | null>(null);
+	let authLoading = $state(false);
+	let authError = $state<string | null>(null);
+	let authPwVisible = $state(false);
+	let authUserCopied = $state(false);
+	let authPwCopied = $state(false);
+	let authUrlCopied = $state(false);
+	let authToggleHint = $state<string | null>(null);
+
+	async function ensureAuthCreds(): Promise<void> {
+		if (authCreds) return;
+		authLoading = true;
+		authError = null;
+		try {
+			const res = await fetch(`/api/cameras/${camera.id}/credentials`);
+			if (!res.ok) { authError = 'Konnte Zugangsdaten nicht laden'; return; }
+			const data = await res.json();
+			authCreds = { username: data.username, password: data.password };
+		} catch {
+			authError = 'Netzwerkfehler';
+		} finally {
+			authLoading = false;
+		}
+	}
+
+	async function toggleAuthReveal() {
+		if (!authCreds) await ensureAuthCreds();
+		authPwVisible = !authPwVisible;
+	}
+
+	async function copyAuthUser() {
+		await ensureAuthCreds();
+		if (!authCreds) return;
+		navigator.clipboard.writeText(authCreds.username);
+		authUserCopied = true;
+		setTimeout(() => { authUserCopied = false; }, 2000);
+	}
+	async function copyAuthPw() {
+		await ensureAuthCreds();
+		if (!authCreds) return;
+		navigator.clipboard.writeText(authCreds.password);
+		authPwCopied = true;
+		setTimeout(() => { authPwCopied = false; }, 2000);
+	}
+	async function copyAuthRtspUrl() {
+		await ensureAuthCreds();
+		if (!authCreds || !camera.rtspUrl) return;
+		const u = encodeURIComponent(authCreds.username);
+		const p = encodeURIComponent(authCreds.password);
+		const withCreds = camera.rtspUrl.replace(/^rtsp:\/\//, `rtsp://${u}:${p}@`);
+		navigator.clipboard.writeText(withCreds);
+		authUrlCopied = true;
+		setTimeout(() => { authUrlCopied = false; }, 2000);
+	}
+
+	async function setRtspAuth(enabled: boolean) {
+		authLoading = true;
+		authError = null;
+		authToggleHint = null;
+		try {
+			const res = await fetch(`/api/cameras/${camera.id}/rtsp-auth`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled })
+			});
+			const data = await res.json();
+			if (data.success) {
+				camera.rtspAuthEnabled = enabled;
+				authToggleHint = data.message ?? null;
+				if (enabled) await ensureAuthCreds();
+			} else {
+				authError = data.error || 'Umschalten fehlgeschlagen';
+			}
+		} catch {
+			authError = 'Netzwerkfehler';
+		} finally {
+			authLoading = false;
+		}
 	}
 
 	let actionLoading = $state(false);
@@ -703,8 +784,8 @@
 				<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2 mt-2">
 					<span class="text-xs text-text-secondary shrink-0">ONVIF</span>
 					<code class="text-xs text-text-primary font-mono flex-1 truncate">{camera.containerIp}:8899</code>
-					<span class="text-[10px] text-text-secondary/70 shrink-0 hidden sm:inline" title="Third-Party Cameras → ONVIF in UniFi Protect, keine Credentials">
-						für manuelle Adoption (ohne Login)
+					<span class="text-[10px] text-text-secondary/70 shrink-0 hidden sm:inline" title="In UniFi Protect: Third-Party Cameras → ONVIF">
+						{camera.rtspAuthEnabled ? 'für manuelle Adoption (Login unten)' : 'für manuelle Adoption (ohne Login)'}
 					</span>
 					<button onclick={copyOnvif} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Kopieren">
 						{#if onvifCopied}
@@ -713,6 +794,83 @@
 							<Copy class="w-4 h-4" />
 						{/if}
 					</button>
+				</div>
+
+				<!-- RTSP-Auth: status + toggle + adoption credentials -->
+				<div class="bg-bg-primary rounded-lg px-3 py-2.5 mt-2 space-y-2">
+					<div class="flex items-center gap-2">
+						{#if camera.rtspAuthEnabled}
+							<Lock class="w-3.5 h-3.5 text-green-400 shrink-0" />
+							<span class="text-xs text-text-primary font-medium">RTSP-Auth aktiv</span>
+							<span class="text-[10px] text-text-secondary/70 hidden sm:inline">go2rtc prüft Creds beim Stream-Pull</span>
+							<button
+								onclick={() => setRtspAuth(false)}
+								disabled={authLoading}
+								class="ml-auto text-[10px] text-text-secondary hover:text-text-primary shrink-0 cursor-pointer disabled:opacity-50"
+								title="RTSP-Auth deaktivieren"
+							>
+								deaktivieren
+							</button>
+						{:else}
+							<LockOpen class="w-3.5 h-3.5 text-text-secondary/60 shrink-0" />
+							<span class="text-xs text-text-secondary">RTSP-Auth aus</span>
+							<span class="text-[10px] text-text-secondary/60 hidden sm:inline">Stream offen im LAN</span>
+							<button
+								onclick={() => setRtspAuth(true)}
+								disabled={authLoading}
+								class="ml-auto text-xs px-2 py-0.5 rounded bg-accent/15 text-accent hover:bg-accent/25 shrink-0 cursor-pointer disabled:opacity-50 font-medium"
+								title="Aktiviert go2rtc-Login mit den Kamera-Credentials. Protect muss danach neu adoptiert werden."
+							>
+								{authLoading ? '…' : 'aktivieren'}
+							</button>
+						{/if}
+					</div>
+
+					{#if authError}
+						<div class="text-[11px] text-red-400">{authError}</div>
+					{/if}
+					{#if authToggleHint}
+						<div class="text-[11px] text-yellow-400/90">{authToggleHint}</div>
+					{/if}
+
+					{#if camera.rtspAuthEnabled}
+						<div class="flex items-center gap-2 pt-1 border-t border-white/5">
+							<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">User</span>
+							<code class="text-xs text-text-primary font-mono flex-1 truncate">
+								{authCreds?.username ?? (authLoading ? '…' : '••••••')}
+							</code>
+							<button onclick={copyAuthUser} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Benutzername kopieren">
+								{#if authUserCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}
+							</button>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">Password</span>
+							<code class="text-xs text-text-primary font-mono flex-1 truncate">
+								{#if authPwVisible}
+									{authCreds?.password ?? '…'}
+								{:else}
+									••••••••
+								{/if}
+							</code>
+							<button onclick={toggleAuthReveal} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title={authPwVisible ? 'Verbergen' : 'Anzeigen'}>
+								{#if authPwVisible}<EyeOff class="w-3.5 h-3.5" />{:else}<Eye class="w-3.5 h-3.5" />{/if}
+							</button>
+							<button onclick={copyAuthPw} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Passwort kopieren">
+								{#if authPwCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}
+							</button>
+						</div>
+						{#if camera.rtspUrl}
+							<div class="flex items-center gap-2">
+								<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">RTSP+Auth</span>
+								<code class="text-xs text-text-primary font-mono flex-1 truncate opacity-70">
+									rtsp://{authCreds?.username ?? '…'}:••••••@{camera.containerIp}:8554/{camera.streamName}
+								</code>
+								<button onclick={copyAuthRtspUrl} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="RTSP-URL mit eingebetteten Credentials kopieren">
+									{#if authUrlCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}
+								</button>
+							</div>
+						{/if}
+					{/if}
 				</div>
 			{/if}
 		{/if}

@@ -110,6 +110,7 @@ export interface CameraCardData {
 	streamName: string;
 	rtspUrl: string | null;
 	status: CameraStatus;
+	rtspAuthEnabled: boolean;
 	width: number;
 	height: number;
 	fps: number;
