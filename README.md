@@ -241,6 +241,36 @@ npx drizzle-kit push   # Create SQLite tables
 npm run dev -- --host 0.0.0.0
 ```
 
+### Deploying to a test VM (git-push workflow)
+
+For iterating against a running VM install, `scripts/dev-deploy.sh` pushes
+the current `main` HEAD directly to `/opt/ip-cam-master` on the VM. A
+server-side `post-receive` hook then runs `npm ci`, builds, and restarts
+the service inline — the full hook output streams back on the push
+connection.
+
+One-time setup on the VM (idempotent, safe to re-run):
+
+```bash
+# On the VM:
+cd /opt/ip-cam-master
+git fetch origin && git reset --hard origin/main
+bash scripts/migrate-install.sh
+```
+
+Setup on your workstation:
+
+```bash
+# Add an SSH alias for the VM in ~/.ssh/config, then:
+./scripts/dev-deploy.sh
+```
+
+The script pushes to an automatically-configured `vm` git remote and
+never relies on GitHub — uncommitted WIP is rejected, but
+committed-but-unpublished commits deploy fine. Coordinates with the
+in-app updater via an flock on `/run/ip-cam-master-deploy.lock`, so the
+two never interleave.
+
 ### Container Specs
 
 Each camera LXC container uses minimal resources:
