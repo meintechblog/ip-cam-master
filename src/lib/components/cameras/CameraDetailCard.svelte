@@ -848,7 +848,12 @@
 					{/if}
 
 					{#if camera.rtspAuthEnabled}
-						<div class="flex items-center gap-2 pt-1 border-t border-white/5">
+						{#if camera.cameraType === 'bambu'}
+							<p class="text-[10px] text-text-secondary/80 pt-1 border-t border-white/5">
+								In UniFi Protect: Third-Party → ONVIF → User <span class="font-mono text-text-primary">bambu</span>, Passwort = Access Code des Druckers.
+							</p>
+						{/if}
+						<div class="flex items-center gap-2 {camera.cameraType === 'bambu' ? '' : 'pt-1 border-t border-white/5'}">
 							<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">User</span>
 							<code class="text-xs text-text-primary font-mono flex-1 truncate">
 								{authCreds?.username ?? (authLoading ? '…' : '')}

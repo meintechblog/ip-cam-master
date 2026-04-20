@@ -46,8 +46,8 @@
 	}
 
 	async function submitBambu() {
-		if (!newBambuName || !newSerial || !newAccessCode) {
-			feedback = { type: 'error', message: 'Alle Felder erforderlich.' };
+		if (!newBambuName || !newAccessCode) {
+			feedback = { type: 'error', message: 'Name und Access Code erforderlich (Seriennummer ist optional).' };
 			return;
 		}
 		if (newAccessCode.length !== 8) {
@@ -55,7 +55,7 @@
 			return;
 		}
 		await postCredential(
-			{ name: newBambuName, type: 'bambu', serialNumber: newSerial, accessCode: newAccessCode },
+			{ name: newBambuName, type: 'bambu', serialNumber: newSerial.trim() || undefined, accessCode: newAccessCode },
 			() => { newBambuName = ''; newSerial = ''; newAccessCode = ''; }
 		);
 	}
@@ -221,12 +221,12 @@
 						/>
 					</div>
 					<div>
-						<label for="cred_serial" class="block text-xs text-text-secondary mb-1">Seriennummer</label>
+						<label for="cred_serial" class="block text-xs text-text-secondary mb-1">Seriennummer <span class="text-text-secondary/60 font-normal">(optional)</span></label>
 						<input
 							id="cred_serial"
 							type="text"
 							bind:value={newSerial}
-							placeholder="01S00A..."
+							placeholder="leer = für alle Drucker"
 							autocomplete="off"
 							class="w-full bg-bg-primary border border-border text-text-primary rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-accent"
 						/>

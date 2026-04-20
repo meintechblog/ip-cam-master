@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { encrypt, decrypt } from '$lib/server/services/crypto';
+import { BAMBU_ADOPTION_USERNAME } from '$lib/server/services/onboarding';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -28,7 +29,9 @@ export const GET: RequestHandler = async ({ params }) => {
 	let password = '';
 	try {
 		if (camera.cameraType === 'bambu') {
-			username = camera.serialNumber || '';
+			// Short shared username for the Protect adoption dialog — keeps the
+			// access code as the actual secret. See BAMBU_ADOPTION_USERNAME.
+			username = BAMBU_ADOPTION_USERNAME;
 			password = camera.accessCode ? decrypt(camera.accessCode) : '';
 		} else {
 			username = camera.username;

@@ -54,12 +54,19 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (type === 'bambu') {
 		const { serialNumber, accessCode } = body;
-		if (!serialNumber || !accessCode) {
-			return json({ success: false, error: 'Seriennummer und Access Code erforderlich' }, { status: 400 });
+		// Serial is optional: a cred without a serial serves as a fallback
+		// for any discovered Bambu that has no exact-serial match. Helpful
+		// when the user knows one shared access code but hasn't memorised
+		// each printer's serial.
+		if (!accessCode) {
+			return json({ success: false, error: 'Access Code erforderlich' }, { status: 400 });
 		}
 		if (typeof accessCode !== 'string' || accessCode.length !== 8) {
 			return json({ success: false, error: 'Access Code muss 8 Zeichen lang sein' }, { status: 400 });
 		}
+		const serial = typeof serialNumber === 'string' && serialNumber.trim().length > 0
+			? serialNumber.trim()
+			: null;
 		const maxPriority = (db.select().from(credentials).all() as unknown[]).length;
 		db.insert(credentials)
 			.values({
@@ -71,7 +78,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				// a plausible value. Canonical fields are serial_number/access_code.
 				username: 'bblp',
 				password: encrypt(accessCode),
-				serialNumber,
+				serialNumber: serial,
 				accessCode: encrypt(accessCode),
 				priority: maxPriority
 			})

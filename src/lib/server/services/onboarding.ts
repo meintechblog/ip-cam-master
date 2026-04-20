@@ -9,10 +9,19 @@ import type { Camera, StreamInfo } from '$lib/types';
 import { CAMERA_STATUS } from '$lib/types';
 
 /**
+ * Canonical username the user types in UniFi Protect's adoption dialog
+ * for a Bambu-backed go2rtc container. Not the upstream Bambu cloud
+ * identity (that's `bblp` in bambu-credentials.ts) — just a short,
+ * memorable RTSP user that the go2rtc server enforces.
+ */
+export const BAMBU_ADOPTION_USERNAME = 'bambu';
+
+/**
  * Build RTSP auth credentials for a camera's go2rtc server, if opt-in is active.
  * - Mobotix/Loxone: camera.username + decrypt(camera.password)
- * - Bambu: camera.serial_number + decrypt(camera.access_code)
- *   (mirrors what the user enters in UniFi Protect during adoption)
+ * - Bambu: constant "bambu" + decrypt(camera.access_code)
+ *   (the access code is the actual secret; a short, shared username keeps
+ *   the Protect adoption dialog fast to type)
  *
  * Returns undefined when rtsp_auth_enabled is false or required fields are
  * missing, so the generator emits an unauthenticated go2rtc.yaml (legacy
@@ -31,8 +40,8 @@ export function buildRtspAuth(
 	if (!camera.rtspAuthEnabled) return undefined;
 
 	if (camera.cameraType === 'bambu') {
-		if (!camera.serialNumber || !camera.accessCode) return undefined;
-		return { username: camera.serialNumber, password: decrypt(camera.accessCode) };
+		if (!camera.accessCode) return undefined;
+		return { username: BAMBU_ADOPTION_USERNAME, password: decrypt(camera.accessCode) };
 	}
 
 	if (!camera.username || !camera.password) return undefined;
