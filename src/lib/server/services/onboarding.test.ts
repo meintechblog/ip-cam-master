@@ -75,6 +75,8 @@ vi.mock('./go2rtc', () => ({
 	generateOnvifConfig: vi.fn().mockReturnValue('onvif: []'),
 	generateOnvifSystemdUnit: vi.fn().mockReturnValue('[Service]'),
 	generateGo2rtcConfigLoxone: vi.fn().mockReturnValue('streams: {}'),
+	generateGo2rtcConfigBambu: vi.fn().mockReturnValue('streams: { bambu: [] }'),
+	generateGo2rtcConfigBambuA1: vi.fn().mockReturnValue('streams: { bambu_a1: [] }'),
 	generateNginxConfig: vi.fn().mockReturnValue('server {}'),
 	getNginxInstallCommands: vi.fn().mockReturnValue(['echo nginx'])
 }));
