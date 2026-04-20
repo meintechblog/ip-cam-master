@@ -89,14 +89,33 @@ WantedBy=multi-user.target
 
 /**
  * Returns shell commands to install ffmpeg and go2rtc in an LXC container.
+ *
+ * When `forBambuA1` is true, appends the NodeSource Node 22 install so the
+ * A1 ingestion script (lxc-assets/bambu-a1-camera.mjs) spawned via
+ * `exec:node ...` can run. Without this hoist, first-time A1 adoption fails
+ * with "node: command not found" because Node is otherwise only installed by
+ * `getOnvifInstallCommands()` which runs AFTER `configureGo2rtc()`
+ * (Phase 18 RESEARCH §Pitfall 5 / §Open Question 1).
+ *
+ * H2C, Mobotix, and Loxone paths call this with the default `false` — no
+ * behavior change for pre-Phase-18 adoptions.
  */
-export function getInstallCommands(): string[] {
-	return [
+export function getInstallCommands(forBambuA1 = false): string[] {
+	const base = [
 		// Debian 13 (Trixie) ships intel-media-va-driver 25.x with Arrow Lake+ support
 		'apt-get update -qq && apt-get install -y -qq ffmpeg intel-media-va-driver wget',
 		'wget -q https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_amd64 -O /usr/local/bin/go2rtc && chmod +x /usr/local/bin/go2rtc',
 		'mkdir -p /etc/go2rtc'
 	];
+	if (forBambuA1) {
+		// A1 ingestion script runs under `exec:node /opt/ipcm/bambu-a1-camera.mjs`.
+		// Installed here (not in getOnvifInstallCommands) because configureGo2rtc
+		// runs before configureOnvif in the provision flow.
+		base.push(
+			'curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y -qq nodejs'
+		);
+	}
+	return base;
 }
 
 /**
@@ -160,6 +179,44 @@ ${rtspServerBlock(rtspAuth)}
 ffmpeg:
   bin: ffmpeg
 
+log:
+  level: info
+`;
+}
+
+/**
+ * Generates go2rtc YAML for a Bambu Lab A1 printer.
+ *
+ * Unlike H2C (which exposes RTSPS on :322), A1 uses a proprietary JPEG-over-TLS
+ * stream on port 6000. We spawn the ingestion Node script
+ * (lxc-assets/bambu-a1-camera.mjs → /opt/ipcm/bambu-a1-camera.mjs inside the
+ * LXC) via go2rtc's `exec:` pipe transport; the script emits raw concatenated
+ * JPEGs on stdout, and go2rtc's `magic.Open()` auto-detects MJPEG from the
+ * FF D8 SOI bytes (RESEARCH §Gap 1).
+ *
+ * `#killsignal=15#killtimeout=5` is MANDATORY — go2rtc's 2024-era default
+ * is SIGKILL, which leaves the printer holding a stale TLS session for ~30s
+ * (RESEARCH §Gap 4 / Pitfall 2). SIGTERM gives the Node script's shutdown
+ * handler a chance to close the socket cleanly.
+ *
+ * Access code is passed via env var, NOT CLI arg, so it does not leak via
+ * `ps ax` on the LXC (RESEARCH §Anti-Pattern 4 / Threat T-18-07).
+ *
+ * Script deployment: lxc-assets/bambu-a1-camera.mjs → /opt/ipcm/bambu-a1-camera.mjs
+ * via `pushFileToContainer()` in onboarding.ts `configureGo2rtc` A1 branch.
+ */
+export function generateGo2rtcConfigBambuA1(params: {
+	streamName: string;
+	printerIp: string;
+	accessCode: string;
+	rtspAuth?: RtspAuth;
+}): string {
+	const { streamName, printerIp, accessCode, rtspAuth } = params;
+	const execCmd = `exec:env A1_ACCESS_CODE=${accessCode} node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}#killsignal=15#killtimeout=5`;
+	return `streams:
+  ${streamName}:
+    - ${execCmd}
+${rtspServerBlock(rtspAuth)}
 log:
   level: info
 `;
