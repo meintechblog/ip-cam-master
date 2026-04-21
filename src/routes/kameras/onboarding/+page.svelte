@@ -180,24 +180,33 @@
 		credPrompt = null;
 	}
 
+	type BambuCredEntry = { id: number; name: string };
+	type BambuCredLookup = {
+		bySerial: Map<string, BambuCredEntry>;
+		globals: BambuCredEntry[];
+	};
+
 	/**
-	 * Load all saved Bambu credentials, keyed by serialNumber.
-	 * Used by the batch pipeline to auto-match printers to saved logins
-	 * without a per-camera round-trip.
+	 * Load all saved Bambu credentials into two buckets:
+	 *   - bySerial: printer-specific logins keyed by serial number
+	 *   - globals: logins without a serial number — used as default for any
+	 *     Bambu printer that has no per-serial match (same fallback the
+	 *     StepBambuCredentials wizard uses in the single-camera flow).
 	 */
-	async function loadBambuCredMap(): Promise<Map<string, { id: number; name: string }>> {
-		const map = new Map<string, { id: number; name: string }>();
+	async function loadBambuCredMap(): Promise<BambuCredLookup> {
+		const bySerial = new Map<string, BambuCredEntry>();
+		const globals: BambuCredEntry[] = [];
 		try {
 			const res = await fetch('/api/credentials');
-			if (!res.ok) return map;
+			if (!res.ok) return { bySerial, globals };
 			const rows = (await res.json()) as Array<{ id: number; name: string; type: string; serialNumber?: string }>;
 			for (const r of rows) {
-				if (r.type === 'bambu' && r.serialNumber) {
-					map.set(r.serialNumber, { id: r.id, name: r.name });
-				}
+				if (r.type !== 'bambu') continue;
+				if (r.serialNumber) bySerial.set(r.serialNumber, { id: r.id, name: r.name });
+				else globals.push({ id: r.id, name: r.name });
 			}
 		} catch { /* ignore */ }
-		return map;
+		return { bySerial, globals };
 	}
 
 	async function fetchBambuCredentialById(id: number): Promise<{ serialNumber: string; accessCode: string } | null> {
@@ -205,8 +214,10 @@
 			const res = await fetch(`/api/credentials/${id}`);
 			if (!res.ok) return null;
 			const data = await res.json();
-			if (data.type !== 'bambu' || !data.serialNumber || !data.accessCode) return null;
-			return { serialNumber: data.serialNumber, accessCode: data.accessCode };
+			// Accept globals (no serial) too — caller supplies the SSDP-derived
+			// serial. Only the accessCode is mandatory here.
+			if (data.type !== 'bambu' || !data.accessCode) return null;
+			return { serialNumber: data.serialNumber ?? '', accessCode: data.accessCode };
 		} catch { return null; }
 	}
 
@@ -520,7 +531,7 @@
 		}
 
 		// Load saved Bambu credentials once for the whole batch run.
-		const bambuCredMap = await loadBambuCredMap();
+		const bambuCredLookup = await loadBambuCredMap();
 
 		for (let i = 0; i < batchResults.length; i++) {
 			if (batchCancelled) {
@@ -539,7 +550,7 @@
 				if (cam?.type === 'mobotix-onvif') {
 					await batchRegisterOnvif(i, cam);
 				} else if (cam?.type === 'bambu') {
-					await batchOnboardBambu(i, cam, bambuCredMap);
+					await batchOnboardBambu(i, cam, bambuCredLookup);
 				} else {
 					await batchOnboardPipeline(i, cam!);
 				}
@@ -750,25 +761,39 @@
 	async function batchOnboardBambu(
 		idx: number,
 		cam: { ip: string; name: string | null; type: string; serialNumber?: string; model?: string },
-		bambuCredMap: Map<string, { id: number; name: string }>
+		bambuCredLookup: BambuCredLookup
 	) {
 		let stepNum = 0;
 
-		// Step 0: credentials — auto-match by serial, else prompt
+		// Step 0: credentials — auto-match by serial, then unique global default, else prompt
 		setStep(idx, stepNum, 'active');
 		let serialNumber = (cam.serialNumber || '').trim();
 		let accessCode = '';
 
-		if (serialNumber && bambuCredMap.has(serialNumber)) {
-			const hit = bambuCredMap.get(serialNumber)!;
+		// Tier 1: serial-exact match (printer-specific saved login)
+		if (serialNumber && bambuCredLookup.bySerial.has(serialNumber)) {
+			const hit = bambuCredLookup.bySerial.get(serialNumber)!;
 			const creds = await fetchBambuCredentialById(hit.id);
-			if (creds) {
-				serialNumber = creds.serialNumber;
+			if (creds && creds.accessCode) {
+				// Saved credential's serial wins when present; otherwise keep
+				// the SSDP-derived serial we already have.
+				if (creds.serialNumber) serialNumber = creds.serialNumber;
 				accessCode = creds.accessCode;
 				setStep(idx, stepNum, 'done', `gespeichert: ${hit.name}`);
 			}
 		}
 
+		// Tier 2: unique serial-less global default (user's "apply to any Bambu")
+		if (!accessCode && bambuCredLookup.globals.length === 1) {
+			const hit = bambuCredLookup.globals[0];
+			const creds = await fetchBambuCredentialById(hit.id);
+			if (creds && creds.accessCode) {
+				accessCode = creds.accessCode;
+				setStep(idx, stepNum, 'done', `global: ${hit.name}`);
+			}
+		}
+
+		// Tier 3: manual prompt
 		if (!accessCode) {
 			const manual = await promptForBambuCredentials(idx, cam.ip, serialNumber);
 			if (!manual) throw new Error('Übersprungen — kein Access Code');
