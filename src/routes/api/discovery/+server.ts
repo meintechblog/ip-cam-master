@@ -3,7 +3,10 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
 import { cameras, credentials } from '$lib/server/db/schema';
 import { decrypt } from '$lib/server/services/crypto';
-import { discoverBambuDevices } from '$lib/server/services/bambu-discovery';
+import {
+	discoverBambuDevices,
+	normalizeBambuModel
+} from '$lib/server/services/bambu-discovery';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFileSync, unlinkSync } from 'node:fs';
@@ -148,9 +151,13 @@ wait
 		// discoverBambuDevices never rejects — it resolves to [] on socket error
 		// (e.g. EADDRINUSE on UDP 2021) so the HTTP scan result is authoritative
 		// for non-Bambu devices even if UDP is blocked.
+		// 12s listen window: Bambu SSDP cadence is ~10-15s per broadcast.
+		// A 6s window hit a single broadcast only ~50% of the time during
+		// live testing (A1 @ 192.168.3.195 on 2026-04-21). 12s virtually
+		// guarantees at least one broadcast per scan without feeling slow.
 		const [httpScanResult, bambuDevices] = await Promise.all([
 			runExistingHttpScan(),
-			discoverBambuDevices({ listenMs: 6000 })
+			discoverBambuDevices({ listenMs: 12000 })
 		]);
 
 		const bambuRows: DiscoveredCamera[] = bambuDevices.map((d) => ({
@@ -159,7 +166,10 @@ wait
 			alreadyOnboarded: onboarded.has(d.ip),
 			name: d.name,
 			serialNumber: d.serialNumber,
-			model: d.model,
+			// Normalize wire code (O1C2/N2S) to canonical product code
+			// (H2C/A1) so the wizard can do simple `model === 'A1'` checks
+			// without knowing the SSDP alias namespace.
+			model: normalizeBambuModel(d.model),
 			// SSDP only fires when LAN Mode is on; not authoritative (real check
 			// lives in the pre-flight handler — Plan 11-03).
 			lanModeHint: 'likely_on' as const
