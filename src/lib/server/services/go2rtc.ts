@@ -75,6 +75,12 @@ export function generateSystemdUnit(): string {
 	return `[Unit]
 Description=go2rtc streaming server
 After=network.target
+# StartLimitIntervalSec=0 disables the 5-restarts-in-10s rate limit that
+# would otherwise leave go2rtc stopped after a run of quick failures
+# (seen during live config-reload cycles — OOM under memory pressure, or
+# a bad exec: producer that exits fast). We want the service always up;
+# if it genuinely loops, logs surface the cause separately.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

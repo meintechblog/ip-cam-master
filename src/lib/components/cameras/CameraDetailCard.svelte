@@ -35,9 +35,27 @@
 		codec: string | null;
 	} | null>(null);
 
+	// When RTSP-Auth is active, the raw rtspUrl stored in the DB is not
+	// directly usable (it lacks credentials) — users need the URL with
+	// user:password embedded for manual tooling. Derive the authoritative
+	// "use this" URL once so the UI has a single source of truth.
+	function buildRtspUrlWithCreds(base: string, user: string, pw: string): string {
+		return base.replace(/^rtsp:\/\//, `rtsp://${encodeURIComponent(user)}:${encodeURIComponent(pw)}@`);
+	}
+	let rtspDisplayUrl = $derived.by(() => {
+		if (!camera.rtspUrl) return '';
+		if (!camera.rtspAuthEnabled) return camera.rtspUrl;
+		if (!authCreds) return camera.rtspUrl; // still loading — fall back to plain
+		return buildRtspUrlWithCreds(camera.rtspUrl, authCreds.username, authCreds.password);
+	});
+	let rtspMaskedUrl = $derived.by(() => {
+		if (!camera.rtspUrl || !camera.rtspAuthEnabled || !authCreds) return rtspDisplayUrl;
+		return buildRtspUrlWithCreds(camera.rtspUrl, authCreds.username, '••••••');
+	});
+
 	async function copyRtsp() {
-		if (!camera.rtspUrl) return;
-		if (await copyToClipboard(camera.rtspUrl)) {
+		if (!rtspDisplayUrl) return;
+		if (await copyToClipboard(rtspDisplayUrl)) {
 			copied = true;
 			setTimeout(() => { copied = false; }, 2000);
 		}
@@ -361,12 +379,20 @@
 					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Umbenennen">
 						<Pencil class="w-3.5 h-3.5" />
 					</button>
-					<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten ändern">
-						<KeyRound class="w-3.5 h-3.5" />
-					</button>
-					<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface öffnen">
-						<ExternalLink class="w-3.5 h-3.5" />
-					</a>
+					{#if camera.cameraType === 'bambu'}
+						<!-- Bambu: credential = access code, edited via inline form further down. -->
+						<button onclick={() => { showAccessCodeInput = !showAccessCodeInput; accessCodeError = ''; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Access Code ändern">
+							<KeyRound class="w-3.5 h-3.5" />
+						</button>
+						<!-- No external web-UI link: Bambu printers don't expose an HTTP control page on the LAN. -->
+					{:else}
+						<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten ändern">
+							<KeyRound class="w-3.5 h-3.5" />
+						</button>
+						<a href={camera.cameraWebUrl || `http://${camera.cameraIp}`} target="_blank" class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1" title="Kamera-Webinterface öffnen">
+							<ExternalLink class="w-3.5 h-3.5" />
+						</a>
+					{/if}
 					{#if camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif' || camera.cameraType === 'loxone'}
 						{#if rebootConfirm}
 							<button onclick={rebootCamera} disabled={rebootLoading} class="bg-red-500/80 backdrop-blur-sm text-white rounded-md px-2 py-0.5 text-xs cursor-pointer">
@@ -514,7 +540,11 @@
 						{:else if camera.printState === 'IDLE'}
 							<span class="px-2 py-0.5 rounded bg-text-secondary/20 text-text-secondary font-medium">Idle</span>
 						{:else if camera.printState === 'FAILED'}
-							<span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">Failed</span>
+							<!-- Bambu sendet gcode_state=FAILED auch bei Benutzer-Abbruch
+							     (nicht nur bei echten Druckerfehlern). Ohne print_error-
+							     Feld können wir die beiden Fälle nicht sauber trennen,
+							     darum neutrales orange-gelb statt rot-Alarm. -->
+							<span class="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium" title="Abbruch oder Fehler — Bambu unterscheidet beide über gcode_state=FAILED nicht">Abbruch/Fehler</span>
 						{:else}
 							<span class="text-text-primary font-mono">{camera.printState}</span>
 						{/if}
@@ -810,12 +840,22 @@
 			</div>
 		</div>
 
-		<!-- RTSP URL bar -->
+		<!-- RTSP URL bar — always the actually-usable URL.
+		     When RTSP-Auth is off: plain rtsp://host:port/stream.
+		     When RTSP-Auth is on:  rtsp://user:pw@host:port/stream (password masked on screen,
+		     full URL copied to clipboard). The separate "RTSP+Auth" field was redundant. -->
 		{#if camera.rtspUrl}
 			<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2 mt-3">
 				<span class="text-xs text-text-secondary shrink-0">RTSP</span>
-				<code class="text-xs text-text-primary font-mono flex-1 truncate">{camera.rtspUrl}</code>
-				<button onclick={copyRtsp} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="Kopieren">
+				<code class="text-xs text-text-primary font-mono flex-1 truncate">
+					{camera.rtspAuthEnabled && authCreds && !authPwVisible ? rtspMaskedUrl : rtspDisplayUrl}
+				</code>
+				{#if camera.rtspAuthEnabled && authCreds}
+					<button onclick={toggleAuthReveal} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title={authPwVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}>
+						{#if authPwVisible}<EyeOff class="w-4 h-4" />{:else}<Eye class="w-4 h-4" />{/if}
+					</button>
+				{/if}
+				<button onclick={copyRtsp} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title={camera.rtspAuthEnabled ? 'Komplette URL mit Creds kopieren' : 'Kopieren'}>
 					{#if copied}
 						<Check class="w-4 h-4 text-green-400" />
 					{:else}
@@ -909,17 +949,9 @@
 								{#if authPwCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}
 							</button>
 						</div>
-						{#if camera.rtspUrl}
-							<div class="flex items-center gap-2">
-								<span class="text-[10px] text-text-secondary/70 shrink-0 w-14">RTSP+Auth</span>
-								<code class="text-xs text-text-primary font-mono flex-1 truncate opacity-70">
-									rtsp://{authCreds?.username ?? '…'}:••••••@{camera.containerIp}:8554/{camera.streamName}
-								</code>
-								<button onclick={copyAuthRtspUrl} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="RTSP-URL mit eingebetteten Credentials kopieren">
-									{#if authUrlCopied}<Check class="w-3.5 h-3.5 text-green-400" />{:else}<Copy class="w-3.5 h-3.5" />{/if}
-								</button>
-							</div>
-						{/if}
+						<!-- RTSP+Auth URL field removed — the top "RTSP" bar now shows the
+						     full URL with credentials embedded (masked on screen, full
+						     on copy) so there's a single source of truth per camera. -->
 					{/if}
 				</div>
 			{/if}
