@@ -223,6 +223,13 @@ export async function createCameraContainer(
 	// Hostname from camera name: lowercase, no spaces/special chars
 	const hostname = `cam-${camera.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
 
+	// Phase 18 / BAMBU-A1-08: Bambu A1 runs an ffmpeg MJPEG→H264 transcode
+	// inside the LXC (peaks ~180 MB RAM). Default 192 MB template → swap
+	// thrash + go2rtc clean-exit. All other cameras stay on the tight
+	// default since their pipelines are just RTSP relay (~40 MB).
+	const containerMemoryMb =
+		camera.cameraType === 'bambu' && camera.model === 'A1' ? 1024 : undefined;
+
 	// Try to clone from template (fast path: ~10s instead of 3-5min)
 	let fromTemplate = false;
 	const templateVmid = await getTemplateVmid();
@@ -233,7 +240,8 @@ export async function createCameraContainer(
 			hostname,
 			cameraName: camera.name,
 			cameraIp: camera.ip,
-			cameraType: camera.cameraType
+			cameraType: camera.cameraType,
+			memory: containerMemoryMb
 		});
 		fromTemplate = true;
 	} else {
@@ -257,7 +265,8 @@ export async function createCameraContainer(
 			ostemplate,
 			cameraName: camera.name,
 			cameraIp: camera.ip,
-			cameraType: camera.cameraType
+			cameraType: camera.cameraType,
+			memory: containerMemoryMb
 		});
 	}
 

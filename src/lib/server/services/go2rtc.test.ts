@@ -158,7 +158,7 @@ describe('go2rtc service', () => {
 	});
 
 	describe('generateGo2rtcConfigBambuA1 (Phase 18 / BAMBU-A1-08)', () => {
-		it('emits exec: source with env-var access code and kill signals', () => {
+		it('emits ffmpeg:exec: source with env-var access code, vaapi transcode, and kill signals', () => {
 			const yaml = generateGo2rtcConfigBambuA1({
 				streamName: 'bambu_a1_test',
 				printerIp: '192.168.3.195',
@@ -166,9 +166,15 @@ describe('go2rtc service', () => {
 			});
 
 			expect(yaml).toContain('bambu_a1_test:');
-			expect(yaml).toContain('exec:env A1_ACCESS_CODE=12345678');
+			// Mobotix-style pattern: ffmpeg: wraps the exec: pipe so go2rtc
+			// transcodes MJPEG→H264 with vaapi (native fps, proper PTS).
+			expect(yaml).toContain('ffmpeg:exec:env A1_ACCESS_CODE=12345678');
 			expect(yaml).toContain('node /opt/ipcm/bambu-a1-camera.mjs');
 			expect(yaml).toContain('--ip=192.168.3.195');
+			// Transcode modifiers for Protect-compatible output
+			expect(yaml).toContain('#video=h264');
+			expect(yaml).toContain('#hardware=vaapi');
+			// Lifecycle control
 			expect(yaml).toContain('#killsignal=15');
 			expect(yaml).toContain('#killtimeout=5');
 			// Access code must NOT appear as --access-code= (ps-ax leak per Anti-Pattern 4)

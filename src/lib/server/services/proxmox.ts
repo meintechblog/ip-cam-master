@@ -296,6 +296,13 @@ export async function cloneFromTemplate(params: {
 	cameraName?: string;
 	cameraIp?: string;
 	cameraType?: string;
+	/**
+	 * Override container RAM in MB after cloning. Default (unset) keeps the
+	 * template's memory config (192 MB). Phase 18: Bambu A1 transcoding peaks
+	 * at ~180 MB (ffmpeg libx264/vaapi encode + node .mjs), so the default is
+	 * too tight — pass >= 1024 for A1 to avoid swap thrash + clean exits.
+	 */
+	memory?: number;
 }): Promise<{ status: 'cloned'; vmid: number }> {
 	const { connectToProxmox: connectSSH } = await import('./ssh');
 	const ssh = await connectSSH();
@@ -309,6 +316,16 @@ export async function cloneFromTemplate(params: {
 		);
 		if (cloneResult.code && cloneResult.code !== 0) {
 			throw new Error(`Clone failed: ${cloneResult.stderr}`);
+		}
+
+		// Apply per-camera RAM override post-clone (template cannot be parameterized).
+		if (params.memory && Number.isInteger(params.memory) && params.memory >= 256) {
+			const memResult = await ssh.execCommand(
+				`pct set ${params.vmid} -memory ${params.memory}`
+			);
+			if (memResult.code && memResult.code !== 0) {
+				throw new Error(`Memory override failed: ${memResult.stderr}`);
+			}
 		}
 
 		// Configure VAAPI passthrough

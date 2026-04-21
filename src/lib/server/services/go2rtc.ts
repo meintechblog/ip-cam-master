@@ -232,10 +232,27 @@ export function generateGo2rtcConfigBambuA1(params: {
 	if (!octetsOk) {
 		throw new Error('A1 printer IP octets must be 0-255');
 	}
-	const execCmd = `exec:env A1_ACCESS_CODE=${accessCode} node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}#killsignal=15#killtimeout=5`;
+	// Mobotix-style pipeline: wrap the exec: pipe with go2rtc's built-in `ffmpeg:`
+	// prefix so the MJPEG bytes from .mjs are transcoded to H264 with VAAPI and
+	// proper PTS/DTS timestamps — exactly how we handle Mobotix S15's native
+	// MJPEG via HTTP. No fps inflation: ffmpeg passes each A1 frame through at
+	// the source rate (~0.5 fps idle, ~1 fps printing) with a real timestamp on
+	// each frame, and Protect treats low-fps streams fine as long as the
+	// timestamps arrive consistently. That keeps CPU + RAM minimal (GPU-accel'd
+	// encoder, no frame-duplication overhead).
+	//
+	// Modifiers breakdown:
+	//   #video=h264         → transcode output video codec to H.264
+	//   #hardware=vaapi     → Intel GPU hardware encoder (/dev/dri passthrough required)
+	//   #killsignal=15      → SIGTERM on shutdown (lets .mjs close TLS cleanly)
+	//   #killtimeout=5      → 5s grace before SIGKILL
+	const ffmpegSource =
+		`ffmpeg:exec:env A1_ACCESS_CODE=${accessCode} ` +
+		`node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}` +
+		`#video=h264#hardware=vaapi#killsignal=15#killtimeout=5`;
 	return `streams:
   ${streamName}:
-    - ${execCmd}
+    - ${ffmpegSource}
 ${rtspServerBlock(rtspAuth)}
 log:
   level: info
