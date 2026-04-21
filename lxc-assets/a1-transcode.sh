@@ -16,12 +16,15 @@
 #      partial-frame flushes as short chunks and trips repeated
 #      "unable to decode APP fields" warnings before a full JPEG arrives.
 #      cat coalesces writes so ffmpeg sees whole frames atomically.
-#   3. ffmpeg image2pipe/mjpeg demuxer + fps=10 filter duplicates the last
-#      frame to produce a continuous 10 fps stream even when the A1 is
-#      idle (~0.5 fps) — Protect's live view prefers a steady cadence.
-#      libx264 preset=ultrafast/tune=zerolatency keeps CPU and latency
-#      low. Output format is mpegts on stdout so go2rtc's exec: pipe
-#      auto-detects and re-serves.
+#   3. ffmpeg image2pipe/mjpeg demuxer + minterpolate motion-compensated
+#      interpolation synthesises real between-frames from the A1's native
+#      ~5 fps (printing) / ~0.5 fps (idle) source up to a smooth 10 fps
+#      output. Previously used fps=10 which only duplicated frames and
+#      made the live view feel frozen. `mi_mode=mci` + `mc_mode=aobmc`
+#      trades a few % CPU for visibly smoother motion on slow-moving
+#      print-head scenes. libx264 preset=ultrafast/tune=zerolatency keeps
+#      latency low. Output format is mpegts on stdout so go2rtc's exec:
+#      pipe auto-detects and re-serves.
 #
 # Security:
 #   - A1 access code is passed via the A1_ACCESS_CODE env var (set in the
@@ -37,7 +40,7 @@ node /opt/ipcm/bambu-a1-camera.mjs --ip="$1" \
   | cat \
   | ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 5M -analyzeduration 5M \
-      -f image2pipe -vcodec mjpeg -framerate 1 -i - \
-      -vf fps=10,format=yuv420p \
+      -f image2pipe -vcodec mjpeg -framerate 5 -i - \
+      -vf "minterpolate=fps=10:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p" \
       -c:v libx264 -preset ultrafast -tune zerolatency -g 20 \
       -f mpegts -

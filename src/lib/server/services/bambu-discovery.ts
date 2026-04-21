@@ -24,7 +24,7 @@ export interface BambuDevice {
 	name: string | null; // DevName.bambu.com (e.g. 'Bob the Builder')
 }
 
-export const BAMBU_MODEL_ALLOWLIST = ['O1C2', 'H2C', 'H2D', 'X1C', 'P1S', 'A1', 'N2S'] as const;
+export const BAMBU_MODEL_ALLOWLIST = ['O1C2', 'H2C', 'H2D', 'X1C', 'P1S', 'A1', 'N2S', 'N1'] as const;
 
 /**
  * Map SSDP wire-code to canonical product code for downstream logic.
@@ -44,6 +44,12 @@ export function normalizeBambuModel(rawCode: string): string {
 			return 'H2C';
 		case 'N2S':
 			return 'A1';
+		// A1 Mini (wire code N1) shares the A1's runtime path: JPEG-over-TLS
+		// on port 6000, 1024 MB RAM for ffmpeg, same access-code flow. The
+		// "Mini" distinction is cosmetic (display label via MODEL_LABELS),
+		// so normalize to 'A1' and reuse every existing model === 'A1' branch.
+		case 'N1':
+			return 'A1';
 		default:
 			return rawCode;
 	}
@@ -61,7 +67,9 @@ const MODEL_LABELS: Record<string, string> = {
 	X1C: 'Bambu Lab X1C',
 	P1S: 'Bambu Lab P1S',
 	A1: 'Bambu Lab A1',
-	N2S: 'Bambu Lab A1'
+	N2S: 'Bambu Lab A1',
+	N1: 'Bambu Lab A1 Mini',
+	A1Mini: 'Bambu Lab A1 Mini'
 };
 
 /**
@@ -134,6 +142,24 @@ export const PRINTER_CAPABILITIES: Record<
 	N2S: {
 		chamberHeater: false,
 		ams: 'lite',
+		xcamFeatures: ['buildplateMarkerDetector'],
+		cameraResolution: '1080p',
+		cameraTransport: 'jpeg-tls-6000'
+	},
+	// A1 Mini — wire code N1 (observed in live SSDP payload 2026-04-21,
+	// DevName="A1 Mini"). Same JPEG-over-TLS transport as A1, smaller build
+	// volume. No chamber heater, no AMS (single-spool only), shares the A1's
+	// xcam buildplate marker detector.
+	N1: {
+		chamberHeater: false,
+		ams: 'none',
+		xcamFeatures: ['buildplateMarkerDetector'],
+		cameraResolution: '1080p',
+		cameraTransport: 'jpeg-tls-6000'
+	},
+	A1Mini: {
+		chamberHeater: false,
+		ams: 'none',
 		xcamFeatures: ['buildplateMarkerDetector'],
 		cameraResolution: '1080p',
 		cameraTransport: 'jpeg-tls-6000'

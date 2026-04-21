@@ -121,7 +121,7 @@ describe('parseNotifyPayload', () => {
 
 	it('allowlist contains the documented model codes + wire aliases', () => {
 		expect([...BAMBU_MODEL_ALLOWLIST].sort()).toEqual(
-			['A1', 'H2C', 'H2D', 'N2S', 'O1C2', 'P1S', 'X1C'].sort()
+			['A1', 'H2C', 'H2D', 'N1', 'N2S', 'O1C2', 'P1S', 'X1C'].sort()
 		);
 	});
 
@@ -151,15 +151,18 @@ describe('normalizeBambuModel', () => {
 		expect(normalizeBambuModel('X1C')).toBe('X1C');
 		expect(normalizeBambuModel('P1S')).toBe('P1S');
 	});
+	it('maps N1 (A1 Mini wire code) to A1 — shares runtime path', () => {
+		expect(normalizeBambuModel('N1')).toBe('A1');
+	});
 	it('passes unknown codes through unchanged (forward-compat)', () => {
 		expect(normalizeBambuModel('Z9Z9')).toBe('Z9Z9');
 	});
 });
 
 describe('PRINTER_CAPABILITIES (Phase 18 / D-07)', () => {
-	it('declares all six canonical Bambu models + wire aliases', () => {
+	it('declares all canonical Bambu models + wire aliases', () => {
 		const keys = Object.keys(PRINTER_CAPABILITIES).sort();
-		expect(keys).toEqual(['A1', 'H2C', 'H2D', 'N2S', 'O1C2', 'P1S', 'X1C']);
+		expect(keys).toEqual(['A1', 'A1Mini', 'H2C', 'H2D', 'N1', 'N2S', 'O1C2', 'P1S', 'X1C']);
 	});
 
 	it('N2S (A1 wire alias) has identical capabilities to A1', () => {
