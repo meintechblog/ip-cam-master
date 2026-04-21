@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	parseNotifyPayload,
 	BAMBU_MODEL_ALLOWLIST,
-	PRINTER_CAPABILITIES
+	PRINTER_CAPABILITIES,
+	normalizeBambuModel
 } from './bambu-discovery';
 
 // Canonical H2C NOTIFY payload, verbatim from
@@ -27,7 +28,8 @@ const H2C_PAYLOAD = [
 ].join('\r\n');
 
 // Synthetic A1 payload — same shape, different DevModel + USN + name.
-// The A1 at 192.168.3.195 was observed in the field notes' Bonus capture.
+// Uses the canonical 'A1' wire code form (kept as a test case even though
+// real hardware broadcasts 'N2S' — the allowlist accepts both).
 const A1_PAYLOAD = [
 	'NOTIFY * HTTP/1.1',
 	'Host: 239.255.255.250:1900',
@@ -39,6 +41,28 @@ const A1_PAYLOAD = [
 	'Cache-Control: max-age=1800',
 	'DevModel.bambu.com: A1',
 	'DevName.bambu.com: TestA1'
+].join('\r\n');
+
+// Real A1 payload — verbatim from live tcpdump 2026-04-21 against the
+// user's A1 at 192.168.3.195. Wire code is N2S, not A1 (same namespace
+// mismatch as H2C's O1C2). This capture is the ground truth for the
+// SSDP allowlist + normalizer.
+const A1_REAL_PAYLOAD = [
+	'NOTIFY * HTTP/1.1',
+	'HOST: 239.255.255.250:1900',
+	'Server: UPnP/1.0',
+	'Location: 192.168.3.195',
+	'NT: urn:bambulab-com:device:3dprinter:1',
+	'USN: 03919A3B0100254',
+	'Cache-Control: max-age=1800',
+	'DevModel.bambu.com: N2S',
+	'DevName.bambu.com: A1',
+	'DevSignal.bambu.com: -51',
+	'DevConnect.bambu.com: cloud',
+	'DevBind.bambu.com: occupied',
+	'Devseclink.bambu.com: secure',
+	'DevVersion.bambu.com: 01.08.00.00',
+	'DevCap.bambu.com: 1'
 ].join('\r\n');
 
 const GENERIC_UPNP_PAYLOAD = [
@@ -95,17 +119,51 @@ describe('parseNotifyPayload', () => {
 		expect(parseNotifyPayload(UNKNOWN_MODEL_PAYLOAD, '192.168.3.210')).toBeNull();
 	});
 
-	it('allowlist contains the documented model codes', () => {
+	it('allowlist contains the documented model codes + wire aliases', () => {
 		expect([...BAMBU_MODEL_ALLOWLIST].sort()).toEqual(
-			['A1', 'H2C', 'H2D', 'O1C2', 'P1S', 'X1C'].sort()
+			['A1', 'H2C', 'H2D', 'N2S', 'O1C2', 'P1S', 'X1C'].sort()
 		);
+	});
+
+	it('parses the REAL A1 SSDP payload (DevModel: N2S) captured 2026-04-21', () => {
+		const result = parseNotifyPayload(A1_REAL_PAYLOAD, '192.168.3.195');
+		expect(result).toEqual({
+			ip: '192.168.3.195',
+			serialNumber: '03919A3B0100254',
+			model: 'N2S',
+			modelLabel: 'Bambu Lab A1',
+			name: 'A1'
+		});
+	});
+});
+
+describe('normalizeBambuModel', () => {
+	it('maps N2S (A1 wire code) to A1', () => {
+		expect(normalizeBambuModel('N2S')).toBe('A1');
+	});
+	it('maps O1C2 (H2C wire code) to H2C', () => {
+		expect(normalizeBambuModel('O1C2')).toBe('H2C');
+	});
+	it('passes canonical codes through unchanged', () => {
+		expect(normalizeBambuModel('A1')).toBe('A1');
+		expect(normalizeBambuModel('H2C')).toBe('H2C');
+		expect(normalizeBambuModel('H2D')).toBe('H2D');
+		expect(normalizeBambuModel('X1C')).toBe('X1C');
+		expect(normalizeBambuModel('P1S')).toBe('P1S');
+	});
+	it('passes unknown codes through unchanged (forward-compat)', () => {
+		expect(normalizeBambuModel('Z9Z9')).toBe('Z9Z9');
 	});
 });
 
 describe('PRINTER_CAPABILITIES (Phase 18 / D-07)', () => {
-	it('declares all six Bambu models', () => {
+	it('declares all six canonical Bambu models + wire aliases', () => {
 		const keys = Object.keys(PRINTER_CAPABILITIES).sort();
-		expect(keys).toEqual(['A1', 'H2C', 'H2D', 'O1C2', 'P1S', 'X1C']);
+		expect(keys).toEqual(['A1', 'H2C', 'H2D', 'N2S', 'O1C2', 'P1S', 'X1C']);
+	});
+
+	it('N2S (A1 wire alias) has identical capabilities to A1', () => {
+		expect(PRINTER_CAPABILITIES.N2S).toEqual(PRINTER_CAPABILITIES.A1);
 	});
 	it('A1 uses jpeg-tls-6000 camera transport (drives preflight split)', () => {
 		expect(PRINTER_CAPABILITIES.A1.cameraTransport).toBe('jpeg-tls-6000');

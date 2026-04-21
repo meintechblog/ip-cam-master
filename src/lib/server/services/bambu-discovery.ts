@@ -24,18 +24,44 @@ export interface BambuDevice {
 	name: string | null; // DevName.bambu.com (e.g. 'Bob the Builder')
 }
 
-export const BAMBU_MODEL_ALLOWLIST = ['O1C2', 'H2C', 'H2D', 'X1C', 'P1S', 'A1'] as const;
+export const BAMBU_MODEL_ALLOWLIST = ['O1C2', 'H2C', 'H2D', 'X1C', 'P1S', 'A1', 'N2S'] as const;
+
+/**
+ * Map SSDP wire-code to canonical product code for downstream logic.
+ * Bambu printers report internal codes in `DevModel.bambu.com` that differ
+ * from their marketing names: H2C broadcasts as "O1C2", A1 broadcasts as
+ * "N2S" (both confirmed via live SSDP capture). Downstream code checks
+ * `camera.model === 'A1' | 'H2C'` using the canonical form, so we normalize
+ * at the persistence boundary (save-camera route) before the value lands
+ * in `cameras.model`.
+ *
+ * Unknown-but-allowlisted codes pass through unchanged so forward-compat
+ * devices still have a valid model string.
+ */
+export function normalizeBambuModel(rawCode: string): string {
+	switch (rawCode) {
+		case 'O1C2':
+			return 'H2C';
+		case 'N2S':
+			return 'A1';
+		default:
+			return rawCode;
+	}
+}
 
 // Map DevModel wire code → display label. O1C2 is the H2C's internal code
-// (H2C-FIELD-NOTES.md §Known Issues). Unknown-but-allowlisted codes fall
-// back to "Bambu Lab <code>" so forward-compat devices still show sensibly.
+// and N2S is the A1's internal code (both observed in live SSDP captures —
+// the product display name differs from the wire code on both models).
+// Unknown-but-allowlisted codes fall back to "Bambu Lab <code>" so
+// forward-compat devices still show sensibly.
 const MODEL_LABELS: Record<string, string> = {
 	O1C2: 'Bambu Lab H2C',
 	H2C: 'Bambu Lab H2C',
 	H2D: 'Bambu Lab H2D',
 	X1C: 'Bambu Lab X1C',
 	P1S: 'Bambu Lab P1S',
-	A1: 'Bambu Lab A1'
+	A1: 'Bambu Lab A1',
+	N2S: 'Bambu Lab A1'
 };
 
 /**
@@ -97,6 +123,15 @@ export const PRINTER_CAPABILITIES: Record<
 		cameraTransport: 'rtsps-322'
 	},
 	A1: {
+		chamberHeater: false,
+		ams: 'lite',
+		xcamFeatures: ['buildplateMarkerDetector'],
+		cameraResolution: '1080p',
+		cameraTransport: 'jpeg-tls-6000'
+	},
+	// N2S is the A1's internal wire code (observed in SSDP payload 2026-04-21).
+	// Capabilities identical to A1 — same hardware, different label namespace.
+	N2S: {
 		chamberHeater: false,
 		ams: 'lite',
 		xcamFeatures: ['buildplateMarkerDetector'],

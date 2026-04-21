@@ -4,7 +4,7 @@ import { db } from '$lib/server/db/client';
 import { cameras } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { encrypt } from '$lib/server/services/crypto';
-import { BAMBU_MODEL_ALLOWLIST } from '$lib/server/services/bambu-discovery';
+import { BAMBU_MODEL_ALLOWLIST, normalizeBambuModel } from '$lib/server/services/bambu-discovery';
 import { CAMERA_STATUS } from '$lib/types';
 
 // Bambu cameras are saved BEFORE LXC provisioning (Phase 12 will create the
@@ -67,8 +67,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	// `PRINTER_CAPABILITIES[model]` as an arbitrary key (T-18-29). Unknown or
 	// absent → null, and the UI/preflight fall back to H2C defaults.
 	const rawModel = typeof model === 'string' ? model.trim() : '';
+	// Validate against allowlist first (T-18-29), THEN normalize wire-code to
+	// canonical product code so downstream `model === 'A1' | 'H2C'` checks
+	// remain simple without needing to know about SSDP wire aliases.
 	const validatedModel = (BAMBU_MODEL_ALLOWLIST as readonly string[]).includes(rawModel)
-		? rawModel
+		? normalizeBambuModel(rawModel)
 		: null;
 
 	const existing = db.select().from(cameras).where(eq(cameras.ip, ip)).get();
