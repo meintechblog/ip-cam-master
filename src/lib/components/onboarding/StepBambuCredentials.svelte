@@ -18,7 +18,7 @@
 		onSubmit: (result: { serialNumber: string; accessCode: string; model: string }) => void;
 	} = $props();
 
-	type SavedBambu = { id: number; name: string; serialNumber: string };
+	type SavedBambu = { id: number; name: string; serialNumber: string | null };
 
 	let serialNumber = $state(prefillSerial);
 	let accessCode = $state('');
@@ -36,16 +36,29 @@
 			try {
 				const res = await fetch('/api/credentials');
 				if (!res.ok) return;
-				const rows = (await res.json()) as Array<{ id: number; name: string; type: string; serialNumber?: string }>;
+				const rows = (await res.json()) as Array<{ id: number; name: string; type: string; serialNumber?: string | null }>;
+				// Include ALL Bambu credentials — entries without a serial are
+				// the user's "global default" (applies to any Bambu printer).
 				savedBambu = rows
-					.filter((r) => r.type === 'bambu' && r.serialNumber)
-					.map((r) => ({ id: r.id, name: r.name, serialNumber: r.serialNumber ?? '' }));
+					.filter((r) => r.type === 'bambu')
+					.map((r) => ({ id: r.id, name: r.name, serialNumber: r.serialNumber ?? null }));
 
-				// Auto-apply saved creds when the discovered serial matches an
-				// entry. No clicks needed — the wizard skips straight to the
-				// "Weiter" button with serial + access code already filled in.
-				if (prefillSerial && !accessCode) {
-					const match = savedBambu.find((c) => c.serialNumber === prefillSerial);
+				// Auto-apply precedence (no clicks needed, user skips straight
+				// to "Weiter" with serial + access code already filled):
+				// 1) Exact serial match (best — that credential is clearly meant
+				//    for this specific printer).
+				// 2) Otherwise, the single unique serial-less entry (a global
+				//    default the user wants applied to every Bambu onboarding).
+				// 3) Otherwise, do nothing — user picks from the list.
+				if (!accessCode) {
+					let match: SavedBambu | undefined;
+					if (prefillSerial) {
+						match = savedBambu.find((c) => c.serialNumber === prefillSerial);
+					}
+					if (!match) {
+						const globals = savedBambu.filter((c) => !c.serialNumber);
+						if (globals.length === 1) match = globals[0];
+					}
 					if (match) {
 						autoMatchedName = match.name;
 						await applySaved(match.id);
@@ -65,7 +78,12 @@
 			if (!res.ok) return;
 			const data = await res.json();
 			if (data.type === 'bambu') {
-				serialNumber = data.serialNumber ?? '';
+				// If the saved credential has no serial (global default), keep
+				// whichever serial the wizard already has (from SSDP discovery).
+				// Only overwrite when the saved credential is printer-specific.
+				if (data.serialNumber) {
+					serialNumber = data.serialNumber;
+				}
 				accessCode = data.accessCode ?? '';
 			}
 		} finally {
