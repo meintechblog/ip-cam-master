@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
 import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateGo2rtcConfigBambuA1, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, type RtspAuth } from './go2rtc';
 import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
@@ -356,12 +357,13 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 			if (camera.model === 'A1') {
 				// A1: deploy ingestion script to /opt/ipcm/ before writing go2rtc.yaml,
 				// then emit the exec: yaml that spawns it (Phase 18 RESEARCH §Gap 3).
-				// Path is relative to this compiled file; import.meta.url resolves
-				// from the file location. onboarding.ts is 4 levels under repo root
-				// (src/lib/server/services/), matching the Loxone nginx pushFileToContainer
-				// pattern already used in this file.
+				// Resolve from process.cwd() (the systemd WorkingDirectory is the
+				// app root — same directory that holds package.json and lxc-assets/).
+				// Source-relative resolution breaks after SvelteKit build because
+				// the compiled file lives in build/server/chunks/ (3 levels deep),
+				// not src/lib/server/services/ (4 levels deep).
 				const scriptContent = readFileSync(
-					new URL('../../../../lxc-assets/bambu-a1-camera.mjs', import.meta.url),
+					resolve(process.cwd(), 'lxc-assets/bambu-a1-camera.mjs'),
 					'utf8'
 				);
 				await executeOnContainer(ssh, camera.vmid, 'mkdir -p /opt/ipcm');
