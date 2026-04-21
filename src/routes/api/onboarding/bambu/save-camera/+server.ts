@@ -100,7 +100,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			model: validatedModel,
 			// Bambu go2rtc locks RTSP with serial as username + access code
 			// as password — exactly the pair the user types in UniFi Protect.
-			rtspAuthEnabled: true
+			rtspAuthEnabled: true,
+			// Adaptive mode was designed for H2C to rest its fragile Live555
+			// RTSPS server during idle cycles. A1 uses a custom JPEG-over-TLS
+			// pipeline on :6000 that does not stress Live555, so gating go2rtc
+			// on/off by print state only breaks Protect adoption (go2rtc
+			// 'stopped' = stream offline, systemd Restart=always does not fire
+			// after an explicit `systemctl stop`). Keep A1 always-live.
+			streamMode: validatedModel === 'A1' ? 'always_live' : 'adaptive'
 		})
 		.run();
 
