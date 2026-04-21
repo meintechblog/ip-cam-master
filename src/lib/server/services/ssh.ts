@@ -29,7 +29,20 @@ export async function connectToProxmox(): Promise<NodeSSH> {
 }
 
 /**
+ * Regex matching transient D-Bus / systemd failures that fresh LXC containers
+ * occasionally throw when a systemctl command lands mid-boot. The container's
+ * systemd-dbus socket resets under load (e.g. right after npm install spikes
+ * CPU), the request gets torn down, and our command exits non-zero. The error
+ * text is stable across systemd versions, so a surface regex is good enough.
+ */
+const TRANSIENT_DBUS_ERROR =
+	/D-Bus connection terminated|Failed to wait for response: Connection reset by peer|Failed to connect to bus|Transport endpoint is not connected/i;
+
+/**
  * Executes a command inside an LXC container via pct exec on the Proxmox host.
+ *
+ * When the stderr matches a transient D-Bus/systemd race, retry up to 2 times
+ * with a 2s backoff before giving up. Keeps non-transient failures loud.
  */
 export async function executeOnContainer(
 	ssh: NodeSSH,
@@ -37,14 +50,27 @@ export async function executeOnContainer(
 	command: string
 ): Promise<{ stdout: string; stderr: string; code: number }> {
 	const escapedCommand = command.replace(/'/g, "'\\''");
-	const result = await ssh.execCommand(`pct exec ${vmid} -- bash -c '${escapedCommand}'`);
-	const code = result.code ?? 0;
+	const maxAttempts = 3;
+	let lastError = '';
 
-	if (code !== 0) {
-		throw new Error(result.stderr || `Command failed with exit code ${code}`);
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		const result = await ssh.execCommand(`pct exec ${vmid} -- bash -c '${escapedCommand}'`);
+		const code = result.code ?? 0;
+
+		if (code === 0) {
+			return { stdout: result.stdout, stderr: result.stderr, code };
+		}
+
+		lastError = result.stderr || `Command failed with exit code ${code}`;
+
+		if (attempt < maxAttempts && TRANSIENT_DBUS_ERROR.test(lastError)) {
+			await new Promise((r) => setTimeout(r, 2000));
+			continue;
+		}
+		throw new Error(lastError);
 	}
 
-	return { stdout: result.stdout, stderr: result.stderr, code };
+	throw new Error(lastError);
 }
 
 /**
