@@ -232,27 +232,44 @@ export function generateGo2rtcConfigBambuA1(params: {
 	if (!octetsOk) {
 		throw new Error('A1 printer IP octets must be 0-255');
 	}
-	// Mobotix-style pipeline: wrap the exec: pipe with go2rtc's built-in `ffmpeg:`
-	// prefix so the MJPEG bytes from .mjs are transcoded to H264 with VAAPI and
-	// proper PTS/DTS timestamps — exactly how we handle Mobotix S15's native
-	// MJPEG via HTTP. No fps inflation: ffmpeg passes each A1 frame through at
-	// the source rate (~0.5 fps idle, ~1 fps printing) with a real timestamp on
-	// each frame, and Protect treats low-fps streams fine as long as the
-	// timestamps arrive consistently. That keeps CPU + RAM minimal (GPU-accel'd
-	// encoder, no frame-duplication overhead).
+	// Two-stream pipeline, Mobotix-style behavior:
 	//
-	// Modifiers breakdown:
-	//   #video=h264         → transcode output video codec to H.264
-	//   #hardware=vaapi     → Intel GPU hardware encoder (/dev/dri passthrough required)
+	//   {streamName}_raw  → exec: runs .mjs, stdout is MJPEG with JFIF APP0
+	//                       (the .mjs rewrites Bambu's non-standard AVI1 APP0
+	//                       on the fly — ffmpeg accepts the stream natively)
+	//
+	//   {streamName}      → ffmpeg: consumes the _raw stream, transcodes to
+	//                       H264 with VAAPI, preserves source frame rate and
+	//                       attaches real PTS timestamps per frame. Protect
+	//                       accepts low-fps streams as long as timestamps
+	//                       arrive consistently, exactly as it does for our
+	//                       Mobotix S15 cameras at night.
+	//
+	// Why two streams instead of a single `ffmpeg:exec:...` line: go2rtc's
+	// combined syntax passes the whole exec command into ffmpeg's own argv,
+	// so our `--ip=` flag gets rejected by ffmpeg ("Unrecognized option").
+	// Splitting into raw + transcode keeps ffmpeg's argv clean and matches
+	// the pattern Mobotix S15 already uses (separate HTTP source + ffmpeg
+	// transcode). The _raw stream is internal-only; Protect/snapshot consumers
+	// always hit the canonical {streamName}.
+	//
+	// Modifiers on the _raw exec:
 	//   #killsignal=15      → SIGTERM on shutdown (lets .mjs close TLS cleanly)
 	//   #killtimeout=5      → 5s grace before SIGKILL
-	const ffmpegSource =
-		`ffmpeg:exec:env A1_ACCESS_CODE=${accessCode} ` +
+	// Modifiers on the transcoded stream:
+	//   #video=h264         → transcode output video codec to H.264
+	//   #hardware=vaapi     → Intel GPU hardware encoder (/dev/dri passthrough required)
+	const rawSource =
+		`exec:env A1_ACCESS_CODE=${accessCode} ` +
 		`node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}` +
-		`#video=h264#hardware=vaapi#killsignal=15#killtimeout=5`;
+		`#killsignal=15#killtimeout=5`;
+	const transcodedSource = `ffmpeg:${streamName}_raw#video=h264#hardware=vaapi`;
 	return `streams:
+  ${streamName}_raw:
+    - ${rawSource}
+
   ${streamName}:
-    - ${ffmpegSource}
+    - ${transcodedSource}
 ${rtspServerBlock(rtspAuth)}
 log:
   level: info
