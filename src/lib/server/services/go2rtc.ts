@@ -537,3 +537,141 @@ export async function checkStreamHealth(
 		return { active: false, codec: null, audioCodec: null, producers: 0, resolution: null };
 	}
 }
+
+/**
+ * Returns a Node.js script that replaces daniela-hase/onvif-server's
+ * soap.listen-based handling with a minimal custom SOAP responder.
+ *
+ * Why: the bundled node-soap@1.1.5 does not resolve the WSDL's remote
+ * <wsdl:import>, so definitions.messages stays empty and every incoming
+ * SOAP request crashes with "Cannot read properties of undefined
+ * (reading 'description')". The crash occurs before requests reach our
+ * GetDeviceInformation / GetProfiles / GetStreamUri handlers, so
+ * UniFi Protect's adoption flow fails at the credential-validation step.
+ *
+ * The patch swaps the HTTP+SOAP plumbing for a tiny handler that reads
+ * the request body, extracts the method name via regex, calls the
+ * matching handler already defined on this.onvif, and serialises the
+ * result back out as a SOAP 1.2 envelope. WS-Discovery on UDP/3702 and
+ * the /snapshot.png endpoint are left untouched.
+ *
+ * Idempotent: no-ops on already-patched files.
+ */
+export function getOnvifSoapPatch(): string {
+	return `const fs = require('fs');
+const src = '/root/onvif-server/src/onvif-server.js';
+let code = fs.readFileSync(src, 'utf8');
+
+if (code.includes('_handleSoap(req, res')) {
+  console.log('Already patched');
+  process.exit(0);
+}
+
+const newStartServer = \`startServer() {
+        const urlMod = require('url');
+        const self = this;
+
+        this.server = http.createServer((req, res) => {
+            const pathname = urlMod.parse(req.url).pathname;
+            if (pathname === '/snapshot.png') {
+                const image = fs.readFileSync('./resources/snapshot.png');
+                res.writeHead(200, {'Content-Type': 'image/png'});
+                res.end(image, 'binary');
+                return;
+            }
+            if (req.method === 'POST' && pathname === '/onvif/device_service') {
+                return self._handleSoap(req, res, self.onvif.DeviceService.Device, 'tds', 'http://www.onvif.org/ver10/device/wsdl');
+            }
+            if (req.method === 'POST' && pathname === '/onvif/media_service') {
+                return self._handleSoap(req, res, self.onvif.MediaService.Media, 'trt', 'http://www.onvif.org/ver10/media/wsdl');
+            }
+            res.writeHead(404, {'Content-Type': 'text/plain'});
+            res.end('404 Not Found\\\\n');
+        });
+        this.server.listen(this.config.ports.server, this.config.hostname);
+    }
+
+    _handleSoap(req, res, handlers, prefix, ns) {
+        const chunks = [];
+        req.on('data', c => chunks.push(c));
+        req.on('end', () => {
+            const body = Buffer.concat(chunks).toString('utf8');
+            const m = body.match(/<(?:[A-Za-z0-9]+:)?Body[^>]*>\\\\s*<(?:[A-Za-z0-9]+:)?([A-Z][A-Za-z0-9]+)/);
+            if (!m) { res.writeHead(400); res.end('Bad SOAP'); return; }
+            const methodName = m[1];
+            const handler = handlers[methodName];
+            const args = this._parseArgs(body);
+            let result = {};
+            if (typeof handler === 'function') {
+                try { result = handler(args) || {}; } catch (e) { result = {}; }
+            }
+            const inner = this._serialize(result, prefix);
+            const respBody = \\\`<\\\${prefix}:\\\${methodName}Response xmlns:\\\${prefix}="\\\${ns}" xmlns:tt="http://www.onvif.org/ver10/schema" xmlns="\\\${ns}">\\\${inner}</\\\${prefix}:\\\${methodName}Response>\\\`;
+            const envelope = \\\`<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tds="http://www.onvif.org/ver10/device/wsdl" xmlns:trt="http://www.onvif.org/ver10/media/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema"><soap:Body>\\\${respBody}</soap:Body></soap:Envelope>\\\`;
+            res.writeHead(200, {'Content-Type': 'application/soap+xml; charset=utf-8', 'Content-Length': Buffer.byteLength(envelope)});
+            res.end(envelope);
+        });
+        req.on('error', () => { try { res.writeHead(500); res.end(); } catch (e) {} });
+    }
+
+    _parseArgs(body) {
+        const args = {};
+        const picks = ['Category', 'ProfileToken', 'IncludeCapability', 'StreamSetup'];
+        for (const tag of picks) {
+            const r = new RegExp('<(?:[A-Za-z0-9]+:)?' + tag + '[^>]*>([^<]*)<', 'i');
+            const match = body.match(r);
+            if (match) args[tag] = match[1];
+        }
+        return args;
+    }
+
+    _escapeXml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    _renderAttrs(obj) {
+        if (!obj || typeof obj !== 'object' || !obj.attributes) return '';
+        const a = obj.attributes;
+        return Object.keys(a).map(k => ' ' + k + '="' + this._escapeXml(a[k]) + '"').join('');
+    }
+
+    _serialize(obj, prefix) {
+        if (obj === null || obj === undefined) return '';
+        if (typeof obj !== 'object') return this._escapeXml(obj);
+        if (Array.isArray(obj)) return obj.map(i => this._serialize(i, prefix)).join('');
+        let xml = '';
+        for (const key of Object.keys(obj)) {
+            if (key === 'attributes') continue;
+            const v = obj[key];
+            if (v === undefined || v === null) continue;
+            const tag = prefix + ':' + key;
+            if (Array.isArray(v)) {
+                for (const item of v) {
+                    if (item !== null && typeof item === 'object') {
+                        const a = this._renderAttrs(item);
+                        const inner = this._serialize(item, prefix);
+                        xml += inner === '' ? ('<' + tag + a + '/>') : ('<' + tag + a + '>' + inner + '</' + tag + '>');
+                    } else {
+                        xml += '<' + tag + '>' + this._escapeXml(item) + '</' + tag + '>';
+                    }
+                }
+            } else if (typeof v === 'object') {
+                const a = this._renderAttrs(v);
+                const inner = this._serialize(v, prefix);
+                xml += inner === '' ? ('<' + tag + a + '/>') : ('<' + tag + a + '>' + inner + '</' + tag + '>');
+            } else {
+                xml += '<' + tag + '>' + this._escapeXml(v) + '</' + tag + '>';
+            }
+        }
+        return xml;
+    }
+
+    enableDebugOutput() { /* no-op: soap-library specific */ }\`;
+
+const re = /startServer\\(\\) \\{[\\s\\S]*?enableDebugOutput\\(\\) \\{[\\s\\S]*?\\}\\s*(?=startDiscovery\\(\\))/;
+if (!re.test(code)) { console.error('startServer block not found — aborting'); process.exit(1); }
+code = code.replace(re, newStartServer + '\\n\\n    ');
+fs.writeFileSync(src, code);
+console.log('onvif-server.js patched with custom SOAP responder');
+`;
+}

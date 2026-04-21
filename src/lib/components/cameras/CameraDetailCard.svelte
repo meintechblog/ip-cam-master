@@ -211,37 +211,6 @@
 	let rebootConfirm = $state(false);
 	let rebooting = $state(false);
 
-	// Bambu access code inline update
-	let showAccessCodeInput = $state(false);
-	let accessCodeValue = $state('');
-	let accessCodeLoading = $state(false);
-	let accessCodeError = $state('');
-
-	async function saveAccessCode() {
-		if (!accessCodeValue.trim()) return;
-		accessCodeLoading = true;
-		accessCodeError = '';
-		try {
-			const res = await fetch(`/api/cameras/${camera.id}/bambu-credentials`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ accessCode: accessCodeValue.trim() })
-			});
-			const data = await res.json();
-			if (data.success) {
-				showAccessCodeInput = false;
-				accessCodeValue = '';
-				// bambuError will clear on next status poll
-			} else {
-				accessCodeError = data.error || 'Fehler';
-			}
-		} catch {
-			accessCodeError = 'Verbindung fehlgeschlagen';
-		} finally {
-			accessCodeLoading = false;
-		}
-	}
-
 	// Bambu stream mode (Phase 14)
 	let streamModeUpdating = $state(false);
 	async function updateStreamMode(mode: string) {
@@ -379,13 +348,7 @@
 					<button onclick={() => { editName = camera.name; editing = true; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Umbenennen">
 						<Pencil class="w-3.5 h-3.5" />
 					</button>
-					{#if camera.cameraType === 'bambu'}
-						<!-- Bambu: credential = access code, edited via inline form further down. -->
-						<button onclick={() => { showAccessCodeInput = !showAccessCodeInput; accessCodeError = ''; }} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Access Code ändern">
-							<KeyRound class="w-3.5 h-3.5" />
-						</button>
-						<!-- No external web-UI link: Bambu printers don't expose an HTTP control page on the LAN. -->
-					{:else}
+					{#if camera.cameraType !== 'bambu'}
 						<button onclick={openCredentials} class="bg-black/70 backdrop-blur-sm text-text-secondary hover:text-text-primary rounded-md p-1 cursor-pointer" title="Zugangsdaten ändern">
 							<KeyRound class="w-3.5 h-3.5" />
 						</button>
@@ -487,31 +450,7 @@
 										{camera.bambuError}
 									{/if}
 								</span>
-								{#if isAuth}
-									<button onclick={() => { showAccessCodeInput = !showAccessCodeInput; accessCodeError = ''; }} class="px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 cursor-pointer text-[10px]">
-										Aktualisieren
-									</button>
-								{/if}
 							</div>
-							{#if isAuth && showAccessCodeInput}
-								<div class="flex items-center gap-1.5 mt-1">
-									<input
-										type="text"
-										bind:value={accessCodeValue}
-										placeholder="Neuer Access Code"
-										maxlength="8"
-										onkeydown={(e) => { if (e.key === 'Enter' && accessCodeValue.trim()) saveAccessCode(); }}
-										class="flex-1 bg-bg-input border border-border rounded px-2 py-1 text-xs text-text-primary placeholder:text-text-secondary/50 outline-none focus:border-accent font-mono"
-									/>
-									<button onclick={saveAccessCode} disabled={accessCodeLoading || !accessCodeValue.trim()}
-										class="px-2 py-1 rounded bg-accent/20 hover:bg-accent/30 text-accent text-[10px] disabled:opacity-40 cursor-pointer">
-										{accessCodeLoading ? '...' : 'OK'}
-									</button>
-								</div>
-								{#if accessCodeError}
-									<p class="text-red-400 text-[10px] mt-0.5">{accessCodeError}</p>
-								{/if}
-							{/if}
 							<p class="text-text-secondary text-[10px] leading-tight">
 								{#if camera.bambuError === 'WRONG_ACCESS_CODE'}
 									Der Access Code rotiert, wenn LAN Mode auf dem Drucker neu aktiviert wird. Prüfe ihn am Drucker-Display.

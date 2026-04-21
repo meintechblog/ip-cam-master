@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { connectToProxmox, executeOnContainer, pushFileToContainer, waitForContainerReady } from './ssh';
-import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateGo2rtcConfigBambuA1, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, type RtspAuth } from './go2rtc';
+import { generateGo2rtcConfig, generateGo2rtcConfigLoxone, generateGo2rtcConfigBambu, generateGo2rtcConfigBambuA1, generateSystemdUnit, getInstallCommands, checkStreamHealth, getOnvifInstallCommands, generateOnvifConfig, generateOnvifSystemdUnit, generateNginxConfig, getNginxInstallCommands, getOnvifAudioPatch, getOnvifSoapPatch, type RtspAuth } from './go2rtc';
 import { createContainer, startContainer, getTemplateVmid, cloneFromTemplate, createTemplateFromContainer } from './proxmox';
 import { encrypt, decrypt } from './crypto';
 import { db } from '$lib/server/db/client';
@@ -554,6 +554,12 @@ export async function configureOnvif(cameraId: number, skipInstall = false): Pro
 			await pushFileToContainer(ssh, camera.vmid, getOnvifAudioPatch(), '/tmp/patch-onvif-audio.js');
 			await executeOnContainer(ssh, camera.vmid, 'node /tmp/patch-onvif-audio.js');
 		}
+
+		// Replace node-soap's broken WSDL handling with a custom SOAP responder.
+		// Without this patch, Protect's adoption SOAP calls get 500 responses
+		// and credential validation fails. Safe for all camera types.
+		await pushFileToContainer(ssh, camera.vmid, getOnvifSoapPatch(), '/tmp/patch-onvif-soap.js');
+		await executeOnContainer(ssh, camera.vmid, 'node /tmp/patch-onvif-soap.js');
 
 		// Generate and push ONVIF config
 		const onvifConfig = generateOnvifConfig({
