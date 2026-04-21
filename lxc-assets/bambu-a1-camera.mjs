@@ -51,6 +51,39 @@ function buildAuth(username, accessCode) {
 	return buf;
 }
 
+/**
+ * Bambu A1 frames ship with an "AVI1" APP0 segment instead of the standard
+ * "JFIF" APP0. Strict JPEG/MJPEG decoders (including ffmpeg's mjpeg codec)
+ * reject this with "unable to decode APP fields: Invalid data found", which
+ * breaks any transcoding pipeline in front of this stream.
+ *
+ * This rewriter swaps the first APP0 segment for canonical JFIF when the
+ * identifier is "AVI1". Image payload and all other segments are untouched.
+ * No-op if the frame already has a JFIF APP0 or no APP0 at all.
+ *
+ * Canonical JFIF APP0 (18 bytes total including FF E0 marker):
+ *   FF E0 00 10 4A 46 49 46 00 01 01 00 00 01 00 01 00 00
+ *   [SOI already present] [APP0][len=16][JFIF\0][v1.1][units=0][xdens=1][ydens=1][thumb 0x0]
+ */
+const JFIF_APP0 = Buffer.from([
+	0xff, 0xe0, 0x00, 0x10,
+	0x4a, 0x46, 0x49, 0x46, 0x00,
+	0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00
+]);
+
+function normalizeJpegApp0(jpeg) {
+	// Quick check: SOI (FF D8) then APP0 (FF E0) at offset 2?
+	if (jpeg.length < 12 || jpeg[2] !== 0xff || jpeg[3] !== 0xe0) return jpeg;
+	const segLen = jpeg.readUInt16BE(4); // includes the 2 length bytes, excludes FF E0
+	// Identifier starts at offset 6 (right after length).
+	const identifier = jpeg.subarray(6, 10).toString('ascii');
+	if (identifier !== 'AVI1') return jpeg; // already JFIF or unknown — leave alone
+	// Replace FF E0 .. (2 + segLen bytes total) with JFIF_APP0.
+	const before = jpeg.subarray(0, 2); // SOI
+	const after = jpeg.subarray(2 + 2 + segLen); // skip FF E0 + len_hi + len_lo + data
+	return Buffer.concat([before, JFIF_APP0, after]);
+}
+
 let socket = null;
 let shuttingDown = false;
 
@@ -116,11 +149,15 @@ socket.on('data', (chunk) => {
 		buf = buf.subarray(16 + size);
 		// Sanity: must start FF D8. Skip frame if not (don't crash).
 		if (jpeg[0] === 0xff && jpeg[1] === 0xd8) {
+			// Bambu A1 frames carry a non-standard AVI1 APP0 marker instead of
+			// the JFIF APP0 that ffmpeg's mjpeg decoder expects. ffmpeg aborts
+			// with "unable to decode APP fields: Invalid data found". Rewrite
+			// the APP0 segment to canonical JFIF so downstream transcoders
+			// (or any standard MJPEG consumer) work transparently.
+			const patched = normalizeJpegApp0(jpeg);
 			// Phase 18 / IN-04: Respect stdout back-pressure. If go2rtc's
-			// consumer side stalls (rare during magic.Open() re-detection),
-			// pause TLS reads until the pipe drains so the Node heap does
-			// not silently buffer JPEGs at ~100-500 KB/s sustained.
-			if (!process.stdout.write(jpeg)) {
+			// consumer side stalls, pause TLS reads until the pipe drains.
+			if (!process.stdout.write(patched)) {
 				socket.pause();
 				process.stdout.once('drain', () => socket.resume());
 			}
