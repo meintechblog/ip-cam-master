@@ -371,16 +371,32 @@ export async function configureGo2rtc(cameraId: number, skipInstall = false): Pr
 				// Source-relative resolution breaks after SvelteKit build because
 				// the compiled file lives in build/server/chunks/ (3 levels deep),
 				// not src/lib/server/services/ (4 levels deep).
-				const scriptContent = readFileSync(
+				const mjsContent = readFileSync(
 					resolve(process.cwd(), 'lxc-assets/bambu-a1-camera.mjs'),
+					'utf8'
+				);
+				const transcodeSh = readFileSync(
+					resolve(process.cwd(), 'lxc-assets/a1-transcode.sh'),
 					'utf8'
 				);
 				await executeOnContainer(ssh, camera.vmid, 'mkdir -p /opt/ipcm');
 				await pushFileToContainer(
 					ssh,
 					camera.vmid,
-					scriptContent,
+					mjsContent,
 					'/opt/ipcm/bambu-a1-camera.mjs'
+				);
+				await pushFileToContainer(
+					ssh,
+					camera.vmid,
+					transcodeSh,
+					'/opt/ipcm/a1-transcode.sh'
+				);
+				// Shell wrapper must be executable — pushFileToContainer uses mode 644.
+				await executeOnContainer(
+					ssh,
+					camera.vmid,
+					'chmod +x /opt/ipcm/a1-transcode.sh'
 				);
 
 				yamlContent = generateGo2rtcConfigBambuA1({

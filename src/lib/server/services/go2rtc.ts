@@ -232,44 +232,35 @@ export function generateGo2rtcConfigBambuA1(params: {
 	if (!octetsOk) {
 		throw new Error('A1 printer IP octets must be 0-255');
 	}
-	// Two-stream pipeline, Mobotix-style behavior:
+	// Single-stream exec: pipeline. The /opt/ipcm/a1-transcode.sh wrapper
+	// (deployed alongside the .mjs by onboarding.ts) runs:
 	//
-	//   {streamName}_raw  → exec: runs .mjs, stdout is MJPEG with JFIF APP0
-	//                       (the .mjs rewrites Bambu's non-standard AVI1 APP0
-	//                       on the fly — ffmpeg accepts the stream natively)
+	//   node .mjs --ip=<ip>  →  cat  →  ffmpeg -f mpegts -
 	//
-	//   {streamName}      → ffmpeg: consumes the _raw stream, transcodes to
-	//                       H264 with VAAPI, preserves source frame rate and
-	//                       attaches real PTS timestamps per frame. Protect
-	//                       accepts low-fps streams as long as timestamps
-	//                       arrive consistently, exactly as it does for our
-	//                       Mobotix S15 cameras at night.
+	// Why a shell wrapper instead of go2rtc's native `ffmpeg:stream_name`
+	// chaining:
+	//   - go2rtc's `ffmpeg:exec:...` merges the exec command into ffmpeg's
+	//     argv, so our `--ip=...` flag is rejected as an unknown ffmpeg
+	//     option.
+	//   - Two-stream chaining (exec raw + ffmpeg: transcode) requires the
+	//     internal ffmpeg to pull via go2rtc's RTSP server back into itself.
+	//     Even with credentials embedded in the URL, that loopback pull
+	//     consistently timed out in live testing.
+	//   - A single exec: that emits mpegts on stdout sidesteps both problems.
+	//     go2rtc auto-detects mpegts from the magic bytes and re-serves the
+	//     stream over RTSP. The transcoder script is simple bash + ffmpeg,
+	//     easy to debug outside go2rtc with `A1_ACCESS_CODE=... ./a1-transcode.sh <ip>`.
 	//
-	// Why two streams instead of a single `ffmpeg:exec:...` line: go2rtc's
-	// combined syntax passes the whole exec command into ffmpeg's own argv,
-	// so our `--ip=` flag gets rejected by ffmpeg ("Unrecognized option").
-	// Splitting into raw + transcode keeps ffmpeg's argv clean and matches
-	// the pattern Mobotix S15 already uses (separate HTTP source + ffmpeg
-	// transcode). The _raw stream is internal-only; Protect/snapshot consumers
-	// always hit the canonical {streamName}.
-	//
-	// Modifiers on the _raw exec:
-	//   #killsignal=15      → SIGTERM on shutdown (lets .mjs close TLS cleanly)
+	// Lifecycle modifiers:
+	//   #killsignal=15      → SIGTERM on shutdown (script forwards to .mjs + ffmpeg)
 	//   #killtimeout=5      → 5s grace before SIGKILL
-	// Modifiers on the transcoded stream:
-	//   #video=h264         → transcode output video codec to H.264
-	//   #hardware=vaapi     → Intel GPU hardware encoder (/dev/dri passthrough required)
-	const rawSource =
+	const execCmd =
 		`exec:env A1_ACCESS_CODE=${accessCode} ` +
-		`node /opt/ipcm/bambu-a1-camera.mjs --ip=${printerIp}` +
+		`/opt/ipcm/a1-transcode.sh ${printerIp}` +
 		`#killsignal=15#killtimeout=5`;
-	const transcodedSource = `ffmpeg:${streamName}_raw#video=h264#hardware=vaapi`;
 	return `streams:
-  ${streamName}_raw:
-    - ${rawSource}
-
   ${streamName}:
-    - ${transcodedSource}
+    - ${execCmd}
 ${rtspServerBlock(rtspAuth)}
 log:
   level: info

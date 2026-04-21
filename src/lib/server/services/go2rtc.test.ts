@@ -158,29 +158,24 @@ describe('go2rtc service', () => {
 	});
 
 	describe('generateGo2rtcConfigBambuA1 (Phase 18 / BAMBU-A1-08)', () => {
-		it('emits two-stream pipeline: raw exec + ffmpeg vaapi transcode', () => {
+		it('emits single-stream exec: pipeline via a1-transcode.sh wrapper', () => {
 			const yaml = generateGo2rtcConfigBambuA1({
 				streamName: 'bambu_a1_test',
 				printerIp: '192.168.3.195',
 				accessCode: '12345678'
 			});
 
-			// Raw stream: exec runs .mjs, emits MJPEG (with JFIF APP0 rewrite)
-			expect(yaml).toContain('bambu_a1_test_raw:');
+			expect(yaml).toContain('bambu_a1_test:');
+			// Access code via env var — NEVER as CLI arg (ps-ax leak, Anti-Pattern 4)
 			expect(yaml).toContain('exec:env A1_ACCESS_CODE=12345678');
-			expect(yaml).toContain('node /opt/ipcm/bambu-a1-camera.mjs');
-			expect(yaml).toContain('--ip=192.168.3.195');
+			// Shell wrapper handles node | ffmpeg transcoding inline
+			expect(yaml).toContain('/opt/ipcm/a1-transcode.sh');
+			// IP is a positional arg to the wrapper script
+			expect(yaml).toContain('a1-transcode.sh 192.168.3.195');
 			expect(yaml).toContain('#killsignal=15');
 			expect(yaml).toContain('#killtimeout=5');
-			// Transcoded stream: ffmpeg reads _raw, outputs H264 via vaapi
-			expect(yaml).toContain('bambu_a1_test:');
-			expect(yaml).toContain('ffmpeg:bambu_a1_test_raw');
-			expect(yaml).toContain('#video=h264');
-			expect(yaml).toContain('#hardware=vaapi');
-			// Access code must NOT appear as --access-code= (ps-ax leak per Anti-Pattern 4)
+			// Belt-and-suspenders: CLI arg form of access code must never appear
 			expect(yaml).not.toContain('--access-code=');
-			// exec: (raw) must NOT carry transcode modifiers — only the ffmpeg: line does
-			expect(yaml).not.toMatch(/exec:.*#video=h264/);
 		});
 
 		it('includes the rtsp server block when rtspAuth is provided', () => {
