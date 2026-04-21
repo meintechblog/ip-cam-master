@@ -4,11 +4,19 @@
 	let {
 		ip,
 		prefillSerial = '',
+		prefillName = '',
 		model = 'H2C',
 		onSubmit
 	}: {
 		ip: string;
 		prefillSerial?: string;
+		/**
+		 * SSDP-discovered printer DevName (e.g. "A1", "A1 Mini", "Bob the
+		 * Builder"). Used for credential auto-match: a saved credential whose
+		 * name matches this wins over a bare unique-global fallback, so
+		 * users with multiple globals labelled per device pick the right one.
+		 */
+		prefillName?: string;
 		/**
 		 * SSDP-discovered printer model (Phase 18 / BAMBU-A1-11). Drives A1-specific
 		 * copy below. Default 'H2C' keeps the pre-Phase-18 wording for manual-add
@@ -47,13 +55,23 @@
 				// to "Weiter" with serial + access code already filled):
 				// 1) Exact serial match (best — that credential is clearly meant
 				//    for this specific printer).
-				// 2) Otherwise, the single unique serial-less entry (a global
+				// 2) Global credential whose name matches the SSDP DevName
+				//    (case-insensitive). Lets users keep per-device globals
+				//    like "A1 Mini" vs "A1" without needing to dig up the
+				//    serial when first saving the login.
+				// 3) Otherwise, the single unique serial-less entry (a global
 				//    default the user wants applied to every Bambu onboarding).
-				// 3) Otherwise, do nothing — user picks from the list.
+				// 4) Otherwise, do nothing — user picks from the list.
 				if (!accessCode) {
 					let match: SavedBambu | undefined;
 					if (prefillSerial) {
 						match = savedBambu.find((c) => c.serialNumber === prefillSerial);
+					}
+					if (!match && prefillName) {
+						const target = prefillName.trim().toLowerCase();
+						match = savedBambu.find(
+							(c) => !c.serialNumber && c.name.trim().toLowerCase() === target
+						);
 					}
 					if (!match) {
 						const globals = savedBambu.filter((c) => !c.serialNumber);

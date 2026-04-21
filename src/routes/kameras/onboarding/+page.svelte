@@ -783,7 +783,25 @@
 			}
 		}
 
-		// Tier 2: unique serial-less global default (user's "apply to any Bambu")
+		// Tier 2a: global credential whose name matches the SSDP DevName
+		// (case-insensitive). User-friendly path when multiple globals exist
+		// — tag a credential "A1 Mini" and it binds to the SSDP-discovered
+		// "A1 Mini" printer without needing the serial up-front.
+		if (!accessCode && cam.name) {
+			const target = cam.name.trim().toLowerCase();
+			const nameMatch = bambuCredLookup.globals.find(
+				(g) => g.name.trim().toLowerCase() === target
+			);
+			if (nameMatch) {
+				const creds = await fetchBambuCredentialById(nameMatch.id);
+				if (creds && creds.accessCode) {
+					accessCode = creds.accessCode;
+					setStep(idx, stepNum, 'done', `Name-Match: ${nameMatch.name}`);
+				}
+			}
+		}
+
+		// Tier 2b: unique serial-less global default (user's "apply to any Bambu")
 		if (!accessCode && bambuCredLookup.globals.length === 1) {
 			const hit = bambuCredLookup.globals[0];
 			const creds = await fetchBambuCredentialById(hit.id);

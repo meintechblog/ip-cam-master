@@ -714,6 +714,7 @@
 				<StepBambuCredentials
 					ip={bambuIp}
 					prefillSerial={bambuSerial}
+					prefillName={bambuName}
 					model={bambuModel}
 					onSubmit={handleBambuCredentialsSubmit}
 				/>
