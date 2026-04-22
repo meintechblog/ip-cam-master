@@ -45,6 +45,7 @@ import { handleMqttMessage, type SubscriberLike } from './bambu-mqtt';
 function makeSub(overrides: Partial<SubscriberLike> = {}): SubscriberLike {
 	return {
 		cameraId: 1,
+		model: 'A1',
 		lastError: null,
 		lastMessageAt: 0,
 		...overrides
@@ -116,6 +117,16 @@ describe('MQTT message handler — TUTK runtime watch (Phase 18 / BAMBU-A1-06 / 
 		const sub = makeSub({ lastError: null });
 		handleMqttMessage(sub, asPayload({ print: { ipcam: { tutk_server: 'enable' } } }));
 		expect(sub.lastError).toBe('A1_CLOUD_MODE_ACTIVE');
+	});
+
+	it('H2C does NOT get A1_CLOUD_MODE_ACTIVE — the flag is A1-only', () => {
+		// H2C reports tutk_server in its MQTT deltas too, but its camera runs on
+		// RTSPS:322 and is unaffected by TUTK cloud routing. Firing the A1 flag
+		// on H2C would be a UI false-positive — the status card would show an
+		// error even though the stream is fine. Gate is `sub.model === 'A1'`.
+		const sub = makeSub({ model: 'H2C', lastError: null });
+		handleMqttMessage(sub, asPayload({ print: { ipcam: { tutk_server: 'enable' } } }));
+		expect(sub.lastError).toBeNull();
 	});
 
 	it('disable branch does not clobber non-A1 error (WRONG_ACCESS_CODE auto-clears via conditional reset)', () => {

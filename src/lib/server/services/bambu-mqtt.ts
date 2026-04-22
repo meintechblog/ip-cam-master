@@ -37,6 +37,15 @@ type BambuConnectionError =
  */
 export interface SubscriberLike {
 	cameraId: number;
+	/**
+	 * Canonical Bambu model (e.g. 'A1', 'H2C'). Drives the TUTK cloud-mode
+	 * guard: `A1_CLOUD_MODE_ACTIVE` is only set for A1-family printers whose
+	 * camera transport is jpeg-tls-6000 — H2C also reports `tutk_server`
+	 * in its MQTT deltas but its camera rides RTSPS on port 322, which is
+	 * unaffected by TUTK. Gating here prevents a false-positive error flag
+	 * on H2C's UI status.
+	 */
+	model: string;
 	lastError: BambuConnectionError | null;
 	lastMessageAt: number;
 }
@@ -44,6 +53,7 @@ export interface SubscriberLike {
 interface Subscriber {
 	cameraId: number;
 	serial: string;
+	model: string;
 	client: MqttClient;
 	lastGroup: 'live' | 'idle' | 'unknown';
 	reconnectAttempts: number;
@@ -148,14 +158,19 @@ export function handleMqttMessage(sub: SubscriberLike, payload: Buffer | string)
 
 	// NEW (Phase 18 / D-06 / BAMBU-A1-06): TUTK cloud-mode runtime watch.
 	// Edge-trigger only — logs and flips lastError only on transitions.
-	const tutkServer = msg?.print?.ipcam?.tutk_server;
-	if (typeof tutkServer === 'string') {
-		if (tutkServer === 'enable' && sub.lastError !== 'A1_CLOUD_MODE_ACTIVE') {
-			sub.lastError = 'A1_CLOUD_MODE_ACTIVE';
-			console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=enable → CLOUD_MODE_ACTIVE`);
-		} else if (tutkServer === 'disable' && sub.lastError === 'A1_CLOUD_MODE_ACTIVE') {
-			sub.lastError = null;
-			console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=disable → cleared`);
+	// Gated to A1-family: H2C also reports tutk_server in its MQTT stream but
+	// its camera is RTSPS-on-322, which is unaffected by TUTK routing, so
+	// firing A1_CLOUD_MODE_ACTIVE on H2C is a UI false-positive.
+	if (sub.model === 'A1') {
+		const tutkServer = msg?.print?.ipcam?.tutk_server;
+		if (typeof tutkServer === 'string') {
+			if (tutkServer === 'enable' && sub.lastError !== 'A1_CLOUD_MODE_ACTIVE') {
+				sub.lastError = 'A1_CLOUD_MODE_ACTIVE';
+				console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=enable → CLOUD_MODE_ACTIVE`);
+			} else if (tutkServer === 'disable' && sub.lastError === 'A1_CLOUD_MODE_ACTIVE') {
+				sub.lastError = null;
+				console.log(`[bambu-mqtt] cam=${sub.cameraId} tutk_server=disable → cleared`);
+			}
 		}
 	}
 }
@@ -237,6 +252,7 @@ async function connectSubscriber(cameraId: number): Promise<void> {
 	const sub: Subscriber = {
 		cameraId,
 		serial: cam.serialNumber,
+		model: cam.model || 'H2C',
 		client,
 		lastGroup: 'unknown',
 		reconnectAttempts: 0,
