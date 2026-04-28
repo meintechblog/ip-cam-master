@@ -26,22 +26,32 @@ import { buildAuth } from './bambu-a1-auth';
 export type CheckOk = { ok: true };
 export type Tls6000Fail = {
 	ok: false;
-	reason: 'REFUSED' | 'TIMEOUT' | 'AUTH_SILENT_DROP' | 'TLS_HANDSHAKE';
+	reason: 'REFUSED' | 'TIMEOUT' | 'AUTH_REJECTED' | 'CAMERA_DISABLED' | 'TLS_HANDSHAKE';
 };
 
 /**
- * Minimum-viable preflight probe for A1 port-6000 JPEG-over-TLS auth.
+ * Preflight probe for A1 port-6000 JPEG-over-TLS auth.
  *
- * Success = received ≥1 byte from the printer within `timeoutMs` AFTER the
- * auth packet was sent. Silent drop (no bytes) after auth = wrong access
- * code (Spike 004 §2 — confirmed silent-fail on bad code, no TLS close).
+ * Three observed printer behaviours after we send the auth packet (see live
+ * tcpdump on real A1 + A1 Mini hardware, 2026-04-29):
+ *   - data arrives                 → AUTH OK, camera streaming  → ok: true
+ *   - server closes within <1s     → AUTH REJECTED (real wrong code)
+ *   - socket stays open, no bytes  → AUTH OK BUT CAMERA DISABLED
+ *     (`ipcam_dev: "0"` in the printer's MQTT report — user has the
+ *     Liveview / camera switch turned off in the printer's display menu)
+ *
+ * Earlier versions collapsed the latter two into AUTH_SILENT_DROP and
+ * surfaced them as WRONG_ACCESS_CODE, which sent users hunting for a code
+ * that was actually correct. Splitting the two is essential for an
+ * actionable hint.
  *
  * Failure classification:
- *   - ECONNREFUSED → REFUSED (port closed or printer off)
- *   - ETIMEDOUT    → TIMEOUT (network-level unreachability)
- *   - timer before `secureConnect`  → TLS_HANDSHAKE (couldn't negotiate)
- *   - timer after `secureConnect`   → AUTH_SILENT_DROP (bad access code)
- *   - other `error` events          → TLS_HANDSHAKE (catch-all safe default)
+ *   - ECONNREFUSED                          → REFUSED (port closed)
+ *   - ETIMEDOUT                             → TIMEOUT (network unreachable)
+ *   - timer before `secureConnect`          → TLS_HANDSHAKE
+ *   - `close` after auth, no data           → AUTH_REJECTED
+ *   - timer after `secureConnect`, no data, socket still open → CAMERA_DISABLED
+ *   - other `error` events                  → TLS_HANDSHAKE (catch-all)
  */
 export async function checkTls6000Real(
 	ip: string,
@@ -57,6 +67,7 @@ export async function checkTls6000Real(
 		});
 		let authSent = false;
 		let settled = false;
+		let dataSeen = false;
 		const finish = (r: CheckOk | Tls6000Fail): void => {
 			if (settled) return;
 			settled = true;
@@ -71,7 +82,7 @@ export async function checkTls6000Real(
 			() =>
 				finish(
 					authSent
-						? { ok: false, reason: 'AUTH_SILENT_DROP' }
+						? { ok: false, reason: 'CAMERA_DISABLED' }
 						: { ok: false, reason: 'TLS_HANDSHAKE' }
 				),
 			timeoutMs
@@ -82,8 +93,21 @@ export async function checkTls6000Real(
 			authSent = true;
 		});
 		socket.on('data', () => {
+			dataSeen = true;
 			clearTimeout(timer);
 			finish({ ok: true });
+		});
+		socket.on('close', () => {
+			clearTimeout(timer);
+			// Server-side close before any data and after auth was sent =
+			// printer rejected the credential. Confirmed live: wrong code →
+			// FIN within 6ms; right code → connection stays open even when
+			// the camera switch is off.
+			if (authSent && !dataSeen) {
+				finish({ ok: false, reason: 'AUTH_REJECTED' });
+			} else {
+				finish({ ok: false, reason: 'TLS_HANDSHAKE' });
+			}
 		});
 		socket.on('error', (err: NodeJS.ErrnoException) => {
 			clearTimeout(timer);

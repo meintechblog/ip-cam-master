@@ -5,6 +5,7 @@
 		| 'PRINTER_UNREACHABLE'
 		| 'LAN_MODE_OFF'
 		| 'WRONG_ACCESS_CODE'
+		| 'A1_CAMERA_DISABLED'
 		| 'RTSPS_HANDSHAKE_HUNG'
 		| 'A1_CLOUD_MODE_ACTIVE'
 		| 'INVALID_INPUT';
@@ -39,6 +40,8 @@
 		PRINTER_UNREACHABLE: 'Drucker nicht erreichbar. IP-Adresse und Netzwerkverbindung prüfen.',
 		LAN_MODE_OFF: 'LAN Mode scheint deaktiviert. Am Drucker: Einstellungen → Netzwerk → LAN Mode aktivieren.',
 		WRONG_ACCESS_CODE: 'Access Code abgelehnt. Am Drucker-Display aktuellen Code ablesen (Einstellungen → Netzwerk → Access Code).',
+		A1_CAMERA_DISABLED:
+			'Access Code OK, aber die Kamera ist am Drucker deaktiviert (ipcam_dev=0). Beim A1 Mini liegt der Toggle in der Bambu Handy App: Gerät → Kamera-Tab → LiveView aktivieren.',
 		RTSPS_HANDSHAKE_HUNG: 'RTSPS-Server antwortet nicht (Live555 hängt). Drucker bitte kurz aus- und wieder einschalten.',
 		A1_CLOUD_MODE_ACTIVE:
 			'Cloud-Modus ist aktiv. Bambu Handy App → Gerät → "LAN Mode only" aktivieren und Cloud-Verbindung deaktivieren.',

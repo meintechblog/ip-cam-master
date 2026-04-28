@@ -30,6 +30,7 @@ export type PreflightError =
 	| 'PRINTER_UNREACHABLE'
 	| 'LAN_MODE_OFF'
 	| 'WRONG_ACCESS_CODE'
+	| 'A1_CAMERA_DISABLED'
 	| 'RTSPS_HANDSHAKE_HUNG'
 	| 'A1_CLOUD_MODE_ACTIVE';
 
@@ -44,6 +45,8 @@ export const PREFLIGHT_HINTS_DE: Record<PreflightError, string> = {
 		'LAN Mode scheint deaktiviert. Am Drucker: Einstellungen → Netzwerk → LAN Mode aktivieren.',
 	WRONG_ACCESS_CODE:
 		'Access Code abgelehnt. Am Drucker-Display aktuellen Code ablesen (Einstellungen → Netzwerk → Access Code).',
+	A1_CAMERA_DISABLED:
+		'Access Code OK, aber die Kamera ist am Drucker deaktiviert (ipcam_dev=0). Beim A1 Mini liegt der Toggle in der Bambu Handy App: Gerät → Kamera-Tab → LiveView aktivieren.',
 	RTSPS_HANDSHAKE_HUNG:
 		'RTSPS-Server antwortet nicht (Live555 hängt). Drucker bitte kurz aus- und wieder einschalten.',
 	A1_CLOUD_MODE_ACTIVE:
@@ -134,13 +137,16 @@ export async function runBambuPreflight(
 			return fail('RTSPS_HANDSHAKE_HUNG');
 		}
 	} else if (caps.cameraTransport === 'jpeg-tls-6000') {
-		// A1 path — TLS:6000 auth probe. Per spike 004 §2, a wrong access
-		// code produces a silent drop after the TLS handshake (no error,
-		// no data), which our helper reports as AUTH_SILENT_DROP.
+		// A1 path — TLS:6000 auth probe. Three outcomes worth distinguishing
+		// (see bambu-a1-camera.ts checkTls6000Real for the live signatures):
+		//   - AUTH_REJECTED    = printer FINs within ms after auth  → wrong code
+		//   - CAMERA_DISABLED  = socket stays open with zero data    → ipcam_dev=0
+		//   - REFUSED/TIMEOUT  = port closed or unreachable
 		const tls6000 = await deps.checkTls6000(input.ip, input.accessCode, 6000);
 		if (!tls6000.ok) {
 			if (tls6000.reason === 'REFUSED') return fail('PRINTER_UNREACHABLE');
-			if (tls6000.reason === 'AUTH_SILENT_DROP') return fail('WRONG_ACCESS_CODE');
+			if (tls6000.reason === 'AUTH_REJECTED') return fail('WRONG_ACCESS_CODE');
+			if (tls6000.reason === 'CAMERA_DISABLED') return fail('A1_CAMERA_DISABLED');
 			// TLS_HANDSHAKE / TIMEOUT → treat as unreachable (conservative).
 			return fail('PRINTER_UNREACHABLE');
 		}

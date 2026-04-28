@@ -118,8 +118,9 @@ describe('runBambuPreflight orchestrator (H2C default — backward compat)', () 
 		expect(result).toMatchObject({ ok: false, error: 'WRONG_ACCESS_CODE' });
 	});
 
-	it('PREFLIGHT_HINTS_DE has German copy for all error codes (includes A1_CLOUD_MODE_ACTIVE)', () => {
+	it('PREFLIGHT_HINTS_DE has German copy for all error codes', () => {
 		expect(Object.keys(PREFLIGHT_HINTS_DE).sort()).toEqual([
+			'A1_CAMERA_DISABLED',
 			'A1_CLOUD_MODE_ACTIVE',
 			'LAN_MODE_OFF',
 			'PRINTER_UNREACHABLE',
@@ -158,15 +159,31 @@ describe('runBambuPreflight — A1 model-split (Phase 18 / BAMBU-A1-04, BAMBU-A1
 		expect(deps.checkTutkDisabled).not.toHaveBeenCalled();
 	});
 
-	it('A1 TLS:6000 AUTH_SILENT_DROP → WRONG_ACCESS_CODE', async () => {
+	it('A1 TLS:6000 AUTH_REJECTED → WRONG_ACCESS_CODE', async () => {
 		const deps = makeDeps({
 			checkTls6000: vi.fn(async () => ({
 				ok: false as const,
-				reason: 'AUTH_SILENT_DROP' as const
+				reason: 'AUTH_REJECTED' as const
 			}))
 		});
 		const result = await runBambuPreflight(INPUT, deps, 'A1');
 		expect(result).toMatchObject({ ok: false, error: 'WRONG_ACCESS_CODE' });
+		expect(deps.checkMqtt).not.toHaveBeenCalled();
+		expect(deps.checkTutkDisabled).not.toHaveBeenCalled();
+	});
+
+	it('A1 TLS:6000 CAMERA_DISABLED → A1_CAMERA_DISABLED with Bambu-app hint', async () => {
+		// New diagnostic — distinguishes "camera switch is off in Bambu Handy"
+		// from "wrong access code" so the user is told to fix the right thing.
+		const deps = makeDeps({
+			checkTls6000: vi.fn(async () => ({
+				ok: false as const,
+				reason: 'CAMERA_DISABLED' as const
+			}))
+		});
+		const result = await runBambuPreflight(INPUT, deps, 'A1');
+		expect(result).toMatchObject({ ok: false, error: 'A1_CAMERA_DISABLED' });
+		expect((result as { hint: string }).hint).toContain('Bambu Handy');
 		expect(deps.checkMqtt).not.toHaveBeenCalled();
 		expect(deps.checkTutkDisabled).not.toHaveBeenCalled();
 	});

@@ -83,11 +83,30 @@ describe('checkTls6000Real (Phase 18 / BAMBU-A1-04)', () => {
 		await expect(p).resolves.toEqual({ ok: false, reason: 'TLS_HANDSHAKE' });
 	});
 
-	it('classifies timeout after auth as AUTH_SILENT_DROP', async () => {
+	it('classifies timeout after auth (socket still open, no data) as CAMERA_DISABLED', async () => {
+		// Live observation 2026-04-29 on a real A1 Mini with the Bambu app's
+		// camera switch off: TLS auth accepted, connection holds open >30s,
+		// zero bytes ever sent. The old AUTH_SILENT_DROP label conflated this
+		// with a wrong access code, which costs users hours debugging the
+		// wrong field.
 		const p = checkTls6000Real('1.2.3.4', 'code', 40);
 		const s = sockets[sockets.length - 1];
-		setImmediate(() => s.emit('secureConnect')); // auth sent, no data reply
-		await expect(p).resolves.toEqual({ ok: false, reason: 'AUTH_SILENT_DROP' });
+		setImmediate(() => s.emit('secureConnect')); // auth sent, no data reply, no close
+		await expect(p).resolves.toEqual({ ok: false, reason: 'CAMERA_DISABLED' });
+	});
+
+	it('classifies post-auth close (no data) as AUTH_REJECTED', async () => {
+		// Live observation 2026-04-29 with a known-wrong code: printer FINs
+		// within ~6ms after receiving the auth packet. Differentiating this
+		// from CAMERA_DISABLED is what lets the preflight tell the user
+		// "your code is wrong" vs "your camera is off in the Bambu app".
+		const p = checkTls6000Real('1.2.3.4', 'badcode', 100);
+		const s = sockets[sockets.length - 1];
+		setImmediate(() => {
+			s.emit('secureConnect');
+			setImmediate(() => s.emit('close'));
+		});
+		await expect(p).resolves.toEqual({ ok: false, reason: 'AUTH_REJECTED' });
 	});
 
 	it('sends buildAuth("bblp", accessCode) as the first write', async () => {
