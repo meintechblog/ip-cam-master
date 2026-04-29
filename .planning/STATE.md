@@ -1,65 +1,57 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: "Bambu Lab H2C Kamera-Integration"
-status: phase_complete
-stopped_at: "Phase 18 complete (6/6 plans, 12/12 reqs, 11/11 review findings fixed). VERIFICATION.md status=human_needed for 5 manual UAT items requiring browser/Bambu-app/Protect."
-last_updated: "2026-04-20T19:30:00.000Z"
-last_activity: 2026-04-20 — Phase 18 execution + verification complete
+milestone: v1.3
+milestone_name: "Protect Stream Hub"
+status: planning
+stopped_at: ""
+last_updated: "2026-04-30T00:25:00.000Z"
+last_activity: 2026-04-30 — Milestone v1.3 started
 progress:
-  total_phases: 8
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-13)
+See: .planning/PROJECT.md (updated 2026-04-30)
 
-**Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect.
-**Current focus:** v1.2 — Bambu Lab H2C Kamera-Integration. Phase 18 (Bambu Lab A1 Camera Integration) abgeschlossen: 6/6 Plans, 12/12 Requirements, 11/11 Code-Review Findings gefixt, live UAT gegen A1 @ 192.168.3.195 für Preflight + Snapshot-Errorpaths verifiziert. 5 manuelle UAT-Schritte (Wizard/Provisioning/Protect/Cloud-Mode-Toggle) bleiben für den User offen.
+**Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
+**Current focus:** v1.3 — Protect Stream Hub (Loxone + Frigate-ready). Defining requirements.
 
 ## Current Position
 
-Phase: 18 — Bambu Lab A1 Camera Integration (COMPLETE)
-Plan: 6/6 plans complete
-Status: Phase verified, awaiting next-phase routing
-Last activity: 2026-04-20 — Phase 18 closed: code-review-fix (11/11), verifier (status: human_needed for live UAT), tracking-files synced
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-30 — Milestone v1.3 started
 
-Phase numbering: continues from v1.1 (ended at Phase 09). v1.2 starts at Phase 10.
+Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
 Shipped milestones:
 
 - v1.0 — One-click camera onboarding (2026-03-23)
 - v1.1 — Self-Maintenance & Polish (2026-04-10)
+- v1.2 — Bambu Lab A1 Camera Integration (code-complete 2026-04-20, formal close pending UAT)
 
 ```
-[          ] 0% — v1.2 just started (0/6 phases)
+[          ] 0% — v1.3 just started (defining requirements)
 ```
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed (v1.2): 0
-- Phases planned (v1.2): 6 (Phases 10–15)
-- Requirements mapped: 26 / 26 (100%)
-- New npm deps expected: 1 (`mqtt@^5.10`)
+- Total plans completed (v1.3): 0
+- Phases planned (v1.3): TBD (roadmapper)
+- Requirements mapped: 0 / 0
 
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 10 | 0 | - | - |
-| 11 | 0 | - | - |
-| 12 | 0 | - | - |
-| 13 | 0 | - | - |
-| 14 | 0 | - | - |
-| 15 | 0 | - | - |
+**Historical (v1.2):**
+| Phase 18 | 6 plans | 12/12 reqs | code-complete, UAT pending |
 
 **Historical (v1.0):**
 | Phase 01 P01 | 6min | 3 tasks | 24 files |
@@ -78,6 +70,7 @@ Shipped milestones:
 
 ### Roadmap Evolution
 
+- 2026-04-30: Milestone v1.3 started — Protect Stream Hub (Loxone + Frigate-ready). Reverse-Direction des bestehenden Patterns: vorher Cams → Protect, jetzt Protect → Loxone/Frigate. Single Bridge-Container mit go2rtc.yaml-Reconciliation, voller Lifecycle (Onboarding → Betrieb → Offboarding), Integration in bestehende `/cameras`-UI mit Stream-Inventur pro Cam.
 - 2026-04-20: Phase 16 added — Deploy Flow — .git/HEAD Sync (maintenance/infra, parallel-track zu v1.2 Bambu-Phasen). Ausgelöst durch false-positive "Update blockiert" im Settings-UI am 2026-04-20: VM HEAD hing 38 Commits hinter main, weil rsync-Deploys `.git/HEAD` nicht mit-aktualisieren.
 - 2026-04-20: Phase 18 added — Bambu Lab A1 Camera Integration (additive on top of v1.2 H2C branch). Added after live-hardware spikes 001–004 (`.planning/spikes/`) against user's A1 at 192.168.3.195 proved: (a) A1 has no RTSPS:322 (closes port), (b) A1 MQTT LAN is byte-for-byte H2C-compatible, (c) A1 camera streams JPEG-over-TLS on :6000 at 1536×1080 / ~0.45 fps idle with an 80-byte auth handshake. Reuses SSDP/MQTT/credentials from Phase 11 and go2rtc+Protect adoption from Phase 12–13; adds ~260 LOC A1-specific ingestion path. Depends on Phases 11–13 being done.
 
@@ -85,6 +78,17 @@ Shipped milestones:
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
+
+*v1.3 Pre-Decisions (from milestone discussion, to be locked during spec-phase/discuss-phase):*
+
+- v1.3 Architektur: **Single Bridge-Container** für n Streams (kein per-Cam-Container) — bestätigt vom User, weil Loxone-Konsumenten typischerweise wenige Cams brauchen und VAAPI sich gut über mehrere ffmpeg-Prozesse teilen lässt.
+- v1.3 Architektur: **Stream-Catalog-Modell** — pro Cam alle nativen Protect-Qualitätsstufen katalogisieren (Low/Medium/High mit Codec/Auflösung/FPS), mehrere Output-Typen pro Cam aktivierbar (Loxone-MJPEG transcoded, Frigate-RTSP passthrough). Erweiterbar für künftige Targets (HomeAssistant, Scrypted).
+- v1.3 UX: **Feature-Toggle in Settings** schaltet den Hub frei. Bei aktiviertem Toggle erscheinen Protect-Cams in bestehender `/cameras`-Übersicht (Marker "Protect Hub" zur Abgrenzung von app-managed Cams).
+- v1.3 UX: **Voller Lifecycle** — kuratiertes Onboarding (Wizard mit Protect-Verbindung → LXC-Provisioning → Discovery-Preview → Cam-Auswahl → Initial-Sync), Betrieb mit Auto-Reconciliation, sauberes Offboarding (Container stoppen/löschen, DB-Cleanup, optionales Aufräumen Stream-Sharing in Protect).
+- v1.3 Open Question: **Stream-Share Auto-Aktivierung via Protect API** — recherchieren ob möglich, sonst sauberer UI-Fallback mit Anleitung pro Cam.
+- v1.3 Open Question: **Loxone Single- vs Dual-Stream** (low+high für Loxone) — im Blogpost reichte single low-stream (640×360 @ 10fps), gegen offizielle Loxone-Doku verifizieren.
+
+*Historical v1.2 decisions preserved:*
 
 - Phase 18 plan: 6 plans in 3 waves. Wave 1 = Plans 01+02 (schema+capabilities, auth lib) with no deps. Wave 2 = Plans 03+04+05 (LXC script, preflight, MQTT watch) depending on 01/02. Wave 3 = Plan 06 (snapshot endpoint + UI + UAT) depending on 01/02/04/05. Plans 03 and 05 have no file overlap with each other → can run parallel in Wave 2; Plan 04 overlaps only in test-file extensions with 03/05 → sequential within-wave scheduling OK.
 - Phase 18 plan: Plan 02 is TDD (buildAuth regression test is the whole point per D-08). Plan 03 task 1 is TDD-flavored (tdd=true on the LXC .mjs script creation task; byte-layout test lives in Plan 02).
@@ -136,19 +140,24 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Run Phase 10 spike against the user's real H2C before planning Phase 11
-- Resolve schema Option A (zero-migration, reuse `password`) vs Option B (new `accessCode` / `serialNumber` columns) in the Phase 11 plan
-- Validate `#video=copy` vs VAAPI re-encode against live UniFi Protect adoption during Phase 12
-- Confirm MQTT print-state field names from Phase 10 findings before implementing Adaptive Stream Mode in Phase 14
+*v1.3 (Open Questions to resolve in spec/discuss):*
+- Recherche: Stream-Sharing in UniFi Protect API auto-aktivierbar (oder bleibt manuell mit UI-Anleitung)?
+- Recherche: Loxone Motion Shape Extreme — single low-quality MJPEG ausreichend, oder werden zwei Streams (low+high) erwartet?
+- Reuse vs Neu: Bridge-LXC auf gleichem Proxmox-Host wie Mobotix/Loxone/Bambu-Container; eigenes Container-Template oder bestehendes wiederverwenden?
+
+*v1.2 (carried over — pending UAT before formal milestone close):*
+- 5 manuelle UAT-Items für Bambu A1 (Wizard / Provisioning / Protect Adoption / Cloud-Mode-Toggle) gegen Live-Hardware @ 192.168.3.195
 
 ### Blockers/Concerns
 
-- Research flag (Phase 10): H2C-specific RTSPS path, SSDP service URN, and MQTT topic schema cannot be resolved by desk research — requires physical hardware access (user has it)
-- Research flag (Phase 12): `#video=copy` passthrough vs forced VAAPI re-encode must be validated against live UniFi Protect adoption (not theoretical)
-- Research flag (Phase 14): MQTT print-state field names must be confirmed from Phase 10 findings or ha-bambulab `pybambu` source before mode-switch logic is implemented
+*v1.3 (none yet — milestone just started)*
+
+*v1.2 (resolved/archived):*
+- Research flag (Phase 10): H2C-specific RTSPS path resolved via spike (A1 is the actual hardware target, no RTSPS:322).
+- Research flag (Phase 12): `#video=copy` validated end-to-end with Bambu A1 JPEG-over-TLS:6000 ingestion path.
+- Research flag (Phase 14): Adaptive Stream Mode validated against Bambu MQTT print-state.
 
 *Prior concerns from v1.1 (resolved/archived):*
-
 - Research flag (Phase 09): `systemd-run --transient` behavior validated on deployed VM (Debian 13) during v1.1 shipping
 - Research flag (Phase 09): Schema-hash comparison stopgap documented as future "real Drizzle migration system" follow-up
 - Research flag (Phase 08): GitHub API unauthenticated rate limit (60 req/h) documented, acceptable for single-user homelab
@@ -162,6 +171,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last activity: 2026-04-20
-Stopped at: Phase 18 planning complete (6 plans, 3 waves). Ready to run `/gsd:execute-phase 18`.
+Last activity: 2026-04-30
+Stopped at: v1.3 milestone started — defining requirements next
 Resume file: None

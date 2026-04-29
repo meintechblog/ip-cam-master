@@ -125,26 +125,50 @@ The app is now fully self-maintaining from the web UI:
 
 **v1.0 shipped** (2026-03-23) — Camera orchestration foundation: discovery, Mobotix/Loxone onboarding, LXC provisioning, dashboard with UniFi Protect integration, event logging, one-line installer.
 
+**v1.2 code-complete, awaiting formal close** — Bambu Lab A1 Camera Integration (Phases 17 + 18) shipped to production via dev-deploy on 2026-04-20. Phase 18 verified: 6/6 plans, 12/12 reqs, 11/11 review findings fixed. 5 manuelle UAT-Items (Wizard/Provisioning/Protect-Adoption/Cloud-Mode-Toggle, Live-Hardware) sind beim User offen — wird via separater `/gsd:complete-milestone` v1.2 abgeschlossen, sobald UAT durch ist.
+
 Running in production on 192.168.3.249 with 6+ cameras managed.
 
-## Current Milestone: v1.2 Bambu Lab H2C Kamera-Integration
+## Current Milestone: v1.3 Protect Stream Hub (Loxone + Frigate-ready)
 
-**Goal:** Bambu Lab H2C 3D-Drucker-Kamera im LAN als UniFi-Protect-kompatible Kamera einbinden — analog zum bestehenden Mobotix/Loxone-Pattern mit Auto-Discovery, LXC-Provisioning und go2rtc-Transcoding.
+**Goal:** UniFi Protect Kameras pro Cam in allen verfügbaren Stream-Qualitäten katalogisieren und über einen Bridge-Container in den jeweils passenden Output-Formaten bereitstellen — primär Loxone-MJPEG (low-quality, Motion Shape Extreme), aber auch native RTSP-Passthrough (high-quality) für Frigate, NVRs und andere Tools.
 
 **Target features:**
-- Netzwerk-Discovery erkennt Bambu-Drucker (mDNS `_bambulab._tcp` / Port-Scan) automatisch — gleicher Flow wie Mobotix/Loxone
-- LAN-Mode-Zugriff via Access Code (vom Drucker-Display) + Serial Number — keine Cloud nötig
-- RTSPS-Stream (`rtsps://bblp:<access_code>@<ip>:322/streaming/live/1`) über go2rtc transcodieren und in UniFi Protect adoptieren
-- UI-Credential-Eingabe für Access Code + Serial beim Onboarding (encrypted im SQLite-Store)
-- Cloud-Auth als Fallback, falls LAN Mode am Drucker nicht aktivierbar
+
+*Discovery & Catalog:*
+- Auto-Discovery aller Protect-Cams via `unifi-protect` lib (bereits im Stack)
+- Stream-Inventur pro Cam: alle Protect-Qualitätsstufen (Low / Medium / High) mit Codec, Auflösung, Framerate — alles in der UI sichtbar und dokumentiert
+- Auto-Reconciliation: Cams in Protect hinzugefügt/entfernt → Hub-Config wird automatisch nachgezogen, deployed via SSH
+
+*Outputs (pro Cam einzeln aktivierbar):*
+- Loxone-Output (MJPEG): 640×360 @ 10fps, transcoded via go2rtc, Endpoint `http://<bridge>:1984/api/stream.mjpeg?src=<cam>-low`
+- Frigate/NVR-Output (RTSP): Passthrough/Re-Stream der nativen High-Quality-RTSP-Stream, Endpoint `rtsp://<bridge>:8554/<cam>-high` (h264 Copy, kein Transcode)
+- Single Bridge-Container (ein LXC, n Streams in einer go2rtc.yaml) — *kein* per-Cam-Container
+
+*Feature-Aktivierung & Integration in bestehende App:*
+- Settings-Toggle "UniFi Protect Stream Hub aktivieren" (default: aus) als Einstiegspunkt zum gesamten Lifecycle
+- Discovered Protect-Cams erscheinen direkt in der bestehenden `/cameras`-Übersicht (mit visuellem Marker "Protect Hub" zur Abgrenzung von app-managed Cams) — kein separater UI-Bereich
+- Cam-Detail-Page zeigt native Protect-Streams (read-only Inventur), aktive Bridge-Outputs, Copy-Buttons für jede URL, Toggles pro Output-Typ
+- Stream-Sharing in Protect via API auto-aktivieren, falls verfügbar; sauberer UI-Fallback mit Anleitung pro Cam
+- Hinweise pro Zielsystem (Loxone Motion Shape Extreme, Frigate `cameras:` config)
+
+*Lifecycle (Onboarding → Betrieb → Offboarding):*
+- **Onboarding (cool & einfach):** Settings-Toggle aktivieren → optionaler Wizard mit klaren Schritten: (1) Protect-Verbindung wiederverwenden oder neu konfigurieren, (2) Bridge-LXC automatisch provisionieren auf vorhandenem Proxmox-Host (existing pattern), (3) Initial-Discovery zeigt gefundene Cams als Preview, (4) User wählt welche Cams im Hub aktiviert werden + Default-Output-Typ, (5) erstes Reconciliation-Run, (6) Done — Cams erscheinen unter `/cameras`
+- **Betrieb:** Auto-Reconciliation-Loop läuft im Hintergrund; UI zeigt Hub-Status (Container-Health, letzter Sync, Drift-Detection); Stream-URLs jederzeit kopierbar; einzelne Cams/Outputs einzeln deaktivierbar ohne den ganzen Hub auszuschalten
+- **Offboarding (sauber & reversibel):** Settings-Toggle deaktivieren → Confirm-Dialog mit Konsequenzen-Liste (welche Cams verschwinden aus `/cameras`, welche Loxone-/Frigate-Konsumenten brechen ab) → optional: Bridge-Container stoppen & löschen ODER nur deaktivieren (Container bleibt für späteres Re-Enable, kein Re-Provisioning nötig) → DB-Cleanup für externe Cams (mit klarem Hinweis was passiert) → optional: Protect Stream-Sharing wieder deaktivieren via API (rückstandsloses Aufräumen)
+- **Re-Enable nach Offboarding:** wenn Container nicht gelöscht wurde, schneller Re-Onboarding-Pfad (Container reuse statt neu provisionieren)
+
+*Architektur-Erweiterbarkeit:*
+- Neue Camera-Klasse "external" (in Protect verwaltet, von der App re-distributed) ergänzend zu bestehender "managed" (app-provisioned LXC pro Cam) — sauber im Datenmodell getrennt
+- Output-Typen-Modell erlaubt spätere Targets (HomeAssistant, Scrypted, …) ohne Architektur-Umbau
 
 ## Next Milestone Goals
 
-Candidates from v1.1's Future Requirements (for v1.3+):
+Candidates from v1.1's Future Requirements (for v1.4+):
 - Real Drizzle migration system (replaces v1.1's schema-hash stopgap)
 - Tag-based release channel (opt-in over rolling `main`)
 - Remote backup targets (S3/WebDAV push of nightly backups)
 - Alert notifications when the service goes down
 
 ---
-*Last updated: 2026-04-13 — started v1.2 Bambu Lab H2C Kamera-Integration*
+*Last updated: 2026-04-30 — started v1.3 Protect Stream Hub (Loxone + Frigate-ready)*
