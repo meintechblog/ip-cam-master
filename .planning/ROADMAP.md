@@ -43,11 +43,16 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
   5. The catalog survives a brief UDM unreachability: when the controller is offline, the UI still renders the cached catalog from SQLite and surfaces a "controller unreachable" banner instead of breaking
   6. A research spike artifact is committed at `.planning/research/v1.3/spikes/p19-tls-rtspx.md` documenting the result of `ffprobe rtspx://192.168.3.1:7441/<alias>` from a throwaway LXC, confirming the TLS scheme choice (rtspx:// vs tls_verify=0) before any reconciler code in P21 depends on it
   7. The two new npm deps (`unifi-protect@^4.29.0` and `yaml@^2.6.0`) are installed and pinned in `package.json` with no version-bumps to existing dependencies
-**Plans**: TBD
+**Plans**: 4 plans (in 3 waves)
+Plans:
+- [ ] 19-01-PLAN.md — TLS spike against UDM 192.168.3.1 (throwaway LXC + ffprobe; commit findings to .planning/research/v1.3/spikes/p19-tls-rtspx.md)
+- [ ] 19-02-PLAN.md — Schema lock (cameras +7 columns; +3 new tables: protect_hub_bridges, camera_outputs, protect_stream_catalog) + install unifi-protect@^4.29.0 + yaml@^2.6.0
+- [ ] 19-03-PLAN.md — protect-bridge.ts (lib boundary, classifyKind via isThirdPartyCamera, TLS_SCHEME const) + orchestration/protect-hub/catalog.ts (discover + loadCatalog) + /api/protect-hub/discover endpoint + Vitest suites
+- [ ] 19-04-PLAN.md — ProtectHubTab.svelte (auto-discover on empty cache, manual refresh, controller-unreachable banner, no-creds deep-link) + 7th settings tab + saveSetting() resets lib client on unifi_ keys + manual UAT against real UDM
 **Research flags**:
-  - TLS spike against actual UDM 192.168.3.1: `rtspx://` vs `tls_verify=0` (PITFALLS #8)
-  - `mac` field reliability for first-party AND third-party cams (PITFALLS #2)
-  - `bootstrap.cameras[].type` discriminator for first-party detection (PROJECT.md classification rule)
+  - TLS spike against actual UDM 192.168.3.1: `rtspx://` vs `tls_verify=0` (PITFALLS #8) — OWNED BY PLAN 19-01
+  - `mac` field reliability for first-party AND third-party cams (PITFALLS #2) — OWNED BY PLAN 19-03 fixtures + UAT
+  - `bootstrap.cameras[].type` discriminator for first-party detection — RESOLVED: amended D-CLASS-01 uses `isThirdPartyCamera` boolean instead (verified against protect-types.ts:788)
 **UI hint**: yes
 
 ### Phase 20: Bridge LXC Provisioning + Hello-World YAML
@@ -128,7 +133,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Data Model + Protect Catalog (Read-Only) | 0/? | Not started | - |
+| 19. Data Model + Protect Catalog (Read-Only) | 0/4 | Not started | - |
 | 20. Bridge LXC Provisioning + Hello-World YAML | 0/? | Not started | - |
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
