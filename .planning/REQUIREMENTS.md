@@ -122,4 +122,89 @@
 
 ## Traceability
 
-(filled by roadmapper after phase decomposition — maps each REQ-ID to the phase that delivers it)
+Maps each REQ-ID to the phase that delivers it. Filled by roadmapper on 2026-04-30.
+
+**Coverage:** 62 / 62 (100% mapped, no orphans, no duplicates)
+**Distribution:** P19=7, P20=11, P21=18, P22=14, P23=12
+
+| REQ-ID | Phase | Category |
+|--------|-------|----------|
+| HUB-CAT-01 | Phase 19 | Catalog & Discovery |
+| HUB-CAT-02 | Phase 19 | Catalog & Discovery |
+| HUB-CAT-03 | Phase 19 | Catalog & Discovery |
+| HUB-CAT-04 | Phase 19 | Catalog & Discovery |
+| HUB-CAT-05 | Phase 19 | Catalog & Discovery |
+| HUB-CAT-06 | Phase 19 | Catalog & Discovery |
+| HUB-WIZ-01 | Phase 19 | Onboarding Wizard (settings tab shell) |
+| HUB-BRG-01 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-02 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-03 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-04 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-05 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-06 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-07 | Phase 20 | Bridge LXC Container |
+| HUB-BRG-08 | Phase 20 | Bridge LXC Container |
+| HUB-WIZ-02 | Phase 20 | Onboarding Wizard (Step 1 entry) |
+| HUB-WIZ-03 | Phase 20 | Onboarding Wizard (Step 1 — Protect connection) |
+| HUB-WIZ-04 | Phase 20 | Onboarding Wizard (Step 2 — bridge provision) |
+| HUB-OUT-01 | Phase 21 | Output Types |
+| HUB-OUT-02 | Phase 21 | Output Types |
+| HUB-OUT-03 | Phase 21 | Output Types |
+| HUB-OUT-04 | Phase 21 | Output Types |
+| HUB-OUT-05 | Phase 21 | Output Types |
+| HUB-OUT-06 | Phase 21 | Output Types |
+| HUB-OUT-07 | Phase 21 | Output Types |
+| HUB-RCN-01 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-02 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-03 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-04 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-05 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-06 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-07 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-08 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-09 | Phase 21 | Reconciliation Loop |
+| HUB-RCN-10 | Phase 21 | Reconciliation Loop |
+| HUB-OPS-05 | Phase 21 | Operations (bridge health probe) |
+| HUB-WIZ-05 | Phase 22 | Onboarding Wizard (Step 3) |
+| HUB-WIZ-06 | Phase 22 | Onboarding Wizard (Step 4) |
+| HUB-WIZ-07 | Phase 22 | Onboarding Wizard (Step 5) |
+| HUB-WIZ-08 | Phase 22 | Onboarding Wizard (Step 6) |
+| HUB-WIZ-09 | Phase 22 | Onboarding Wizard (resumability) |
+| HUB-WIZ-10 | Phase 22 | Onboarding Wizard (state-machine gate) |
+| HUB-UI-01 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-02 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-03 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-04 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-05 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-06 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-07 | Phase 22 | `/cameras` UI Integration |
+| HUB-UI-08 | Phase 22 | `/cameras` UI Integration |
+| HUB-OFF-01 | Phase 23 | Offboarding |
+| HUB-OFF-02 | Phase 23 | Offboarding |
+| HUB-OFF-03 | Phase 23 | Offboarding |
+| HUB-OFF-04 | Phase 23 | Offboarding |
+| HUB-OFF-05 | Phase 23 | Offboarding |
+| HUB-OFF-06 | Phase 23 | Offboarding |
+| HUB-OFF-07 | Phase 23 | Offboarding |
+| HUB-OFF-08 | Phase 23 | Offboarding |
+| HUB-OPS-01 | Phase 23 | Operations & Monitoring |
+| HUB-OPS-02 | Phase 23 | Operations & Monitoring |
+| HUB-OPS-03 | Phase 23 | Operations & Monitoring |
+| HUB-OPS-04 | Phase 23 | Operations & Monitoring |
+
+### Phase-Wise Summary
+
+**Phase 19 — Data Model + Protect Catalog (Read-Only)** [7 reqs]
+HUB-CAT-01, HUB-CAT-02, HUB-CAT-03, HUB-CAT-04, HUB-CAT-05, HUB-CAT-06, HUB-WIZ-01
+
+**Phase 20 — Bridge LXC Provisioning + Hello-World YAML** [11 reqs]
+HUB-BRG-01, HUB-BRG-02, HUB-BRG-03, HUB-BRG-04, HUB-BRG-05, HUB-BRG-06, HUB-BRG-07, HUB-BRG-08, HUB-WIZ-02, HUB-WIZ-03, HUB-WIZ-04
+
+**Phase 21 — Multi-Cam YAML + Reconciliation Loop** [18 reqs]
+HUB-OUT-01, HUB-OUT-02, HUB-OUT-03, HUB-OUT-04, HUB-OUT-05, HUB-OUT-06, HUB-OUT-07, HUB-RCN-01, HUB-RCN-02, HUB-RCN-03, HUB-RCN-04, HUB-RCN-05, HUB-RCN-06, HUB-RCN-07, HUB-RCN-08, HUB-RCN-09, HUB-RCN-10, HUB-OPS-05
+
+**Phase 22 — Onboarding Wizard + `/cameras` Integration** [14 reqs]
+HUB-WIZ-05, HUB-WIZ-06, HUB-WIZ-07, HUB-WIZ-08, HUB-WIZ-09, HUB-WIZ-10, HUB-UI-01, HUB-UI-02, HUB-UI-03, HUB-UI-04, HUB-UI-05, HUB-UI-06, HUB-UI-07, HUB-UI-08
+
+**Phase 23 — Offboarding + Lifecycle Polish + Stream-Sharing API** [12 reqs]
+HUB-OFF-01, HUB-OFF-02, HUB-OFF-03, HUB-OFF-04, HUB-OFF-05, HUB-OFF-06, HUB-OFF-07, HUB-OFF-08, HUB-OPS-01, HUB-OPS-02, HUB-OPS-03, HUB-OPS-04
