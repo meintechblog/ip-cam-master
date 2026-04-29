@@ -138,6 +138,8 @@ Running in production on 192.168.3.249 with 6+ cameras managed.
 *Discovery & Catalog:*
 - Auto-Discovery aller Protect-Cams via `unifi-protect` lib (bereits im Stack)
 - Stream-Inventur pro Cam: alle Protect-Qualitätsstufen (Low / Medium / High) mit Codec, Auflösung, Framerate — alles in der UI sichtbar und dokumentiert
+- **Cam-Klassifikation pro Cam:** UniFi-eigene Cams ("first-party") vs Drittanbieter-Cams in Protect ("third-party adopted") — automatisch erkannt anhand der Protect-Manufacturer/Model-Felder
+- **Default-Aktivierungslogik:** UniFi-eigene Cams werden by default im Hub aktiviert (Standard-Anwendungsfall); Drittanbieter-Cams in Protect erscheinen ebenfalls im Catalog, sind aber **opt-in** — User kann sie pro Cam aktivieren, wenn er explizit den Hub-Output braucht (z.B. weil die Drittanbieter-Cam zwar in Protect läuft aber kein natives MJPEG für Loxone liefert). Mobotix S15 etc. die direkt MJPEG können, lässt der User dann logischerweise off.
 - Auto-Reconciliation: Cams in Protect hinzugefügt/entfernt → Hub-Config wird automatisch nachgezogen, deployed via SSH
 
 *Outputs (pro Cam einzeln aktivierbar):*
