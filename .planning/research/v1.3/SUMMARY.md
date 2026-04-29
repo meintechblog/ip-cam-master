@@ -77,7 +77,7 @@ ARCHITECTURE proposes 5 phases (P19–P23); FEATURES suggests 3 clusters; PITFAL
 | L-25 | Bridge LXC sizing | Dedicated profile (~1–2 GB RAM, 2–4 cores, `nofile=4096`), NOT per-cam template | PITFALLS #17, #19 |
 | L-26 | VAAPI concurrency | Soft cap 4, hard cap 6 Loxone-MJPEG transcodes; Frigate-RTSP `-c:v copy` (zero VAAPI) | PITFALLS #7 |
 | L-27 | Frigate output defaults | `-an` (no audio) by default; H.264 passthrough; H.265 → UI hint | PITFALLS #18 + STACK §3 |
-| L-28 | Cam classification | `manufacturer`, `model`, `kind` columns; first-party default-ON, third-party default-OFF (opt-in) | PROJECT.md update |
+| L-28 | Cam classification | `kind` column derived from Protect's own `isThirdPartyCamera: boolean` (NOT a manufacturer regex — that field does not exist on the lib type). `model` reuses Phase-18's existing column for `marketName`. first-party default-ON, third-party default-OFF (opt-in). **Amended 2026-04-30** in `19-CONTEXT.md` D-CLASS-01 after phase-researcher verified types against `protect-types.ts@main` line 788. | PROJECT.md update + lib-source verification |
 | L-29 | YAML library | `yaml@^2.6.0` (eemeli) — deterministic key ordering | STACK §2.5 |
 | L-30 | Protect API client | `unifi-protect@^4.29.0` for write-paths; existing `protect.ts` STAYS for reads (no rip-out) | STACK §1.4 |
 

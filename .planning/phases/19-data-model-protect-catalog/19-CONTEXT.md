@@ -25,19 +25,35 @@ Success criteria (from ROADMAP §Phase 19) flow into plan acceptance:
 
 ### Classification (D-CLASS)
 
-**D-CLASS-01 — first-party detection rule (PRIMARY: manufacturer):**
+**D-CLASS-01 — first-party detection rule (AMENDED 2026-04-30 after phase-researcher verified `unifi-protect@4.29.0` types):**
 
+```ts
+kind = 'first-party'  IF  cam.isThirdPartyCamera === false
+     = 'third-party'  IF  cam.isThirdPartyCamera === true
+     = 'unknown'      IF  isThirdPartyCamera is undefined/null
+                          (defensive only — required field per current lib types,
+                           but old firmware may omit it)
 ```
-kind = 'first-party'  IF  manufacturer matches /^(Ubiquiti|UniFi)$/i
-                          (case-insensitive, exact word match — NOT substring)
-     = 'third-party'  IF  manufacturer present AND not first-party
-     = 'unknown'      IF  manufacturer is null/empty
-                          AND type matches /^UVC/i (low-confidence first-party guess; NOT used to assign first-party)
+
+**Why amended:** The original rule referenced a `manufacturer` field that does NOT exist on `ProtectCameraConfigInterface`. Phase-researcher verified verbatim against `github.com/hjdhjd/unifi-protect/blob/main/src/protect-types.ts` line 788 — the canonical discriminator is `isThirdPartyCamera: boolean`. Original milestone research (ARCHITECTURE.md, FEATURES.md) inferred `manufacturer` from web docs without source verification. Phase-research caught it.
+
+**Why this is BETTER than the original rule:**
+- Protect itself already has the classification — we trust their boolean rather than re-deriving from manufacturer-string-matching that could regress on edge cases
+- Mobotix-via-Protect-5.0-third-party-adoption gets `isThirdPartyCamera=true` by Protect's own bookkeeping → still default-OFF (Mobotix users with native MJPEG can leave it off)
+- UniFi-AI-Pro and any future first-party UniFi cams just work — no regex maintenance
+- Zero string-matching ambiguity (case sensitivity, whitespace, partial matches)
+
+**Code impact:** `protect-bridge.ts` `classifyKind(camera)` becomes a 3-line function:
+
+```ts
+export function classifyKind(camera: ProtectCameraConfigInterface): 'first-party' | 'third-party' | 'unknown' {
+  if (camera.isThirdPartyCamera === false) return 'first-party';
+  if (camera.isThirdPartyCamera === true) return 'third-party';
+  return 'unknown';
+}
 ```
 
-**Why manufacturer-primary, not type-primary:** Mobotix in Protect 5.0+ third-party-camera-feature can advertise `type` starting with "UVC" (Protect emulates the protocol layer), but `manufacturer` stays "Mobotix". Matching against `type` would false-positive Mobotix as first-party → default-ON the Hub for cams that produce native MJPEG → unwanted re-distribution.
-
-**Why exact-word match `/^(Ubiquiti|UniFi)$/i`, not substring:** Avoids matching e.g. `manufacturer="UbiquitiPartner-XYZ"` as first-party.
+**`model`/`marketName` columns:** still populate from `cam.modelKey` / `cam.marketName` for UI display (manufacturer pill on third-party cards), just not used for classification logic. **Note:** `cameras.model` already exists in DB from Phase 18 — reuse that column for `marketName`, do NOT re-add.
 
 **D-CLASS-02 — `kind='unknown'` treatment:**
 
