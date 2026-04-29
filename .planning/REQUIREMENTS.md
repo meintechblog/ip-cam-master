@@ -1,158 +1,125 @@
-# Requirements: IP-Cam-Master v1.2 — Bambu Lab H2C Kamera-Integration
+# v1.3 Requirements — Protect Stream Hub (Loxone + Frigate-ready)
 
-**Defined:** 2026-04-13
-**Milestone:** v1.2
-**Core Value:** Bambu Lab H2C als UniFi-Protect-kompatible Kamera integrieren — Auto-Discovery, verschlüsselte Credentials, go2rtc-Transcoding, Adoption — analog zum bestehenden Mobotix/Loxone-Pattern.
+**Milestone:** v1.3
+**Defined:** 2026-04-30
+**Goal:** UniFi Protect Kameras pro Cam in allen verfügbaren Stream-Qualitäten katalogisieren und über einen einzigen LXC-Bridge-Container in den jeweils passenden Output-Formaten bereitstellen — primär Loxone-MJPEG (low-quality, "Benutzerdefinierte Intercom"), aber auch native RTSP-Passthrough (high-quality) für Frigate, NVRs und andere Tools. Voller Lifecycle (Onboarding-Wizard → Auto-Reconciliation → Offboarding-Teardown).
 
-> Numbering continues conceptually from v1.1 categories. REQ-IDs use the `BAMBU-*` prefix for the new Bambu-specific capabilities and extend existing category prefixes where work slots into existing modules.
+**Locked-Early Decisions:** see `.planning/research/v1.3/SUMMARY.md` §"Locked-Early Decisions" (30 items, including MAC-as-PK and 5-phase decomposition).
 
-## v1.2 Requirements
+---
 
-### Hardware Validation Spike (Phase 10)
+## v1.3 Requirements
 
-- [ ] **BAMBU-01**: User runs a validation spike against their real H2C to confirm RTSPS stream path (`/streaming/live/1` assumed from X1C), SSDP service type (`urn:bambulab-com:device:3dprinter:1` assumed), and MQTT topic schema before any production code is written
-- [ ] **BAMBU-02**: Spike outputs a short findings note (`.planning/research/H2C-FIELD-NOTES.md`) that subsequent phases treat as ground truth
+### Catalog & Discovery (HUB-CAT-*)
 
-### Discovery (Phase 11)
+- [ ] **HUB-CAT-01**: User sees all UniFi Protect cams in `/cameras` (inline with managed cams), each marked with a "Protect Hub" badge.
+- [ ] **HUB-CAT-02**: For each external Protect cam, the catalog displays manufacturer, model, MAC, and the set of available native stream qualities with codec, resolution, framerate, and bitrate per quality.
+- [ ] **HUB-CAT-03**: System auto-classifies each Protect cam as `first-party` (UniFi/UVC) or `third-party` (adopted Mobotix/Hikvision/etc.) based on Protect bootstrap data; classification is visible in the UI as a secondary qualifier badge.
+- [ ] **HUB-CAT-04**: Stream catalog refreshes automatically on a cadence (15 min default) and on user-triggered "Sync now."
+- [ ] **HUB-CAT-05**: Catalog is cached in SQLite so the UI renders correctly even when the UDM is briefly unreachable.
+- [ ] **HUB-CAT-06**: Single-channel cams (low-end models with only one stream quality) render correctly — no hardcoded 3-channel assumption.
 
-- [ ] **BAMBU-03**: Network scanner detects Bambu Lab printers on the local network via SSDP (UDP broadcast on port 2021, service type matches Bambu URN)
-- [ ] **BAMBU-04**: Discovery result shows device type ("Bambu Lab H2C"), IP, serial number (from SSDP payload), and LAN-Mode status hint
-- [ ] **BAMBU-05**: User can manually add a Bambu printer by IP if auto-discovery misses it
-- [ ] **BAMBU-06**: Discovery integrates into the existing scanner module — result list UI differentiates Bambu from Mobotix/Loxone/ONVIF cameras
+### Bridge LXC Container (HUB-BRG-*)
 
-### Credentials & Schema (Phase 11)
+- [ ] **HUB-BRG-01**: A single shared LXC container hosts all Hub streams (no per-cam container).
+- [ ] **HUB-BRG-02**: The Bridge container is auto-provisioned from the existing Debian 13 + VAAPI template — no new template work required.
+- [ ] **HUB-BRG-03**: Bridge container has a static IP (DHCP reservation or static config) so URLs in Loxone/Frigate configs never break.
+- [ ] **HUB-BRG-04**: Bridge container resource profile is sized for go2rtc bridge workload (1–2 GB RAM, 2–4 cores, `/dev/dri` passthrough, `nofile=4096`).
+- [ ] **HUB-BRG-05**: go2rtc API binds to `127.0.0.1:1984` inside the LXC; only `:1984` (MJPEG HTTP) and `:8554` (RTSP) are LAN-exposed; the go2rtc web editor is disabled.
+- [ ] **HUB-BRG-06**: Bridge container can be started, stopped, and restarted from the app UI.
+- [ ] **HUB-BRG-07**: Bridge container survives Proxmox host reboot (autostart enabled).
+- [ ] **HUB-BRG-08**: Bridge container health is monitored continuously and visible in the UI (go2rtc `/api/streams` + container status, last health-check timestamp).
 
-- [ ] **BAMBU-07**: User enters Access Code (from printer display, 8-digit) and Serial Number in the onboarding wizard; both stored AES-256-GCM encrypted in SQLite
-- [ ] **BAMBU-08**: Drizzle schema extends `cameras` (or introduces Bambu-specific fields) for `access_code`, `serial_number`, and a `transport` stub (`'lan'` default; `'cloud'` reserved for v1.3)
-- [ ] **BAMBU-09**: Credential schema migration lands without breaking existing Mobotix/Loxone rows
+### Output Types (HUB-OUT-*)
 
-### Pre-flight & Connection Test (Phase 11)
+- [ ] **HUB-OUT-01**: Each Protect cam can independently activate one or more outputs (Loxone-MJPEG, Frigate-RTSP). Outputs are toggleable from the cam detail page.
+- [ ] **HUB-OUT-02**: Loxone-MJPEG output transcodes the source via VAAPI to 640×360 @ 10 fps (per the meintechblog 2025-11-07 recipe) and exposes `http://<bridge-ip>:1984/api/stream.mjpeg?src=<cam-slug>-low`.
+- [ ] **HUB-OUT-03**: Frigate-RTSP output is H.264 copy-passthrough (`-c:v copy -an`, no audio) and exposes `rtsp://<bridge-ip>:8554/<cam-slug>-high`.
+- [ ] **HUB-OUT-04**: VAAPI transcode concurrency is capped (soft 4, hard 6) for Loxone-MJPEG outputs; Frigate-RTSP outputs incur zero VAAPI cost.
+- [ ] **HUB-OUT-05**: First-party UniFi cams default to Loxone-MJPEG enabled at onboarding; third-party adopted cams default OFF (opt-in) — Mobotix S15 with native MJPEG can be left unchanged.
+- [ ] **HUB-OUT-06**: Stream URLs are stable across cam-name edits in Protect — slug is derived from MAC, not display name.
+- [ ] **HUB-OUT-07**: Each output URL has a one-click copy button + a per-target hint (Loxone "Benutzerdefinierte Intercom" snippet, Frigate `cameras:` config snippet).
 
-- [ ] **BAMBU-10**: Pre-flight test verifies (a) TCP reachability on port 322, (b) RTSPS handshake succeeds with given Access Code, (c) MQTT TLS handshake succeeds on port 8883 — distinct error states surfaced in UI (LAN Mode off, wrong code, printer offline, Live555 hung)
+### Reconciliation Loop (HUB-RCN-*)
 
-### Stream Pipeline (Phase 12)
+- [ ] **HUB-RCN-01**: Auto-reconciliation runs every 5 minutes when `settings.protect_hub_enabled = true`; tick is silent when disabled.
+- [ ] **HUB-RCN-02**: Force-reconcile is triggered automatically on every output toggle in UI (in-process Promise; user sees results within seconds, not minutes).
+- [ ] **HUB-RCN-03**: Manual "Sync now" button on the settings page triggers a force-reconcile and shows the resulting event log.
+- [ ] **HUB-RCN-04**: Reconciliation re-extracts Protect Share-Livestream URLs from `bootstrap` every pass — URLs are never cached across reconciles (UDM reboots rotate the share tokens).
+- [ ] **HUB-RCN-05**: Reconciliation uses canonical-form sha256 hash of the rendered YAML for deploy diff; identical YAML produces a no-op (no SSH push, no go2rtc reload).
+- [ ] **HUB-RCN-06**: Reconciliation is single-flight: concurrent triggers serialize via a mutex; if a trigger arrives while a reconcile is mid-flight, a dirty-flag retry is scheduled.
+- [ ] **HUB-RCN-07**: WebSocket connection to Protect uses exponential backoff (5 s → 5 min cap) on disconnect, with a single-flight reconnect and a full bootstrap fetch on reconnect.
+- [ ] **HUB-RCN-08**: New Protect cam appearing → auto-added to catalog; outputs default-ON for first-party, default-OFF for third-party. User is notified (event log + optional toast).
+- [ ] **HUB-RCN-09**: Removed Protect cam → soft-deleted (`cameras.source = 'external_archived'`); 7-day grace before pruning; re-add path restores the original row.
+- [ ] **HUB-RCN-10**: Self-update (v1.1 feature) returns HTTP 409 if `reconciler.busy = true`; reconciler writes YAML via `tmp+rename` so a mid-deploy crash never leaves a half-written file.
 
-- [ ] **BAMBU-11**: App generates a go2rtc YAML config for Bambu H2C using `rtspx://bblp:<code>@<ip>:322/streaming/live/1` (skips TLS validation for printer self-signed cert) with `#video=copy` passthrough (no transcode — stream is already H.264)
-- [ ] **BAMBU-12**: LXC template used for Bambu cameras is the existing shared template (ffmpeg, go2rtc, Node.js, VAAPI passthrough) — no new template needed
-- [ ] **BAMBU-13**: go2rtc restream is the sole RTSPS consumer of the printer — UniFi Protect adopts go2rtc's RTSP output on :8554, never touches the printer directly (architectural guarantee, documented)
-- [ ] **BAMBU-14**: go2rtc health check (HTTP :1984 `/api/streams`) confirms stream is live before onboarding completes
+### Onboarding Wizard (HUB-WIZ-*)
 
-### UniFi Protect Adoption & Monitoring (Phase 13)
+- [ ] **HUB-WIZ-01**: Settings page shows a "Protect Hub" tab with the feature toggle (default OFF) as the entry point.
+- [ ] **HUB-WIZ-02**: Activating the toggle (when bridge does not yet exist) navigates to a dedicated wizard route `/settings/protect-hub/onboarding` — not a modal.
+- [ ] **HUB-WIZ-03**: Wizard Step 1 verifies the Protect connection using existing credentials; missing creds deep-link to the UniFi settings tab.
+- [ ] **HUB-WIZ-04**: Wizard Step 2 provisions the Bridge LXC (long-running 30–90 s) with progress events streamed to the UI; provision failure leaves the bridge row in `status='failed'` and is retryable from the wizard.
+- [ ] **HUB-WIZ-05**: Wizard Step 3 fetches Protect cams and populates the stream catalog; preview shows discovered cams grouped by `kind`.
+- [ ] **HUB-WIZ-06**: Wizard Step 4 lets the user pick which cams join the Hub: first-party cams checkboxes pre-checked with default output type pre-selected; third-party cams checkboxes unchecked with copy "Already producing MJPEG natively? Leave off."
+- [ ] **HUB-WIZ-07**: Wizard Step 5 runs the first reconcile, deploys the initial YAML, and waits for go2rtc to come up healthy on `:1984`.
+- [ ] **HUB-WIZ-08**: Wizard Step 6 redirects to `/cameras` with a confirmation toast; new external cams are visible inline with "Protect Hub" badges.
+- [ ] **HUB-WIZ-09**: Wizard is resumable: if interrupted (browser closed, app restarted, network blip), re-entering the wizard picks up from the last completed step using the `hub_onboarding_state` step-pointer table.
+- [ ] **HUB-WIZ-10**: `settings.protect_hub_enabled` becomes `true` only after Step 6 completes successfully — no half-enabled state where the toggle is on but the catalog/bridge aren't ready.
 
-- [ ] **BAMBU-15**: End-to-end onboarding flow: discover → credentials → pre-flight → create LXC → deploy go2rtc config → adopt in UniFi Protect → status appears on dashboard
-- [ ] **BAMBU-16**: Dashboard shows Bambu camera status (online/offline/error) with Bambu-specific error taxonomy (LAN Mode disabled, Access Code invalid, RTSPS handshake hung, MQTT disconnected)
-- [ ] **BAMBU-17**: UniFi Protect status monitoring reuses the existing polling pattern — no Bambu-specific Protect code
+### `/cameras` UI Integration (HUB-UI-*)
 
-### Adaptive Stream Mode — Differentiator (Phase 14)
+- [ ] **HUB-UI-01**: External Protect cams appear inline in the existing `/cameras` list (one merged sorted array from the existing status endpoint).
+- [ ] **HUB-UI-02**: External cam cards show a primary "Protect Hub" badge plus a secondary first-party / third-party qualifier badge.
+- [ ] **HUB-UI-03**: External cam detail page shows: read-only native Protect stream catalog (Low/Medium/High with codec/resolution/fps), active Bridge outputs with toggles, copy-buttons per URL, snapshot preview.
+- [ ] **HUB-UI-04**: External cam detail page hides cam-edit and cam-delete buttons (the cam belongs to Protect, not the app).
+- [ ] **HUB-UI-05**: External cam action menu replaces "delete container" with "remove from Hub" (clarity about ownership).
+- [ ] **HUB-UI-06**: A `ProtectHubGuide` component shows Loxone "Benutzerdefinierte Intercom" copy-paste snippet + Frigate `cameras:` config copy-paste snippet, both pre-filled with the user's actual URLs.
+- [ ] **HUB-UI-07**: An "All Hub URLs" page lists every active output URL across all cams in one copy-friendly view (for users provisioning Loxone/Frigate in bulk).
+- [ ] **HUB-UI-08**: Settings page Protect Hub tab shows: Hub status, last reconcile timestamp, container status badge, drift indicator, "Sync now" button, and the last 50 reconcile events.
 
-- [ ] **BAMBU-18**: MQTT subscription to `device/<serial>/report` detects active print state (user-configurable field — verified in Phase 10)
-- [ ] **BAMBU-19**: During active print: go2rtc pulls live RTSPS continuously (current behavior)
-- [ ] **BAMBU-20**: During idle: go2rtc is reconfigured to serve a snapshot loop (1 frame/min via a lightweight HTTP/RTSPS grab) instead of continuous pull — reduces printer Live555 load and eliminates 24/7 exposure to known hang bug
-- [ ] **BAMBU-21**: Mode switching is automatic (driven by MQTT print-state transitions) and visible in the dashboard ("Live" vs "Snapshot" badge)
-- [ ] **BAMBU-22**: User can override per-camera: "Always Live" / "Always Snapshot" / "Adaptive (default)"
+### Offboarding (HUB-OFF-*)
 
-### Wizard UI & Polish (Phase 14)
+- [ ] **HUB-OFF-01**: Deactivating the Protect Hub toggle opens a 3-tier confirm dialog explaining the consequences and offering Pause / Disable+Keep / Full Uninstall.
+- [ ] **HUB-OFF-02**: Tier A — Pause: stops the reconciler tick but keeps everything else; recoverable instantly by re-enabling the toggle.
+- [ ] **HUB-OFF-03**: Tier B (default) — Disable + Keep LXC: stops the Bridge container, soft-deletes external cam rows (`source='external_archived'`), keeps history; re-enable is fast-path (start container, flip rows back).
+- [ ] **HUB-OFF-04**: Tier C — Full Uninstall: requires `type DELETE to confirm`; destroys the LXC, purges archived cam rows after the grace window, optionally cleans up Protect-side RTSP-share toggles.
+- [ ] **HUB-OFF-05**: Tier C confirm dialog shows consequence preview: which Loxone consumers will lose stream, which Frigate streams go offline, how many archived cam rows will be purged.
+- [ ] **HUB-OFF-06**: Protect-side RTSP-share cleanup is an opt-in sub-toggle (default OFF); the cleanup only touches channels we ourselves enabled (tracked via `share_enabled_by_us` flag in `protect_rtsp_actions` log) — never touches user-managed share toggles.
+- [ ] **HUB-OFF-07**: Offboarding cleanup is idempotent: kill SSH mid-step → restart app → "Force cleanup" admin action completes the remaining steps.
+- [ ] **HUB-OFF-08**: Pre-uninstall: "Export Hub config" button generates a JSON file of `cam → output → URL` mapping for backup before destructive actions.
 
-- [ ] **BAMBU-23**: Onboarding wizard has a Bambu-specific credential step with inline help ("find Access Code on printer display → Settings → LAN Mode")
-- [ ] **BAMBU-24**: Error states from pre-flight map to actionable UI messages (not raw errors)
+### Operations & Monitoring (HUB-OPS-*)
 
-### Documentation & Installer (Phase 15)
+- [ ] **HUB-OPS-01**: Settings Protect Hub tab shows live operational status: bridge container state, container IP, active stream count, last successful reconcile timestamp, last YAML hash.
+- [ ] **HUB-OPS-02**: Reconcile event log surfaces the last 50 events (timestamp, type — `discover`/`reconcile`/`deploy`/`reload`/`error`, success/failure, deploy-or-noop, reconcile-id).
+- [ ] **HUB-OPS-03**: Drift indicator visible when the deployed YAML's hash differs from the app's expected hash (warn the user, surface a "Re-deploy" action — don't silently auto-overwrite).
+- [ ] **HUB-OPS-04**: Per-stream metrics card on cam detail page (optional, when Hub is enabled): bitrate, framerate, ffmpeg uptime — pulled from go2rtc `/api/streams`.
+- [ ] **HUB-OPS-05**: Bridge container health probe extends the existing `healthCheckInterval` in `scheduler.ts` (one extra fetch to bridge:1984 per tick); failures are surfaced as events and trigger a UI warning.
 
-- [ ] **BAMBU-25**: README / docs explain Bambu LAN Mode setup, firmware version caveat (Authorization Control changes risk breaking LAN access), and the Bambu Studio single-connection trade-off
-- [ ] **BAMBU-26**: Existing one-line installer needs no Bambu-specific changes (validated)
+---
 
-## Future Requirements (Deferred to v1.3+)
+## Future Requirements (Deferred to v1.4+)
 
-- **Cloud-Auth Fallback**: Bambu Handy account + OAuth + 2FA + JWT refresh + TUTK P2P for cloud streams. Explicitly deferred — TUTK is not RTSPS (doesn't fit existing pipeline), and the auth flow is a large independent workstream. Schema stub (`transport` column) already in place.
-- **Bird's Eye Camera** (second camera on H2C via `/streaming/live/2`?) — needs separate hardware verification
-- **Print-progress overlays** on the stream (e.g., burn-in layer count) — nice-to-have, not v1.2 scope
+- Multi-bridge support (one bridge per cam-group / per VAAPI host) — schema leaves the door open via `cameras.hubBridgeId`, code path is single-bridge only in v1.3.
+- Per-channel `enableRtsp` granularity (today the `unifi-protect` lib flips all channels at once).
+- Additional output types: HomeAssistant, Scrypted, generic webhook.
+- Profile system (named profiles like "Loxone-Default", "Frigate-Recording") — only justified at ≥5 output types.
+- Output-stream auth (LAN-trust-boundary is the v1.3 posture; v1.4+ if requested).
+- Webhook/event bus for stream lifecycle events.
+- Real Drizzle migration system (replaces v1.1 schema-hash stopgap).
 
-## Out of Scope
+## Out of Scope (Explicit Exclusions)
 
-- **Cloud-only integration** — explicitly LAN-only for v1.2
-- **Printer control** (start/stop print, temperature, AMS, file upload) — this is a camera integration, not a 3D-printer-management app
-- **Telemetry / metrics** (nozzle temp, bed temp, progress graphs) — out of scope, Home Assistant `bambu_lab` covers that use case
-- **Non-H2C Bambu models** in v1.2 (X1C, P1S, H2D, A1) — architecture will likely support them, but v1.2 validation is H2C-only
-- **Multi-camera per printer** beyond the primary `/streaming/live/1` feed — Bird's Eye deferred
+- **Multi-Protect / multi-site:** v1.3 is one Protect controller per app instance.
+- **Protect cams that the app provisions itself:** v1.3 only re-distributes cams already adopted in Protect by the user; the existing v1.0 onboarding path covers cams managed BY the app.
+- **`unifi-cam-proxy` style adoption:** that solves the opposite direction (cams INTO Protect) and is not in v1.3 scope.
+- **Authentication on output streams:** LAN-trust posture for v1.3, documented in wizard + README.
+- **Loxone "Motion Shape Extreme" hardware integration:** that's Loxone's own outdoor cam product; v1.3 integrates with Loxone's "Benutzerdefinierte Intercom" component, which is the correct target for external MJPEG streams (correction surfaced by stack research).
+- **Embedding go2rtc as a Node child process:** go2rtc lives in the Bridge LXC, deployed via SSH — not in the app process.
+- **Profile system / named output bundles:** only justified at ≥5 output types; v1.3 ships flat per-cam toggles.
+
+---
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| BAMBU-01 | Phase 10 | Pending |
-| BAMBU-02 | Phase 10 | Pending |
-| BAMBU-03 | Phase 11 | Pending |
-| BAMBU-04 | Phase 11 | Pending |
-| BAMBU-05 | Phase 11 | Pending |
-| BAMBU-06 | Phase 11 | Pending |
-| BAMBU-07 | Phase 11 | Pending |
-| BAMBU-08 | Phase 11 | Pending |
-| BAMBU-09 | Phase 11 | Pending |
-| BAMBU-10 | Phase 11 | Pending |
-| BAMBU-11 | Phase 12 | Pending |
-| BAMBU-12 | Phase 12 | Pending |
-| BAMBU-13 | Phase 12 | Pending |
-| BAMBU-14 | Phase 12 | Pending |
-| BAMBU-15 | Phase 13 | Pending |
-| BAMBU-16 | Phase 13 | Pending |
-| BAMBU-17 | Phase 13 | Pending |
-| BAMBU-18 | Phase 14 | Pending |
-| BAMBU-19 | Phase 14 | Pending |
-| BAMBU-20 | Phase 14 | Pending |
-| BAMBU-21 | Phase 14 | Pending |
-| BAMBU-22 | Phase 14 | Pending |
-| BAMBU-23 | Phase 14 | Pending |
-| BAMBU-24 | Phase 14 | Pending |
-| BAMBU-25 | Phase 15 | Pending |
-| BAMBU-26 | Phase 15 | Pending |
-
-**Coverage:** 26 / 26 v1.2 requirements mapped (100%). No orphans.
-
----
-*REQ-ID format: `BAMBU-NN`. All v1.2 work is Bambu-specific; existing modules (discovery, go2rtc, onboarding, Protect monitoring) get extended, not duplicated.*
-
----
-
-## Phase 18 Requirements — Bambu Lab A1 Camera Integration
-
-**Added:** 2026-04-20 (post-initial-mapping — Phase 18 was added after spikes 001-004 proved feasibility)
-
-### Schema & Foundation (Phase 18)
-
-- [x] **BAMBU-A1-01**: SSDP discovery labels A1 correctly (already allowlisted in `BAMBU_MODEL_ALLOWLIST`); `PRINTER_CAPABILITIES` export added next to `MODEL_LABELS` in `bambu-discovery.ts` so frontend/preflight can read per-model capabilities without hardcoded model checks (D-07)
-- [x] **BAMBU-A1-02**: `cameras.model` column added to Drizzle schema (nullable TEXT — null = assume H2C for backward-compat); populated from SSDP on adoption; threaded through preflight route, `saveCameraRecord`, and API responses
-- [x] **BAMBU-A1-03**: `PRINTER_CAPABILITIES` map shape exported per D-07 (chamberHeater, ams, xcamFeatures, cameraResolution, cameraTransport) for all six models (O1C2, H2C, H2D, X1C, P1S, A1); API responses for Bambu cameras include `capabilities` field
-
-### Auth & Stream Ingestion (Phase 18)
-
-- [x] **BAMBU-A1-04**: Model-aware preflight (`runBambuPreflight(input, deps, model)`): for A1, skip RTSPS:322 + run TCP:6000 + TLS-auth probe; for H2C path, preserve existing behavior
-- [x] **BAMBU-A1-05**: New preflight error `A1_CLOUD_MODE_ACTIVE` + German hint fires when `print.ipcam.tutk_server == "enable"` (D-05); extends `PreflightError` enum + `PREFLIGHT_HINTS_DE`
-- [x] **BAMBU-A1-06**: MQTT runtime watch (`bambu-mqtt.ts:104-136`): transitions `BambuConnectionError` on `ipcam.tutk_server` edge changes (disable→enable sets error; enable→disable auto-clears); `lastError` unconditional-clear becomes conditional (D-06)
-- [x] **BAMBU-A1-07**: Auth-packet byte builder (`buildAuth`) + golden fixture (80-byte `a1-auth-packet.bin`) + Vitest regression test asserting exact 80-byte layout (catches 0x30 vs 0x3000 silent-fail per D-08)
-- [x] **BAMBU-A1-08**: `generateGo2rtcConfigBambuA1()` emits yaml with `exec:env A1_ACCESS_CODE=... node /opt/ipcm/bambu-a1-camera.mjs --ip=...#killsignal=15#killtimeout=5` — env-var creds (not CLI arg), mandatory kill flags
-- [x] **BAMBU-A1-09**: Ingestion Node script at `lxc-assets/bambu-a1-camera.mjs` deployed to `/opt/ipcm/bambu-a1-camera.mjs` via `pushFileToContainer`; uses only Node stdlib (`tls`, `fs`, `process`); handles SIGTERM with graceful `socket.end()` + 500ms exit delay; emits raw concatenated JPEGs on stdout
-
-### Endpoint & UI (Phase 18)
-
-- [x] **BAMBU-A1-10**: Snapshot endpoint `GET /api/cameras/:id/a1-snapshot` returns JPEG from on-demand TLS+auth+first-frame pull; 2-second in-memory cache per camera ID (DoS mitigation); `Content-Type: image/jpeg`; 404 if not Bambu, 400 if not A1, 502 if fetch fails (D-04)
-- [x] **BAMBU-A1-11**: UI gates `chamber_temper`, AMS panel, xcam features via `camera.capabilities` (CameraDetailCard.svelte) instead of hardcoded `model === 'H2C'` branches; wizard (StepBambuCredentials.svelte) shows A1-specific copy when `model === 'A1'`
-- [x] **BAMBU-A1-12**: End-to-end A1 onboarding through existing wizard → preflight → provision → adoption (manual UAT against real A1 @ 192.168.3.195)
-
-### Traceability Addendum
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| BAMBU-A1-01 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-02 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-03 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-04 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-05 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-06 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-07 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-08 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-09 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-10 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-11 | Phase 18 | Done (2026-04-20) |
-| BAMBU-A1-12 | Phase 18 | Done (2026-04-20) |
-
-**Phase 18 coverage:** 12 / 12 BAMBU-A1 requirements mapped (100%).
+(filled by roadmapper after phase decomposition — maps each REQ-ID to the phase that delivers it)
