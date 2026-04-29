@@ -79,21 +79,39 @@ export function startScheduler(): void {
 				const withContainer = allCameras.filter((c) => c.containerIp);
 
 				for (const cam of withContainer) {
-					// Check go2rtc API
-					try {
-						const controller = new AbortController();
-						const timeout = setTimeout(() => controller.abort(), 3000);
-						await fetch(`http://${cam.containerIp}:1984/api/streams`, {
-							signal: controller.signal
-						});
-						clearTimeout(timeout);
-					} catch {
-						storeHealthEvent(
-							cam.id,
-							cam.name,
-							`go2rtc unreachable on ${cam.containerIp}:1984`,
-							'warning'
-						);
+					// Check go2rtc API.
+					// Adaptive-mode Bambu cameras intentionally stop go2rtc when
+					// the printer is idle (gcode_state=FINISH/IDLE/PAUSE) to free
+					// CPU/RAM in the LXC. Logging "unreachable" for that expected
+					// dormant state spams the operator with non-issues — the bambu
+					// MQTT subscriber will start go2rtc back up the moment the
+					// printer transitions to RUNNING. So skip the check entirely
+					// when adaptive + idle is the live config.
+					const isAdaptiveIdle =
+						cam.cameraType === 'bambu' &&
+						(cam.streamMode ?? 'adaptive') === 'adaptive' &&
+						(cam.printState === 'FINISH' ||
+							cam.printState === 'IDLE' ||
+							cam.printState === 'PAUSE' ||
+							cam.printState === 'FAILED' ||
+							cam.printState === null);
+
+					if (!isAdaptiveIdle) {
+						try {
+							const controller = new AbortController();
+							const timeout = setTimeout(() => controller.abort(), 3000);
+							await fetch(`http://${cam.containerIp}:1984/api/streams`, {
+								signal: controller.signal
+							});
+							clearTimeout(timeout);
+						} catch {
+							storeHealthEvent(
+								cam.id,
+								cam.name,
+								`go2rtc unreachable on ${cam.containerIp}:1984`,
+								'warning'
+							);
+						}
 					}
 
 					// Check ONVIF server
