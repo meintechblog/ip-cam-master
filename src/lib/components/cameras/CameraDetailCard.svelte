@@ -50,7 +50,15 @@
 	});
 	let rtspMaskedUrl = $derived.by(() => {
 		if (!camera.rtspUrl || !camera.rtspAuthEnabled || !authCreds) return rtspDisplayUrl;
-		return buildRtspUrlWithCreds(camera.rtspUrl, authCreds.username, '••••••');
+		// Cosmetic mask — bypass buildRtspUrlWithCreds because
+		// encodeURIComponent('•') = '%E2%80%A2', so reusing the helper would
+		// render rtsp://user:%E2%80%A2%E2%80%A2%E2%80%A2@... instead of
+		// rtsp://user:••••••@... . URL validity is irrelevant for a masked
+		// preview that's never used as an actual stream URL.
+		return camera.rtspUrl.replace(
+			/^rtsp:\/\//,
+			`rtsp://${encodeURIComponent(authCreds.username)}:••••••@`
+		);
 	});
 
 	async function copyRtsp() {
