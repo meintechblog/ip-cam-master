@@ -78,6 +78,15 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 			}
 		})
 		.run();
+
+	// v1.3 Phase 19 — drop the cached unifi-protect lib client on creds change
+	// so the next fetchBootstrap() does not reuse a stale session token (RESEARCH Pitfall 5).
+	// Dynamic import is intentional: legacy paths do not reference protect-bridge,
+	// and a top-level static import would unnecessarily eager-load it on every settings read.
+	if (key.startsWith('unifi_')) {
+		const { resetProtectClient } = await import('./protect-bridge');
+		resetProtectClient();
+	}
 }
 
 export async function saveSettings(data: Record<string, string>): Promise<void> {
