@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProxmoxTab from '$lib/components/settings/ProxmoxTab.svelte';
 	import UnifiTab from '$lib/components/settings/UnifiTab.svelte';
+	import ProtectHubTab from '$lib/components/settings/ProtectHubTab.svelte';
 	import CredentialsTab from '$lib/components/settings/CredentialsTab.svelte';
 	import BackupTab from '$lib/components/settings/BackupTab.svelte';
 	import VersionTab from '$lib/components/settings/VersionTab.svelte';
@@ -8,8 +9,15 @@
 
 	let { data, form } = $props();
 
-	const tabs = ['Proxmox', 'UniFi', 'Credentials', 'Backup', 'Version', 'Zugangsschutz'] as const;
+	const tabs = ['Proxmox', 'UniFi', 'Protect Hub', 'Credentials', 'Backup', 'Version', 'Zugangsschutz'] as const;
 	let activeTab = $state<(typeof tabs)[number]>('Proxmox');
+
+	function switchTab(tab: string) {
+		// Type-narrow at call site — only valid tabs are accepted by activeTab.
+		if ((tabs as readonly string[]).includes(tab)) {
+			activeTab = tab as (typeof tabs)[number];
+		}
+	}
 
 	let confirmDelete = $state(false);
 </script>
@@ -39,6 +47,8 @@
 		<ProxmoxTab initialValues={data.proxmox} />
 	{:else if activeTab === 'UniFi'}
 		<UnifiTab initialValues={data.unifi} udmSshKeyPath={data.udmSshKeyPath} udmSshPassword={data.udmSshPassword} />
+	{:else if activeTab === 'Protect Hub'}
+		<ProtectHubTab hub={data.protectHub} {switchTab} />
 	{:else if activeTab === 'Credentials'}
 		<CredentialsTab />
 	{:else if activeTab === 'Backup'}

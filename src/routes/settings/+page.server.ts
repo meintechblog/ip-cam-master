@@ -2,6 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { getSettings, getSetting, saveSetting } from '$lib/server/services/settings';
 import { getUser, createUser, deleteUser, verifyPassword, isYoloMode } from '$lib/server/services/auth';
+import { loadCatalog } from '$lib/server/orchestration/protect-hub/catalog';
 
 export const load: PageServerLoad = async () => {
 	const proxmox = await getSettings('proxmox_');
@@ -9,6 +10,12 @@ export const load: PageServerLoad = async () => {
 	const udmSshKeyPath = await getSetting('udm_ssh_key_path');
 	const udmSshPassword = await getSetting('udm_ssh_password');
 	const user = getUser();
+
+	// v1.3 Phase 19 — Protect Hub tab data block
+	const hubEnabled = (await getSetting('protect_hub_enabled')) === 'true';
+	const credsConfigured = !!(unifi.unifi_host && unifi.unifi_username && unifi.unifi_password);
+	const catalogState = await loadCatalog();
+
 	return {
 		proxmox,
 		unifi,
@@ -18,7 +25,14 @@ export const load: PageServerLoad = async () => {
 		udmSshPassword: udmSshPassword ?? '',
 		hasUser: user !== null,
 		authUsername: user?.username ?? null,
-		isYolo: isYoloMode()
+		isYolo: isYoloMode(),
+		protectHub: {
+			enabled: hubEnabled,
+			credsConfigured,
+			cams: catalogState.cams,
+			catalogByCamId: catalogState.catalogByCamId,
+			lastDiscoveredAt: catalogState.lastDiscoveredAt
+		}
 	};
 };
 
