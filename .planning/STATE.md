@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
-status: planning
-stopped_at: ""
-last_updated: "2026-04-30T00:45:00.000Z"
-last_activity: 2026-04-30 — v1.3 roadmap created (5 phases P19–P23, 62/62 reqs mapped)
+status: phase_in_progress
+stopped_at: "P19 Plans 02/03/04 code-complete (3/4); Plan 01 (TLS spike) blocked on user UDM-share-toggle action; Plan 04 ends with checkpoint:human-verify against real UDM. Stopped before P20 (creates real Proxmox LXC — wanted user awake)."
+last_updated: "2026-04-30T01:25:00.000Z"
+last_activity: 2026-04-30 — autonomous overnight run: P19 schema + protect-bridge + catalog + Hub-tab UI shipped
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 3
+  percent: 15
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
-**Current focus:** v1.3 — Protect Stream Hub. Roadmap created (P19–P23), ready for `/gsd:plan-phase 19`.
+**Current focus:** v1.3 P19 — 3/4 plans complete autonomously (schema, protect-bridge + catalog, Hub-tab UI). 2 user-pending items before P20 can start.
 
 ## Current Position
 
-Phase: P19 (next up — not started)
-Plan: —
-Status: Roadmap complete; awaiting `/gsd:plan-phase 19`
-Last activity: 2026-04-30 — v1.3 roadmap created (5 phases, 62/62 reqs mapped, 100% coverage)
+Phase: P19 (3/4 plans complete; 2 items pending user action)
+Plan: P19-01 TLS spike PENDING USER (browser action against UDM); P19-04 Task 03 UAT PENDING USER (manual verification against real UDM)
+Status: Autonomous overnight run complete — P19 code 100% shipped (28 new tests green, schema migrated idempotently, ProtectHubTab live). Waiting for user UAT before P20 (which creates real Proxmox LXC).
+Last activity: 2026-04-30 — Plans 19-02/03/04 executed autonomously; STATE.md sync completes the wave handoff.
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
@@ -39,15 +39,53 @@ Shipped milestones:
 - v1.2 — Bambu Lab A1 Camera Integration (code-complete 2026-04-20, formal close pending UAT)
 
 ```
-[          ] 0% — v1.3 roadmap done, P19 not yet started
+[##        ] 15% — P19 3/4 plans done; 2 user-actions pending; P20 not started
 ```
+
+## What's pending for user (in priority order)
+
+### 1. P19-01 TLS Spike (browser action ~2 min, then ~5min for spike script)
+
+In UniFi Protect web UI at https://192.168.3.1, on any one camera, toggle ON "Share Livestream" (also called "Enable Secure RTSPS Output"). Copy the resulting `<rtspAlias>` token from the URL Protect generates.
+
+Then run the spike (creates throwaway LXC vmid 9919, runs ffprobe, destroys LXC, commits findings file):
+
+```bash
+# in repo root, with rtspAlias from above:
+RTSP_ALIAS=<paste-token-here> npx tsx scripts/spike/p19-tls-rtspx.ts
+```
+
+If the spike resolves to `rtsps-tls-verify-0` (instead of the placeholder `rtspx`), patch `src/lib/server/services/protect-bridge.ts` `TLS_SCHEME` const accordingly. The placeholder is safe for v1.3 internal code (catalog.ts doesn't use it directly; only P21 yaml-builder will).
+
+### 2. P19-04 Task 03 UAT (manual ~10 min in browser + Protect)
+
+7 ROADMAP success criteria for P19, walked through in `.planning/phases/19-data-model-protect-catalog/19-04-SUMMARY.md` §"UAT walkthrough". Includes:
+- Settings tab "Protect Hub" visible between "UniFi" and "Credentials"
+- Auto-discover on first open populates `protect_stream_catalog` with real cams
+- first-party / third-party badges visible per cam
+- Single-channel cam (if you have one) renders without 3-channel placeholder
+- "Controller unreachable" banner when UDM is briefly down
+- Manual refresh button works
+- DB inspection: `cameras.mac NOT NULL` for `source='external'` rows
+
+### 3. After UAT passes: deploy to VM
+
+```bash
+./scripts/dev-deploy.sh  # standard post-phase deploy (per memory)
+```
+
+Schema migration runs on boot in production VM. Watch first-boot logs.
+
+### 4. Then P20 — Bridge LXC Provisioning
+
+`/gsd:discuss-phase 20` → `/gsd:plan-phase 20` → `/gsd:execute-phase 20`. P20 creates a real shared bridge container on Proxmox — the orchestrator deferred this overnight because real-infra creation while you sleep is a higher-risk action than schema migration.
 
 ## v1.3 Phase Overview
 
 | # | Phase | Reqs | Status |
 |---|-------|------|--------|
-| 19 | Data Model + Protect Catalog (Read-Only) | 7 | Not started |
-| 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | Not started |
+| 19 | Data Model + Protect Catalog (Read-Only) | 7 | **3/4 plans complete; 2 user-pending items** |
+| 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | Not started — gated on P19 UAT pass + user awake (creates real LXC) |
 | 21 | Multi-Cam YAML + Reconciliation Loop | 18 | Not started |
 | 22 | Onboarding Wizard + `/cameras` Integration | 14 | Not started |
 | 23 | Offboarding + Lifecycle Polish + Stream-Sharing API | 12 | Not started |

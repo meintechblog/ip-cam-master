@@ -133,7 +133,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Data Model + Protect Catalog (Read-Only) | 0/4 | Not started | - |
+| 19. Data Model + Protect Catalog (Read-Only) | 3/4 | In progress (Plan 01 + Plan 04 UAT pending user) | - |
 | 20. Bridge LXC Provisioning + Hello-World YAML | 0/? | Not started | - |
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
