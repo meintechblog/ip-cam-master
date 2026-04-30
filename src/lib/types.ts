@@ -172,6 +172,21 @@ export interface CameraCardData {
 	capabilities?: PrinterCapabilities;
 }
 
+/**
+ * Discriminator for the v1.3 cameras table extension (Phase 19, per L-2).
+ * - 'managed': this app provisions the LXC container and owns the stream lifecycle.
+ * - 'external': read-only Protect cam, owned by Protect itself; cached for catalog UI.
+ * - 'external_archived': soft-deleted external cam (P21+); not yet emitted in P19.
+ */
+export type CameraSource = 'managed' | 'external' | 'external_archived';
+
+/**
+ * Cam classification per amended D-CLASS-01.
+ * Derived in Plan 03 from `cam.isThirdPartyCamera`:
+ *   false → 'first-party' | true → 'third-party' | undefined/null → 'unknown'.
+ */
+export type CameraKind = 'first-party' | 'third-party' | 'unknown';
+
 export interface ProtectCamera {
 	id: string;
 	name: string;

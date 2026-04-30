@@ -54,6 +54,29 @@ export const cameras = sqliteTable('cameras', {
 	printState: text('print_state'),
 	streamMode: text('stream_mode').default('adaptive'),
 	rtspAuthEnabled: integer('rtsp_auth_enabled', { mode: 'boolean' }).notNull().default(false),
+	// v1.3 Phase 19 — Protect Stream Hub schema lock (per L-1, L-28).
+	// `source` discriminates managed cams (this app provisions them) from external
+	// Protect cams (read-only catalog). 'external_archived' is reserved for P21+ soft-delete.
+	source: text('source').notNull().default('managed'),
+	// MAC normalised to lowercase, no separators (e.g. 'aabbccddeeff'). Effective PK
+	// for source='external' rows. SQLite ALTER TABLE cannot add NOT NULL without a
+	// default, so the NOT-NULL invariant is enforced in catalog upsert (Plan 03).
+	mac: text('mac'),
+	// Protect cam UUID — denormalised cache only; never used as a join key (per L-1).
+	externalId: text('external_id'),
+	// Logical FK → protect_hub_bridges.id (no SQLite enforcement; app-level invariant).
+	// NULL for managed cams.
+	hubBridgeId: integer('hub_bridge_id'),
+	// Derived hint: 'Ubiquiti' for first-party, first token of marketName for third-party,
+	// 'Unknown' otherwise. NOT read directly from the lib —
+	// see protect-bridge.ts deriveManufacturerHint() (Plan 03).
+	manufacturer: text('manufacturer'),
+	// Protect marketName (e.g. 'G4 Bullet', 'Mobotix S15'). Distinct from Phase 18's
+	// `model` column above which holds Bambu SSDP codes ('A1', 'H2C', 'O1C2').
+	modelName: text('model_name'),
+	// 'first-party' | 'third-party' | 'unknown' — derived via classifyKind()
+	// per amended D-CLASS-01 (uses cam.isThirdPartyCamera).
+	kind: text('kind').notNull().default('unknown'),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
@@ -96,6 +119,63 @@ export const events = sqliteTable('events', {
 	message: text('message').notNull(),
 	source: text('source').notNull(),
 	timestamp: text('timestamp')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
+// v1.3 Phase 19 — Protect Stream Hub: bridge LXC tracking (per ARCH §1.2).
+// One row per bridge container provisioned in P20. P19 only locks the schema —
+// no rows are inserted in this phase.
+export const protectHubBridges = sqliteTable('protect_hub_bridges', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	vmid: integer('vmid').notNull().unique(),
+	hostname: text('hostname').notNull(),
+	containerIp: text('container_ip'),
+	status: text('status').notNull().default('pending'),
+	lastDeployedYamlHash: text('last_deployed_yaml_hash'),
+	lastReconciledAt: text('last_reconciled_at'),
+	lastHealthCheckAt: text('last_health_check_at'),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	updatedAt: text('updated_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
+// v1.3 Phase 19 — per-cam output configuration (per L-4: separate table, not JSON column).
+// outputType is open-ended ('loxone-mjpeg' | 'frigate-rtsp' in P21; extends in later phases).
+// `config` is a JSON-serialised string per-output settings blob.
+export const cameraOutputs = sqliteTable('camera_outputs', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	cameraId: integer('camera_id').notNull(),
+	outputType: text('output_type').notNull(),
+	enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+	config: text('config').notNull().default('{}'),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	updatedAt: text('updated_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
+// v1.3 Phase 19 — Protect bootstrap stream catalog cache (per ARCH §1.2).
+// One row per (cameraId, quality). Codec is camera-level in protect-types.ts:1053
+// but stored per-row here for forward-compat with mixed-codec firmware.
+// `bitrate` is bps (NOT kbps; the lib reports raw values).
+export const protectStreamCatalog = sqliteTable('protect_stream_catalog', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	cameraId: integer('camera_id').notNull(),
+	quality: text('quality').notNull(),
+	codec: text('codec'),
+	width: integer('width'),
+	height: integer('height'),
+	fps: integer('fps'),
+	bitrate: integer('bitrate'),
+	rtspUrl: text('rtsp_url'),
+	shareEnabled: integer('share_enabled', { mode: 'boolean' }).notNull().default(false),
+	cachedAt: text('cached_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
 });
