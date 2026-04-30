@@ -41,6 +41,8 @@
 		"lucide-svelte": "^0.577.0",
 		"mqtt": "^5.15.1",
 		"node-ssh": "^13.2.1",
-		"proxmox-api": "^1.1.1"
+		"proxmox-api": "^1.1.1",
+		"unifi-protect": "^4.29.0",
+		"yaml": "^2.6.0"
 	}
 }
