@@ -52,3 +52,59 @@ ensureColumn('cameras', 'model', 'TEXT');
 ensureColumn('credentials', 'type', "TEXT NOT NULL DEFAULT 'mobotix'");
 ensureColumn('credentials', 'access_code', 'TEXT');
 ensureColumn('credentials', 'serial_number', 'TEXT');
+
+// v1.3 Phase 19 — Protect Stream Hub schema lock (per L-1, L-28; reuses Phase 18 `cameras.model` column).
+// MAC-as-PK for source='external' rows is irreversible after this commit.
+ensureColumn('cameras', 'source', "TEXT NOT NULL DEFAULT 'managed'");
+ensureColumn('cameras', 'mac', 'TEXT'); // NULL for managed; required by app for external (enforced in catalog.ts upsert, Plan 03)
+ensureColumn('cameras', 'external_id', 'TEXT'); // Protect cam UUID — denormalised cache only, never join on this
+ensureColumn('cameras', 'hub_bridge_id', 'INTEGER'); // FK → protect_hub_bridges.id; NULL for managed
+ensureColumn('cameras', 'manufacturer', 'TEXT'); // derived hint, see protect-bridge.ts deriveManufacturerHint() (Plan 03)
+ensureColumn('cameras', 'model_name', 'TEXT'); // Protect marketName (e.g. 'G4 Bullet'). Phase 18's `model` is reused for Bambu SSDP codes.
+ensureColumn('cameras', 'kind', "TEXT NOT NULL DEFAULT 'unknown'"); // 'first-party' | 'third-party' | 'unknown'
+
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS protect_hub_bridges (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		vmid INTEGER NOT NULL UNIQUE,
+		hostname TEXT NOT NULL,
+		container_ip TEXT,
+		status TEXT NOT NULL DEFAULT 'pending',
+		last_deployed_yaml_hash TEXT,
+		last_reconciled_at TEXT,
+		last_health_check_at TEXT,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)
+`);
+
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS camera_outputs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		camera_id INTEGER NOT NULL,
+		output_type TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 0,
+		config TEXT NOT NULL DEFAULT '{}',
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)
+`);
+
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS protect_stream_catalog (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		camera_id INTEGER NOT NULL,
+		quality TEXT NOT NULL,
+		codec TEXT,
+		width INTEGER,
+		height INTEGER,
+		fps INTEGER,
+		bitrate INTEGER,
+		rtsp_url TEXT,
+		share_enabled INTEGER NOT NULL DEFAULT 0,
+		cached_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)
+`);
+
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_stream_catalog_cam ON protect_stream_catalog(camera_id)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_camera_outputs_cam ON camera_outputs(camera_id)`);
