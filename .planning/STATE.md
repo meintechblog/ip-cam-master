@@ -243,6 +243,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260323-krt | Phase 4 QA sweep — fix Protect status UI and logic | 2026-03-23 | fe32585 | [260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a](./quick/260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a/) |
 | 260410-c36 | Container-IP prominent im Batch-Onboarding + MAC im LXC-Panel | 2026-04-10 | 569062f | [260410-c36-container-ip-prominent-im-batch-onboardi](./quick/260410-c36-container-ip-prominent-im-batch-onboardi/) |
+| 260502-bzm | LXC + VM start-at-boot fix + release v1.2 | 2026-05-02 | ce37cb6 | [260502-bzm-lxc-vm-onboot-fix-and-release](./quick/260502-bzm-lxc-vm-onboot-fix-and-release/) |
 
 ## Session Continuity
 
