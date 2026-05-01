@@ -195,7 +195,9 @@ describe('proxmox service', () => {
 
 			expect(result.status).toBe('created');
 			expect(result.vmid).toBe(200);
-			expect(mockLxcPost).toHaveBeenCalled();
+			expect(mockLxcPost).toHaveBeenCalledWith(
+				expect.objectContaining({ onboot: 1, start: false })
+			);
 			expect(mockDbInsert).toHaveBeenCalled();
 			expect(mockOnConflictDoUpdate).toHaveBeenCalled();
 		});
@@ -278,7 +280,9 @@ describe('proxmox service', () => {
 
 			expect(result.status).toBe('updated');
 			expect(result.vmid).toBe(200);
-			expect(mockConfigPut).toHaveBeenCalled();
+			expect(mockConfigPut).toHaveBeenCalledWith(
+				expect.objectContaining({ onboot: 1, memory: 1024 })
+			);
 			expect(mockLxcPost).not.toHaveBeenCalled();
 		});
 	});

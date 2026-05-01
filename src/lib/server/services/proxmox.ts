@@ -101,14 +101,12 @@ export async function createContainer(params: {
 	const alreadyExists = existing.find((c: { vmid: number }) => c.vmid === params.vmid);
 
 	if (alreadyExists) {
-		// Update config instead of creating a duplicate (only if there's something to update)
-		const updateParams: Record<string, unknown> = {};
+		// Update config instead of creating a duplicate. onboot is set unconditionally so containers from older versions get backfilled on the next config touch.
+		const updateParams: Record<string, unknown> = { onboot: 1 };
 		if (params.memory) updateParams.memory = params.memory;
 		if (params.cores) updateParams.cores = params.cores;
 
-		if (Object.keys(updateParams).length > 0) {
-			await proxmox.nodes.$(node).lxc.$(params.vmid).config.$put(updateParams as any);
-		}
+		await proxmox.nodes.$(node).lxc.$(params.vmid).config.$put(updateParams as any);
 
 		// Upsert DB record
 		db.insert(containers)
@@ -145,6 +143,7 @@ export async function createContainer(params: {
 		memory: params.memory || 192,
 		cores: params.cores || 1,
 		net0: `name=eth0,bridge=${bridge},ip=dhcp`,
+		onboot: 1,
 		start: false
 	} as any);
 
