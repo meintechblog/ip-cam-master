@@ -8,7 +8,8 @@ import { cleanupOldUpdateLogs } from './update-history';
 import { getCurrentVersion } from './version';
 import { startBambuSubscribers, stopBambuSubscribers } from './bambu-mqtt';
 import { db } from '$lib/server/db/client';
-import { cameras } from '$lib/server/db/schema';
+import { cameras, protectHubBridges } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
@@ -138,6 +139,29 @@ export function startScheduler(): void {
 						}
 					}
 				}
+				// Bridge health probe (HUB-BRG-08)
+					const bridge = db.select().from(protectHubBridges).get();
+					if (bridge && bridge.status === 'running' && bridge.containerIp) {
+						try {
+							const controller = new AbortController();
+							const timeout = setTimeout(() => controller.abort(), 3000);
+							await fetch(`http://${bridge.containerIp}:1984/api/streams`, {
+								signal: controller.signal
+							});
+							clearTimeout(timeout);
+							db.update(protectHubBridges)
+								.set({ lastHealthCheckAt: new Date().toISOString() })
+								.where(eq(protectHubBridges.id, bridge.id))
+								.run();
+						} catch {
+							storeHealthEvent(
+								0,
+								'Protect Hub Bridge',
+								`go2rtc unreachable on ${bridge.containerIp}:1984`,
+								'warning'
+							);
+						}
+					}
 			} catch (err) {
 				console.error('[scheduler] Health check failed:', err);
 			}
