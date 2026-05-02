@@ -23,7 +23,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 
 ## Phases
 
-- [ ] **Phase 19: Data Model + Protect Catalog (Read-Only)** — Schema lock (MAC-as-PK), Protect bootstrap fetch, first-party/third-party classification, read-only stream catalog UI; settings tab shell. No bridge, no reconcile, no outputs. Ships demoable value alone (7 reqs).
+- [x] **Phase 19: Data Model + Protect Catalog (Read-Only)** — Schema lock (MAC-as-PK), Protect bootstrap fetch, first-party/third-party classification, read-only stream catalog UI; settings tab shell. No bridge, no reconcile, no outputs. Ships demoable value alone (7 reqs). (completed 2026-05-02)
 - [ ] **Phase 20: Bridge LXC Provisioning + Hello-World YAML** — Provision the single shared bridge LXC from existing template, deploy a hardcoded go2rtc.yaml, bind go2rtc API to localhost, expose `:1984` + `:8554`. Wizard Steps 1–2. Ships demoable value alone (11 reqs).
 - [ ] **Phase 21: Multi-Cam YAML + Reconciliation Loop** — Heart of the milestone. yaml-builder for Loxone-MJPEG (VAAPI transcode) + Frigate-RTSP (copy passthrough); reconcile with canonical-form sha256 dedupe, single-flight + dirty-flag retry; WS exp backoff; bridge health probe (18 reqs).
 - [ ] **Phase 22: Onboarding Wizard + `/cameras` Integration** — Wizard Steps 3–6 (resumable via `hub_onboarding_state`), `/cameras` partition (managed/external), Protect Hub badge + first/third-party qualifier, Outputs subsection with copy-buttons + per-target snippets, "All Hub URLs" page (14 reqs).
@@ -46,9 +46,9 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 **Plans**: 4 plans (in 3 waves)
 Plans:
 - [ ] 19-01-PLAN.md — TLS spike against UDM 192.168.3.1 (throwaway LXC + ffprobe; commit findings to .planning/research/v1.3/spikes/p19-tls-rtspx.md)
-- [ ] 19-02-PLAN.md — Schema lock (cameras +7 columns; +3 new tables: protect_hub_bridges, camera_outputs, protect_stream_catalog) + install unifi-protect@^4.29.0 + yaml@^2.6.0
-- [ ] 19-03-PLAN.md — protect-bridge.ts (lib boundary, classifyKind via isThirdPartyCamera, TLS_SCHEME const) + orchestration/protect-hub/catalog.ts (discover + loadCatalog) + /api/protect-hub/discover endpoint + Vitest suites
-- [ ] 19-04-PLAN.md — ProtectHubTab.svelte (auto-discover on empty cache, manual refresh, controller-unreachable banner, no-creds deep-link) + 7th settings tab + saveSetting() resets lib client on unifi_ keys + manual UAT against real UDM
+- [x] 19-02-PLAN.md — Schema lock (cameras +7 columns; +3 new tables: protect_hub_bridges, camera_outputs, protect_stream_catalog) + install unifi-protect@^4.29.0 + yaml@^2.6.0
+- [x] 19-03-PLAN.md — protect-bridge.ts (lib boundary, classifyKind via isThirdPartyCamera, TLS_SCHEME const) + orchestration/protect-hub/catalog.ts (discover + loadCatalog) + /api/protect-hub/discover endpoint + Vitest suites
+- [x] 19-04-PLAN.md — ProtectHubTab.svelte (auto-discover on empty cache, manual refresh, controller-unreachable banner, no-creds deep-link) + 7th settings tab + saveSetting() resets lib client on unifi_ keys + manual UAT against real UDM
 **Research flags**:
   - TLS spike against actual UDM 192.168.3.1: `rtspx://` vs `tls_verify=0` (PITFALLS #8) — OWNED BY PLAN 19-01
   - `mac` field reliability for first-party AND third-party cams (PITFALLS #2) — OWNED BY PLAN 19-03 fixtures + UAT
@@ -141,7 +141,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Data Model + Protect Catalog (Read-Only) | 3/4 | In progress (Plan 01 + Plan 04 UAT pending user) | - |
+| 19. Data Model + Protect Catalog (Read-Only) | 3/4 | Complete    | 2026-05-02 |
 | 20. Bridge LXC Provisioning + Hello-World YAML | 0/? | Not started | - |
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |

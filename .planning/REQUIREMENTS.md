@@ -12,12 +12,12 @@
 
 ### Catalog & Discovery (HUB-CAT-*)
 
-- [ ] **HUB-CAT-01**: User sees all UniFi Protect cams in `/cameras` (inline with managed cams), each marked with a "Protect Hub" badge.
-- [ ] **HUB-CAT-02**: For each external Protect cam, the catalog displays manufacturer, model, MAC, and the set of available native stream qualities with codec, resolution, framerate, and bitrate per quality.
-- [ ] **HUB-CAT-03**: System auto-classifies each Protect cam as `first-party` (UniFi/UVC) or `third-party` (adopted Mobotix/Hikvision/etc.) based on Protect bootstrap data; classification is visible in the UI as a secondary qualifier badge.
-- [ ] **HUB-CAT-04**: Stream catalog refreshes automatically on a cadence (15 min default) and on user-triggered "Sync now."
-- [ ] **HUB-CAT-05**: Catalog is cached in SQLite so the UI renders correctly even when the UDM is briefly unreachable.
-- [ ] **HUB-CAT-06**: Single-channel cams (low-end models with only one stream quality) render correctly — no hardcoded 3-channel assumption.
+- [x] **HUB-CAT-01**: User sees all UniFi Protect cams in `/cameras` (inline with managed cams), each marked with a "Protect Hub" badge.
+- [x] **HUB-CAT-02**: For each external Protect cam, the catalog displays manufacturer, model, MAC, and the set of available native stream qualities with codec, resolution, framerate, and bitrate per quality.
+- [x] **HUB-CAT-03**: System auto-classifies each Protect cam as `first-party` (UniFi/UVC) or `third-party` (adopted Mobotix/Hikvision/etc.) based on Protect bootstrap data; classification is visible in the UI as a secondary qualifier badge.
+- [x] **HUB-CAT-04**: Stream catalog refreshes automatically on a cadence (15 min default) and on user-triggered "Sync now."
+- [x] **HUB-CAT-05**: Catalog is cached in SQLite so the UI renders correctly even when the UDM is briefly unreachable.
+- [x] **HUB-CAT-06**: Single-channel cams (low-end models with only one stream quality) render correctly — no hardcoded 3-channel assumption.
 
 ### Bridge LXC Container (HUB-BRG-*)
 
@@ -55,7 +55,7 @@
 
 ### Onboarding Wizard (HUB-WIZ-*)
 
-- [ ] **HUB-WIZ-01**: Settings page shows a "Protect Hub" tab with the feature toggle (default OFF) as the entry point.
+- [x] **HUB-WIZ-01**: Settings page shows a "Protect Hub" tab with the feature toggle (default OFF) as the entry point.
 - [x] **HUB-WIZ-02**: Activating the toggle (when bridge does not yet exist) navigates to a dedicated wizard route `/settings/protect-hub/onboarding` — not a modal.
 - [x] **HUB-WIZ-03**: Wizard Step 1 verifies the Protect connection using existing credentials; missing creds deep-link to the UniFi settings tab.
 - [x] **HUB-WIZ-04**: Wizard Step 2 provisions the Bridge LXC (long-running 30–90 s) with progress events streamed to the UI; provision failure leaves the bridge row in `status='failed'` and is retryable from the wizard.

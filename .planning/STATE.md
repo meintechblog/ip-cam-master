@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "Completed 20-02-PLAN.md (wizard UI + bridge controls + health probe). Continuing P20."
-last_updated: "2026-05-02T06:47:27Z"
-last_activity: 2026-05-02 — P20-02 shipped (wizard Steps 1-2, ProtectHubTab bridge controls, scheduler health probe, 2min)
+stopped_at: "P20 code-complete (20-01 + 20-02 shipped, 7/8 success criteria structurally verified per 20-VERIFICATION.md). 20-03 is autonomous=false UAT against real Proxmox hardware → user must run wizard end-to-end. Stopped before P21 (yaml-builder needs P19-01 TLS spike result first)."
+last_updated: "2026-05-02T07:10:00.000Z"
+last_activity: 2026-05-02 — P20-01 + P20-02 shipped autonomously (8 commits, ~14 min); halted before P21 to wait on TLS spike
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
   completed_plans: 5
-  percent: 25
+  percent: 71
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 ## Current Position
 
-Phase: P20 (2/3 plans complete)
-Plan: 20-02 complete; next is 20-03
+Phase: 20
+Plan: Not started
 Status: Wizard UI (Steps 1-2), bridge status panel, lifecycle controls, scheduler health probe shipped. P19 user-pending items deferred.
-Last activity: 2026-04-30 — Plans 19-02/03/04 executed autonomously; STATE.md sync completes the wave handoff.
+Last activity: 2026-05-02
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
@@ -51,7 +51,9 @@ In UniFi Protect web UI at https://192.168.3.1, on any one camera, toggle ON "Sh
 Then run the spike (creates throwaway LXC vmid 9919, runs ffprobe, destroys LXC, commits findings file):
 
 ```bash
+
 # in repo root, with rtspAlias from above:
+
 RTSP_ALIAS=<paste-token-here> npx tsx scripts/spike/p19-tls-rtspx.ts
 ```
 
@@ -60,6 +62,7 @@ If the spike resolves to `rtsps-tls-verify-0` (instead of the placeholder `rtspx
 ### 2. P19-04 Task 03 UAT (manual ~10 min in browser + Protect)
 
 7 ROADMAP success criteria for P19, walked through in `.planning/phases/19-data-model-protect-catalog/19-04-SUMMARY.md` §"UAT walkthrough". Includes:
+
 - Settings tab "Protect Hub" visible between "UniFi" and "Credentials"
 - Auto-discover on first open populates `protect_stream_catalog` with real cams
 - first-party / third-party badges visible per cam
@@ -216,11 +219,13 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 *v1.3 Research Flags (resolve during phase execution):*
+
 - **P19**: TLS spike against actual UDM 192.168.3.1 — confirm `rtspx://` works (vs `tls_verify=0`); confirm `mac` field reliability for first-party AND third-party cams; confirm `bootstrap.cameras[].type` discriminator for first-party detection. Spike artifact: `.planning/research/v1.3/spikes/p19-tls-rtspx.md`.
 - **P21**: go2rtc reconnect-after-source-disconnect empirical test (does go2rtc auto-redial when upstream Protect cam reboots, or hold a dead consumer connection?); canonical YAML form choice (`yaml.stringify()` options for byte-identical idempotency).
 - **P23**: `unifi-protect.updateDevice` exact PATCH semantics for `isRtspEnabled=false` per channel — is per-channel granularity supported in v4.29.0, or does it flip all channels?
 
 *v1.2 (carried over — pending UAT before formal milestone close):*
+
 - 5 manuelle UAT-Items für Bambu A1 (Wizard / Provisioning / Protect Adoption / Cloud-Mode-Toggle) gegen Live-Hardware @ 192.168.3.195
 
 ### Blockers/Concerns
@@ -228,11 +233,13 @@ Recent decisions affecting current work:
 *v1.3 (none yet — roadmap just complete, ready for `/gsd:plan-phase 19`)*
 
 *v1.2 (resolved/archived):*
+
 - Research flag (Phase 10): H2C-specific RTSPS path resolved via spike (A1 is the actual hardware target, no RTSPS:322).
 - Research flag (Phase 12): `#video=copy` validated end-to-end with Bambu A1 JPEG-over-TLS:6000 ingestion path.
 - Research flag (Phase 14): Adaptive Stream Mode validated against Bambu MQTT print-state.
 
 *Prior concerns from v1.1 (resolved/archived):*
+
 - Research flag (Phase 09): `systemd-run --transient` behavior validated on deployed VM (Debian 13) during v1.1 shipping
 - Research flag (Phase 09): Schema-hash comparison stopgap documented as future "real Drizzle migration system" follow-up
 - Research flag (Phase 08): GitHub API unauthenticated rate limit (60 req/h) documented, acceptable for single-user homelab
