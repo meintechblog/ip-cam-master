@@ -28,7 +28,7 @@
 - [x] **HUB-BRG-05**: go2rtc API binds to `127.0.0.1:1984` inside the LXC; only `:1984` (MJPEG HTTP) and `:8554` (RTSP) are LAN-exposed; the go2rtc web editor is disabled.
 - [x] **HUB-BRG-06**: Bridge container can be started, stopped, and restarted from the app UI.
 - [x] **HUB-BRG-07**: Bridge container survives Proxmox host reboot (autostart enabled).
-- [ ] **HUB-BRG-08**: Bridge container health is monitored continuously and visible in the UI (go2rtc `/api/streams` + container status, last health-check timestamp).
+- [x] **HUB-BRG-08**: Bridge container health is monitored continuously and visible in the UI (go2rtc `/api/streams` + container status, last health-check timestamp).
 
 ### Output Types (HUB-OUT-*)
 
@@ -56,8 +56,8 @@
 ### Onboarding Wizard (HUB-WIZ-*)
 
 - [ ] **HUB-WIZ-01**: Settings page shows a "Protect Hub" tab with the feature toggle (default OFF) as the entry point.
-- [ ] **HUB-WIZ-02**: Activating the toggle (when bridge does not yet exist) navigates to a dedicated wizard route `/settings/protect-hub/onboarding` — not a modal.
-- [ ] **HUB-WIZ-03**: Wizard Step 1 verifies the Protect connection using existing credentials; missing creds deep-link to the UniFi settings tab.
+- [x] **HUB-WIZ-02**: Activating the toggle (when bridge does not yet exist) navigates to a dedicated wizard route `/settings/protect-hub/onboarding` — not a modal.
+- [x] **HUB-WIZ-03**: Wizard Step 1 verifies the Protect connection using existing credentials; missing creds deep-link to the UniFi settings tab.
 - [x] **HUB-WIZ-04**: Wizard Step 2 provisions the Bridge LXC (long-running 30–90 s) with progress events streamed to the UI; provision failure leaves the bridge row in `status='failed'` and is retryable from the wizard.
 - [ ] **HUB-WIZ-05**: Wizard Step 3 fetches Protect cams and populates the stream catalog; preview shows discovered cams grouped by `kind`.
 - [ ] **HUB-WIZ-06**: Wizard Step 4 lets the user pick which cams join the Hub: first-party cams checkboxes pre-checked with default output type pre-selected; third-party cams checkboxes unchecked with copy "Already producing MJPEG natively? Leave off."

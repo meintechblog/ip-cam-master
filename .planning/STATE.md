@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "Completed 20-01-PLAN.md (bridge provisioning backend + API). Continuing P20."
-last_updated: "2026-05-02T06:40:00.000Z"
-last_activity: 2026-05-02 — P20-01 shipped (bridge provision + lifecycle + 5 API endpoints + 20 tests, 7min)
+stopped_at: "Completed 20-02-PLAN.md (wizard UI + bridge controls + health probe). Continuing P20."
+last_updated: "2026-05-02T06:47:27Z"
+last_activity: 2026-05-02 — P20-02 shipped (wizard Steps 1-2, ProtectHubTab bridge controls, scheduler health probe, 2min)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 4
-  percent: 20
+  completed_plans: 5
+  percent: 25
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
-**Current focus:** v1.3 P20 — Bridge LXC Provisioning. Plan 01 complete (backend + API). P19 user-pending items (TLS spike, UAT) accepted as deferred.
+**Current focus:** v1.3 P20 — Bridge LXC Provisioning. Plans 01-02 complete (backend + API + wizard UI + bridge controls). P19 user-pending items (TLS spike, UAT) accepted as deferred.
 
 ## Current Position
 
-Phase: P20 (1/3 plans complete)
-Plan: 20-01 complete; next is 20-02
-Status: Bridge provisioning backend shipped — provisionBridge(), lifecycle controls, 5 API endpoints, 20 new tests. P19 user-pending items deferred.
+Phase: P20 (2/3 plans complete)
+Plan: 20-02 complete; next is 20-03
+Status: Wizard UI (Steps 1-2), bridge status panel, lifecycle controls, scheduler health probe shipped. P19 user-pending items deferred.
 Last activity: 2026-04-30 — Plans 19-02/03/04 executed autonomously; STATE.md sync completes the wave handoff.
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
@@ -248,5 +248,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last activity: 2026-05-02
-Stopped at: Completed 20-01-PLAN.md (bridge provisioning backend + API layer)
+Stopped at: Completed 20-02-PLAN.md (wizard UI + bridge controls + scheduler health probe)
 Resume file: None

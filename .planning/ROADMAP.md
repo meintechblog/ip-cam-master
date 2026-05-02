@@ -71,7 +71,7 @@ Plans:
 **Plans**: 3 plans (in 3 waves)
 Plans:
 - [x] 20-01-PLAN.md — Bridge provisioning backend: bridge-provision.ts + bridge-lifecycle.ts + generateBridgeConfig() + 5 API endpoints + Vitest suites
-- [ ] 20-02-PLAN.md — Wizard route /settings/protect-hub/onboarding (Steps 1-2) + ProtectHubTab bridge controls + scheduler health probe
+- [x] 20-02-PLAN.md — Wizard route /settings/protect-hub/onboarding (Steps 1-2) + ProtectHubTab bridge controls + scheduler health probe
 - [ ] 20-03-PLAN.md — UAT against real Proxmox: provision bridge, verify SC-1..8, state sync
 **Amended decisions**:
   - L-9 amended to `api.listen: "0.0.0.0:1984"` + `ui_editor: false` (D-API-BIND-01) — MJPEG streams live under API HTTP, localhost-only would block Loxone
