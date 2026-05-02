@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "Starting P20 autonomously per user authorisation (2026-05-02). P19-01 TLS spike + P19-04 UAT remain user-pending — accepted as deferred. P21 will halt for spike before yaml-builder ships."
-last_updated: "2026-05-02T00:55:00.000Z"
-last_activity: 2026-05-02 — boot fix shipped (v1.2 tag); resuming autonomous at P20 only (gated stop before P21 pending TLS spike)
+stopped_at: "Completed 20-01-PLAN.md (bridge provisioning backend + API). Continuing P20."
+last_updated: "2026-05-02T06:40:00.000Z"
+last_activity: 2026-05-02 — P20-01 shipped (bridge provision + lifecycle + 5 API endpoints + 20 tests, 7min)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 4
-  completed_plans: 3
-  percent: 15
+  total_plans: 7
+  completed_plans: 4
+  percent: 20
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
-**Current focus:** v1.3 P19 — 3/4 plans complete autonomously (schema, protect-bridge + catalog, Hub-tab UI). 2 user-pending items before P20 can start.
+**Current focus:** v1.3 P20 — Bridge LXC Provisioning. Plan 01 complete (backend + API). P19 user-pending items (TLS spike, UAT) accepted as deferred.
 
 ## Current Position
 
-Phase: P19 (3/4 plans complete; 2 items pending user action)
-Plan: P19-01 TLS spike PENDING USER (browser action against UDM); P19-04 Task 03 UAT PENDING USER (manual verification against real UDM)
-Status: Autonomous overnight run complete — P19 code 100% shipped (28 new tests green, schema migrated idempotently, ProtectHubTab live). Waiting for user UAT before P20 (which creates real Proxmox LXC).
+Phase: P20 (1/3 plans complete)
+Plan: 20-01 complete; next is 20-02
+Status: Bridge provisioning backend shipped — provisionBridge(), lifecycle controls, 5 API endpoints, 20 new tests. P19 user-pending items deferred.
 Last activity: 2026-04-30 — Plans 19-02/03/04 executed autonomously; STATE.md sync completes the wave handoff.
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
@@ -247,6 +247,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last activity: 2026-04-30
-Stopped at: v1.3 roadmap complete (5 phases P19–P23, 62/62 reqs mapped); next step is `/gsd:plan-phase 19`
+Last activity: 2026-05-02
+Stopped at: Completed 20-01-PLAN.md (bridge provisioning backend + API layer)
 Resume file: None

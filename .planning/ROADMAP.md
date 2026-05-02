@@ -62,13 +62,21 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Activating the Hub toggle (when no bridge row exists) navigates to `/settings/protect-hub/onboarding` and runs Wizard Step 1 (reuses existing v1.0 Protect connection) and Step 2 (calls `bridge-provision.ts` to allocate next free VMID, run `createContainer()` with bridge profile — 1–2 GB RAM, 2–4 cores, `/dev/dri` passthrough, `nofile=4096`, static IP via DHCP reservation, autostart on host reboot enabled)
   2. After provision completes, `pct config <vmid>` on the Proxmox host shows the LXC was created from the SAME existing template used for Mobotix/Loxone/Bambu cams — no new template work — with the bridge-specific resource sizing applied
-  3. The deployed `/etc/go2rtc/go2rtc.yaml` on the bridge contains `api: { listen: "127.0.0.1:1984", ui_editor: false }` — verifiable: from another LAN host, `curl http://<bridge-ip>:1984/editor.html` returns connection-refused, while `curl http://<bridge-ip>:1984/api/streams` (API root) returns the streams JSON, and `:8554/<test-stream>` plays via `ffprobe`
+  3. The deployed `/etc/go2rtc/go2rtc.yaml` on the bridge contains `api: { listen: "0.0.0.0:1984", ui_editor: false }` (L-9 amended per D-API-BIND-01: MJPEG streams live under the API HTTP server, so localhost-only would block Loxone access; editor disabled is the security surface) — verifiable: from another LAN host, `curl http://<bridge-ip>:1984/editor.html` returns 404, while `curl http://<bridge-ip>:1984/api/streams` (API root) returns the streams JSON, and `:8554/<test-stream>` plays via `ffprobe`
   4. The deployed YAML carries the idempotency stamp `# managed by ip-cam-master, reconcile-id <uuid>, ts <iso>` as the first comment block, ready for canonical-hash drift detection in P21
   5. Bridge container survives a Proxmox host reboot (autostart=1) and resumes serving on the same static IP — verifiable by rebooting the test host and observing the bridge IP unchanged + go2rtc back online within 60 s
   6. From the Protect Hub settings tab, user can click Start / Stop / Restart and observe the container state reflect within 10 s; container health probe is wired into the existing `healthCheckInterval` in `scheduler.ts` (one extra `fetch(http://<bridge-ip>:1984/api/streams)` per tick) and surfaces "last health check" timestamp in the UI
   7. Provision failure (Proxmox storage full, network blip, SSH timeout) leaves `protect_hub_bridges.status='failed'` and is retryable from the wizard — re-running the step is idempotent (does NOT create a duplicate VMID)
   8. The wizard documents the LAN-trust-boundary explicitly in Step 2's info panel and the README: "Bridge endpoints are unauthenticated by design; ensure the LXC is on a trusted LAN segment"
-**Plans**: TBD
+**Plans**: 3 plans (in 3 waves)
+Plans:
+- [x] 20-01-PLAN.md — Bridge provisioning backend: bridge-provision.ts + bridge-lifecycle.ts + generateBridgeConfig() + 5 API endpoints + Vitest suites
+- [ ] 20-02-PLAN.md — Wizard route /settings/protect-hub/onboarding (Steps 1-2) + ProtectHubTab bridge controls + scheduler health probe
+- [ ] 20-03-PLAN.md — UAT against real Proxmox: provision bridge, verify SC-1..8, state sync
+**Amended decisions**:
+  - L-9 amended to `api.listen: "0.0.0.0:1984"` + `ui_editor: false` (D-API-BIND-01) — MJPEG streams live under API HTTP, localhost-only would block Loxone
+  - Bridge sizing: 1024 MB / 2 cores for P20; P21 may bump to 2048 MB
+  - DHCP with reservation recommendation (D-PROV-03); static IP not required in wizard
 **UI hint**: yes
 
 ### Phase 21: Multi-Cam YAML + Reconciliation Loop
