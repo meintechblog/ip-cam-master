@@ -503,6 +503,52 @@ console.log('ONVIF audio patch applied');
 }
 
 /**
+ * Generates go2rtc YAML for the Protect Hub bridge container.
+ * Includes the idempotency stamp (L-8) and hello-world test stream.
+ * API binds to 0.0.0.0:1984 with editor disabled (D-API-BIND-01).
+ */
+export function generateBridgeConfig(): string {
+	const reconcileId = crypto.randomUUID();
+	const ts = new Date().toISOString();
+	return `# managed by ip-cam-master, reconcile-id ${reconcileId}, ts ${ts}
+api:
+  listen: "0.0.0.0:1984"
+  ui_editor: false
+
+streams:
+  test: exec:ffmpeg -re -f lavfi -i testsrc=size=640x360:rate=10 -c:v libx264 -f rtsp {output}
+
+ffmpeg:
+  bin: ffmpeg
+
+log:
+  level: info
+`;
+}
+
+/**
+ * Generates a systemd unit for go2rtc on the bridge container.
+ * Identical to camera unit but adds LimitNOFILE=4096 (L-25).
+ */
+export function generateBridgeSystemdUnit(): string {
+	return `[Unit]
+Description=go2rtc streaming server
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/go2rtc -config /etc/go2rtc/go2rtc.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
+`;
+}
+
+/**
  * Checks stream health via go2rtc HTTP API.
  */
 export async function checkStreamHealth(
