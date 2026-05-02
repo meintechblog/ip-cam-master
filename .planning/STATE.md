@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "P19 Plans 02/03/04 code-complete (3/4); Plan 01 (TLS spike) blocked on user UDM-share-toggle action; Plan 04 ends with checkpoint:human-verify against real UDM. Stopped before P20 (creates real Proxmox LXC — wanted user awake)."
-last_updated: "2026-04-30T01:25:00.000Z"
-last_activity: 2026-04-30 — autonomous overnight run: P19 schema + protect-bridge + catalog + Hub-tab UI shipped
+stopped_at: "Starting P20 autonomously per user authorisation (2026-05-02). P19-01 TLS spike + P19-04 UAT remain user-pending — accepted as deferred. P21 will halt for spike before yaml-builder ships."
+last_updated: "2026-05-02T00:55:00.000Z"
+last_activity: 2026-05-02 — boot fix shipped (v1.2 tag); resuming autonomous at P20 only (gated stop before P21 pending TLS spike)
 progress:
   total_phases: 5
   completed_phases: 0
