@@ -3,6 +3,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { getSettings, getSetting, saveSetting } from '$lib/server/services/settings';
 import { getUser, createUser, deleteUser, verifyPassword, isYoloMode } from '$lib/server/services/auth';
 import { loadCatalog } from '$lib/server/orchestration/protect-hub/catalog';
+import { getBridgeStatus } from '$lib/server/orchestration/protect-hub/bridge-lifecycle';
 
 export const load: PageServerLoad = async () => {
 	const proxmox = await getSettings('proxmox_');
@@ -15,6 +16,7 @@ export const load: PageServerLoad = async () => {
 	const hubEnabled = (await getSetting('protect_hub_enabled')) === 'true';
 	const credsConfigured = !!(unifi.unifi_host && unifi.unifi_username && unifi.unifi_password);
 	const catalogState = await loadCatalog();
+	const bridge = getBridgeStatus();
 
 	return {
 		proxmox,
@@ -31,7 +33,17 @@ export const load: PageServerLoad = async () => {
 			credsConfigured,
 			cams: catalogState.cams,
 			catalogByCamId: catalogState.catalogByCamId,
-			lastDiscoveredAt: catalogState.lastDiscoveredAt
+			lastDiscoveredAt: catalogState.lastDiscoveredAt,
+			bridge: bridge
+				? {
+						id: bridge.id,
+						vmid: bridge.vmid,
+						hostname: bridge.hostname,
+						containerIp: bridge.containerIp,
+						status: bridge.status,
+						lastHealthCheckAt: bridge.lastHealthCheckAt
+					}
+				: null
 		}
 	};
 };

@@ -16,9 +16,13 @@
 		Loader2,
 		ShieldCheck,
 		ShieldQuestion,
-		Building2
+		Building2,
+		Server,
+		Play,
+		Square,
+		RotateCcw
 	} from 'lucide-svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 
 	let { hub, switchTab } = $props<{
 		hub: {
@@ -45,9 +49,44 @@
 				}>
 			>;
 			lastDiscoveredAt: number | null;
+			bridge: {
+				id: number;
+				vmid: number;
+				hostname: string;
+				containerIp: string | null;
+				status: string;
+				lastHealthCheckAt: string | null;
+			} | null;
 		};
 		switchTab: (tab: string) => void;
 	}>();
+
+	let bridgeLoading = $state(false);
+
+	async function bridgeAction(action: 'start' | 'stop' | 'restart') {
+		bridgeLoading = true;
+		try {
+			await fetch(`/api/protect-hub/bridge/${action}`, { method: 'POST' });
+			await invalidateAll();
+		} finally {
+			bridgeLoading = false;
+		}
+	}
+
+	function bridgeStatusBadge(status: string): { color: string; label: string; spinning: boolean } {
+		switch (status) {
+			case 'running':
+				return { color: 'bg-green-500', label: 'Läuft', spinning: false };
+			case 'stopped':
+				return { color: 'bg-yellow-500', label: 'Gestoppt', spinning: false };
+			case 'failed':
+				return { color: 'bg-red-500', label: 'Fehlgeschlagen', spinning: false };
+			case 'provisioning':
+				return { color: 'bg-blue-500', label: 'Wird bereitgestellt...', spinning: true };
+			default:
+				return { color: 'bg-gray-500', label: 'Ausstehend', spinning: false };
+		}
+	}
 
 	let refreshing = $state(false);
 	let unreachable = $state(false);
@@ -116,6 +155,107 @@
 			</button>
 		</div>
 	{:else}
+		<!-- Bridge status panel (P20) -->
+		{#if hub.bridge === null}
+			<div class="bg-bg-card rounded-lg border border-border p-6">
+				<div class="flex items-center gap-3 mb-3">
+					<Server class="w-5 h-5 text-text-secondary" />
+					<h2 class="text-lg font-semibold text-text-primary">Bridge-Container</h2>
+				</div>
+				<p class="text-sm text-text-secondary mb-4">
+					Kein Bridge-Container vorhanden. Richte einen ein, um Protect-Streams über go2rtc bereitzustellen.
+				</p>
+				<button
+					onclick={() => goto('/settings/protect-hub/onboarding')}
+					class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded font-medium
+						hover:bg-accent/90 transition-colors cursor-pointer"
+				>
+					<Server class="w-4 h-4" />
+					Bridge einrichten
+				</button>
+			</div>
+		{:else}
+			{@const badge = bridgeStatusBadge(hub.bridge.status)}
+			<div class="bg-bg-card rounded-lg border border-border p-6">
+				<div class="flex items-center gap-3 mb-4">
+					<Server class="w-5 h-5 text-text-secondary" />
+					<h2 class="text-lg font-semibold text-text-primary">Bridge-Container</h2>
+					<div class="flex items-center gap-2 ml-auto">
+						{#if badge.spinning}
+							<Loader2 class="w-3.5 h-3.5 animate-spin text-blue-400" />
+						{:else}
+							<span class="w-2.5 h-2.5 rounded-full {badge.color}"></span>
+						{/if}
+						<span class="text-sm font-medium {hub.bridge.status === 'running' ? 'text-green-400' : hub.bridge.status === 'failed' ? 'text-red-400' : 'text-text-secondary'}">
+							{badge.label}
+						</span>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+					<div>
+						<span class="text-text-secondary">Hostname</span>
+						<p class="font-mono text-text-primary">{hub.bridge.hostname}</p>
+					</div>
+					<div>
+						<span class="text-text-secondary">VMID</span>
+						<p class="font-mono text-text-primary">{hub.bridge.vmid}</p>
+					</div>
+					{#if hub.bridge.containerIp}
+						<div>
+							<span class="text-text-secondary">Container-IP</span>
+							<p class="font-mono text-text-primary">{hub.bridge.containerIp}</p>
+						</div>
+					{/if}
+					<div>
+						<span class="text-text-secondary">Letzter Health-Check</span>
+						<p class="font-mono text-text-primary">
+							{hub.bridge.lastHealthCheckAt
+								? new Date(hub.bridge.lastHealthCheckAt).toLocaleString('de-DE')
+								: 'noch nie'}
+						</p>
+					</div>
+				</div>
+
+				<div class="flex items-center gap-2">
+					{#if hub.bridge.status === 'stopped' || hub.bridge.status === 'failed' || hub.bridge.status === 'pending'}
+						<button
+							onclick={() => bridgeAction('start')}
+							disabled={bridgeLoading}
+							class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded
+								hover:bg-green-700 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
+						>
+							<Play class="w-3.5 h-3.5" />
+							Starten
+						</button>
+					{/if}
+					{#if hub.bridge.status === 'running'}
+						<button
+							onclick={() => bridgeAction('stop')}
+							disabled={bridgeLoading}
+							class="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-600 text-white rounded
+								hover:bg-yellow-700 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
+						>
+							<Square class="w-3.5 h-3.5" />
+							Stoppen
+						</button>
+						<button
+							onclick={() => bridgeAction('restart')}
+							disabled={bridgeLoading}
+							class="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary rounded
+								hover:text-text-primary hover:bg-bg-input transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
+						>
+							<RotateCcw class="w-3.5 h-3.5" />
+							Neustarten
+						</button>
+					{/if}
+					{#if bridgeLoading}
+						<Loader2 class="w-4 h-4 animate-spin text-text-secondary" />
+					{/if}
+				</div>
+			</div>
+		{/if}
+
 		<!-- Status + refresh card -->
 		<div class="bg-bg-card rounded-lg border border-border p-6">
 			<h2 class="text-lg font-semibold text-text-primary mb-2">
