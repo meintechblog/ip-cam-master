@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "P20 code-complete (20-01 + 20-02 shipped, 7/8 success criteria structurally verified per 20-VERIFICATION.md). 20-03 is autonomous=false UAT against real Proxmox hardware → user must run wizard end-to-end. Stopped before P21 (yaml-builder needs P19-01 TLS spike result first)."
-last_updated: "2026-05-02T07:10:00.000Z"
-last_activity: 2026-05-02 — P20-01 + P20-02 shipped autonomously (8 commits, ~14 min); halted before P21 to wait on TLS spike
+stopped_at: "P24 (Auto-Update Parity) code-complete (13 atomic commits across 5 waves; 9/10 success criteria structurally verified). W5-T3 deploy + W5-T4 UAT pending against running VM (VMID 104). v1.3 main track: P20 code-complete pending UAT, P21-P23 not started."
+last_updated: "2026-05-04T19:58:00.000Z"
+last_activity: 2026-05-04 — P24 Auto-Update Parity shipped autonomously (parallel-track maintenance, precedent P16 in v1.2). Charging-master parity port: dedicated systemd unit + 9-stage pipeline + 2-stage rollback + auto-update scheduler with 23h spacing + ETag GitHub polling + 4 new UI components (AutoUpdateCard, StageStepper, ReconnectOverlay, InstallModal). 56/56 P24 tests pass.
 progress:
   total_phases: 5
   completed_phases: 0
