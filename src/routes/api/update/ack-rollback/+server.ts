@@ -27,7 +27,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	writeUpdateState({
 		rollbackHappened: false,
 		rollbackReason: null,
-		rollbackStage: null
+		rollbackStage: null,
+		// Once the user acks, the previous run's terminal state isn't relevant
+		// anymore — bring updateStatus back to idle so the next install starts
+		// from a clean state.
+		updateStatus: 'idle'
 	});
 
 	return json({ status: 'acked' });
