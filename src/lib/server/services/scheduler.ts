@@ -3,9 +3,7 @@ import { storeEvents, cleanupOldEvents, storeHealthEvent } from './events';
 import { getSettings } from './settings';
 import { cleanupExpiredSessions } from './auth';
 import { getProtectStatus } from './protect';
-import { checkForUpdate } from './update-check';
 import { cleanupOldUpdateLogs } from './update-history';
-import { getCurrentVersion } from './version';
 import { startBambuSubscribers, stopBambuSubscribers } from './bambu-mqtt';
 import { db } from '$lib/server/db/client';
 import { cameras, protectHubBridges } from '$lib/server/db/schema';
@@ -15,8 +13,6 @@ let logScanInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 let protectPollInterval: ReturnType<typeof setInterval> | null = null;
 let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
-let updateCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
 let updateLogCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(): void {
@@ -168,33 +164,6 @@ export function startScheduler(): void {
 		}, 5 * 60_000);
 	}
 
-	// Daily update check — first run 30s after boot, then every 24h.
-	// Skip entirely in dev mode (no git repo).
-	if (!updateCheckTimeout && !updateCheckInterval) {
-		updateCheckTimeout = setTimeout(async () => {
-			updateCheckTimeout = null;
-			try {
-				const current = await getCurrentVersion();
-				if (current.isDev) {
-					console.log('[scheduler] Update check skipped — dev mode');
-					return;
-				}
-				await checkForUpdate();
-			} catch (err) {
-				console.error('[scheduler] Update check failed:', (err as Error).message);
-			}
-			updateCheckInterval = setInterval(async () => {
-				try {
-					const current = await getCurrentVersion();
-					if (current.isDev) return;
-					await checkForUpdate();
-				} catch (err) {
-					console.error('[scheduler] Update check failed:', (err as Error).message);
-				}
-			}, 86_400_000);
-		}, 30_000);
-	}
-
 	// Update log cleanup — once per 24h, drop entries + files older than 30 days
 	if (!updateLogCleanupInterval) {
 		const runCleanup = async () => {
@@ -220,7 +189,7 @@ export function startScheduler(): void {
 		console.error('[scheduler] bambu-mqtt startup failed:', err)
 	);
 
-	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update check (24h), update log cleanup (24h), bambu MQTT');
+	console.log('[scheduler] Started: event cleanup (1h), SSH log scan (60s), Protect poll (30s), health checks (5m), update log cleanup (24h), bambu MQTT');
 }
 
 export function stopScheduler(): void {
@@ -239,14 +208,6 @@ export function stopScheduler(): void {
 	if (healthCheckInterval) {
 		clearInterval(healthCheckInterval);
 		healthCheckInterval = null;
-	}
-	if (updateCheckTimeout) {
-		clearTimeout(updateCheckTimeout);
-		updateCheckTimeout = null;
-	}
-	if (updateCheckInterval) {
-		clearInterval(updateCheckInterval);
-		updateCheckInterval = null;
 	}
 	stopBambuSubscribers();
 	if (updateLogCleanupInterval) {
