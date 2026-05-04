@@ -1,25 +1,35 @@
+/**
+ * Self-update runner — spawns the dedicated systemd unit
+ * `ip-cam-master-updater.service` (UPD-AUTO-12 / D-01 in CONTEXT).
+ *
+ * Switched from `systemd-run` transient units to a permanent oneshot
+ * unit so the updater lives in a sibling cgroup. With the previous
+ * pattern, `systemctl stop ip-cam-master` (the `stop` stage of the
+ * pipeline) would also kill the spawning systemd-run unit, leaving
+ * the update half-applied with no rollback driver.
+ *
+ * The unit's WorkingDirectory + ExecStart point at /opt/ip-cam-master
+ * and /usr/local/bin/ip-cam-master-update.sh, which we keep in sync
+ * with the running install via ensureUpdateScriptInstalled() and
+ * ensureUpdaterUnitInstalled() at app boot.
+ */
+
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, promises as fsp, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { createBackup } from './backup';
+import { writeUpdateState } from './update-state-store';
 
 const execFileAsync = promisify(execFile);
 
-/**
- * Absolute path the detached systemd-run unit executes.
- * Owned by root, installed by ensureUpdateScriptInstalled() at app startup.
- */
 export const INSTALLED_SCRIPT_PATH = '/usr/local/bin/ip-cam-master-update.sh';
+export const UPDATER_UNIT_NAME = 'ip-cam-master-updater.service';
+export const UPDATER_UNIT_PATH = `/etc/systemd/system/${UPDATER_UNIT_NAME}`;
+export const UPDATER_ENV_FILE = '/run/ip-cam-master-update.env';
 
-/**
- * Candidate directories to find the installed ip-cam-master git worktree in.
- * Must match the candidate list in src/lib/server/services/version.ts so the
- * same dir is picked regardless of which service asks first.
- */
 const CANDIDATE_INSTALL_DIRS = ['/opt/ip-cam-master', process.cwd()];
 
-/** Resolve the first candidate dir that contains a .git entry. Returns null in dev mode. */
 function findInstallDir(): string | null {
 	for (const dir of CANDIDATE_INSTALL_DIRS) {
 		if (existsSync(path.join(dir, '.git'))) return dir;
@@ -28,25 +38,15 @@ function findInstallDir(): string | null {
 }
 
 /**
- * Copy scripts/update.sh from the running install dir to /usr/local/bin so the
- * detached systemd-run unit invokes a script on the root filesystem that cannot
- * disappear when the worktree swaps during `git pull`.
- *
- * No-op in dev mode (no install dir found) or when the target is already at least
- * as new as the source (mtime compare).
+ * Copy scripts/update.sh from the install dir to /usr/local/bin.
+ * Best-effort: silent in dev mode, errors logged but not thrown.
  */
 export async function ensureUpdateScriptInstalled(): Promise<void> {
 	const installDir = findInstallDir();
-	if (!installDir) {
-		// Dev mode — nothing to install
-		return;
-	}
+	if (!installDir) return;
 
 	const sourcePath = path.join(installDir, 'scripts', 'update.sh');
-	if (!existsSync(sourcePath)) {
-		// Source missing (partial worktree?) — silent no-op
-		return;
-	}
+	if (!existsSync(sourcePath)) return;
 
 	try {
 		const sourceStat = await fsp.stat(sourcePath);
@@ -62,9 +62,46 @@ export async function ensureUpdateScriptInstalled(): Promise<void> {
 			await fsp.chmod(INSTALLED_SCRIPT_PATH, 0o755);
 		}
 	} catch (err) {
-		// Surface error to caller log but do not throw — update script install
-		// is best-effort at boot and must not crash the app.
 		console.error('[update-runner] ensureUpdateScriptInstalled failed:', err);
+	}
+}
+
+/**
+ * Install/refresh the dedicated systemd unit for the updater.
+ * Best-effort. Reads scripts/update/ip-cam-master-updater.service
+ * from the install dir (delivered by W3-T1) and copies it into
+ * /etc/systemd/system/. Runs daemon-reload + enable on change.
+ *
+ * Idempotent: skips if the target file is at least as new as the source.
+ */
+export async function ensureUpdaterUnitInstalled(): Promise<void> {
+	const installDir = findInstallDir();
+	if (!installDir) return;
+
+	const sourcePath = path.join(installDir, 'scripts', 'update', 'ip-cam-master-updater.service');
+	if (!existsSync(sourcePath)) return;
+
+	try {
+		const sourceStat = await fsp.stat(sourcePath);
+		let shouldCopy = true;
+		if (existsSync(UPDATER_UNIT_PATH)) {
+			const targetStat = await fsp.stat(UPDATER_UNIT_PATH);
+			if (targetStat.mtimeMs >= sourceStat.mtimeMs) {
+				shouldCopy = false;
+			}
+		}
+		if (!shouldCopy) return;
+
+		await fsp.copyFile(sourcePath, UPDATER_UNIT_PATH);
+		await fsp.chmod(UPDATER_UNIT_PATH, 0o644);
+
+		await execFileAsync('systemctl', ['daemon-reload']);
+		await execFileAsync('systemctl', ['enable', UPDATER_UNIT_NAME]).catch(() => {
+			/* enable is non-essential; ignore */
+		});
+		console.log(`[update-runner] installed/updated ${UPDATER_UNIT_NAME}`);
+	} catch (err) {
+		console.error('[update-runner] ensureUpdaterUnitInstalled failed:', err);
 	}
 }
 
@@ -74,6 +111,7 @@ export type SpawnedRun = {
 	unitName: string;
 	startedAt: string;
 	backupPath: string | null;
+	targetSha: string | null;
 };
 
 function hhmmss(d: Date = new Date()): string {
@@ -81,23 +119,26 @@ function hhmmss(d: Date = new Date()): string {
 	return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+export type SpawnUpdateRunOptions = {
+	preSha: string;
+	preSchemaHash: string;
+	targetSha?: string | null;
+	trigger?: 'manual' | 'auto';
+};
+
 /**
- * Spawn a detached systemd-run unit that executes the update script.
+ * Take an auto-backup, write the LOG/EXITCODE_FILE/PRE_SHA env file,
+ * and start the dedicated updater unit via `systemctl start --no-block`.
  *
- * Before spawning, this writes an initial header to the log file and creates
- * an auto-backup via the existing createBackup() helper. The backup path is
- * returned so it can be persisted in the run history. If the backup fails the
- * update is aborted — we do not start a potentially destructive update without
- * a known-good rollback target.
+ * Aborts the update with a thrown error if the backup fails — we
+ * refuse to proceed without a known-good rollback target.
  */
-export async function spawnUpdateRun(
-	preSha: string,
-	preSchemaHash: string
-): Promise<SpawnedRun> {
+export async function spawnUpdateRun(options: SpawnUpdateRunOptions): Promise<SpawnedRun> {
+	const { preSha, preSchemaHash, targetSha = null, trigger = 'manual' } = options;
 	const ts = Date.now();
 	const logPath = `/tmp/ip-cam-master-update-${ts}.log`;
 	const exitcodeFile = `/tmp/ip-cam-master-update-${ts}.exitcode`;
-	const unitName = `ip-cam-master-update-${ts}`;
+	const unitName = `${UPDATER_UNIT_NAME}-${ts}`; // logical name for history
 	const startedAt = new Date(ts).toISOString();
 
 	writeFileSync(logPath, `[${hhmmss()}] Pre-update auto-backup...\n`);
@@ -118,25 +159,35 @@ export async function spawnUpdateRun(
 		throw new Error(`Auto-backup failed: ${msg}`);
 	}
 
-	const args = [
-		`--unit=${unitName}`,
-		'--service-type=oneshot',
-		'--collect',
-		'--quiet',
-		`--setenv=LOG=${logPath}`,
-		`--setenv=EXITCODE_FILE=${exitcodeFile}`,
-		INSTALLED_SCRIPT_PATH,
-		preSha,
-		preSchemaHash
-	];
+	// Write env file the systemd unit reads via EnvironmentFile=. The unit's
+	// ExecStart is hard-coded to call /usr/local/bin/ip-cam-master-update.sh
+	// with no args; everything passes through env.
+	const envContent = [
+		`LOG=${logPath}`,
+		`EXITCODE_FILE=${exitcodeFile}`,
+		`PRE_SHA=${preSha}`,
+		`PRE_SCHEMA_HASH=${preSchemaHash}`,
+		`TARGET_SHA=${targetSha ?? ''}`,
+		`UPDATE_TRIGGER=${trigger}`,
+		''
+	].join('\n');
+	writeFileSync(UPDATER_ENV_FILE, envContent, { mode: 0o600 });
 
-	const child: ChildProcess = spawn('systemd-run', args, {
-		detached: true,
-		stdio: 'ignore'
+	// Mark state.json as installing — the bash script picks up the rest.
+	writeUpdateState({
+		updateStatus: 'installing',
+		targetSha,
+		updateStartedAt: startedAt
 	});
+
+	const child: ChildProcess = spawn(
+		'systemctl',
+		['start', '--no-block', UPDATER_UNIT_NAME],
+		{ detached: true, stdio: 'ignore' }
+	);
 	child.unref();
 
-	return { logPath, exitcodeFile, unitName, startedAt, backupPath };
+	return { logPath, exitcodeFile, unitName, startedAt, backupPath, targetSha };
 }
 
 export type TailEvent =
@@ -149,7 +200,6 @@ function exitCodeToResult(code: number): 'success' | 'failed' | 'rolled_back' {
 	return 'failed';
 }
 
-/** Sleep helper that rejects when aborted so the tail loop can exit promptly. */
 function sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
 	return new Promise((resolve) => {
 		if (signal.aborted) return resolve();
@@ -166,13 +216,6 @@ function sleepAbortable(ms: number, signal: AbortSignal): Promise<void> {
 	});
 }
 
-/**
- * Async generator that tails a growing log file line-by-line and terminates
- * once an exitcode file appears.
- *
- * Strategy: poll-based with 500ms interval. This is simpler than fs.watch and
- * works across every filesystem the app might run on (tmpfs, ext4, overlayfs).
- */
 export async function* tailUpdateLog(
 	logPath: string,
 	exitcodeFile: string,
@@ -182,7 +225,6 @@ export async function* tailUpdateLog(
 	let buffer = '';
 
 	while (!signal.aborted) {
-		// Drain any new bytes from the log file first
 		if (existsSync(logPath)) {
 			try {
 				const handle = await fsp.open(logPath, 'r');
@@ -201,7 +243,6 @@ export async function* tailUpdateLog(
 							yield { type: 'log', line };
 						}
 					} else if (stat.size < position) {
-						// Log rotated / truncated — reset and start over
 						position = 0;
 						buffer = '';
 					}
@@ -209,13 +250,11 @@ export async function* tailUpdateLog(
 					await handle.close();
 				}
 			} catch {
-				// Transient read error — retry next tick
+				/* transient */
 			}
 		}
 
-		// Check for completion marker
 		if (existsSync(exitcodeFile)) {
-			// Drain any final bytes
 			if (existsSync(logPath)) {
 				try {
 					const handle = await fsp.open(logPath, 'r');
@@ -260,11 +299,6 @@ export async function* tailUpdateLog(
 	}
 }
 
-/**
- * Parse `git status --porcelain` inside the install dir and return the list of
- * dirty entries (one per line, already trimmed). Returns an empty array on any
- * error so callers can rely on the shape.
- */
 export async function getDirtyFiles(): Promise<string[]> {
 	const installDir = findInstallDir();
 	if (!installDir) return [];
