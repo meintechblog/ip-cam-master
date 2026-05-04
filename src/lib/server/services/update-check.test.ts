@@ -1,18 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { VersionInfo } from './version';
+import type { LastCheckResult } from './update-state-store';
 
-// Mock dependencies BEFORE importing the module under test
 vi.mock('./version', () => ({
 	getCurrentVersion: vi.fn()
 }));
 
-vi.mock('./settings', () => ({
-	getSettings: vi.fn(),
-	saveSetting: vi.fn()
+const stateStore: { state: Record<string, unknown> } = { state: {} };
+
+vi.mock('./update-state-store', () => ({
+	readUpdateState: vi.fn(() => ({
+		currentSha: 'a'.repeat(40),
+		rollbackSha: null,
+		lastCheckAt: stateStore.state.lastCheckAt ?? null,
+		lastCheckEtag: stateStore.state.lastCheckEtag ?? null,
+		lastCheckResult: stateStore.state.lastCheckResult ?? null,
+		updateStatus: 'idle',
+		targetSha: null,
+		updateStartedAt: null,
+		rollbackHappened: false,
+		rollbackReason: null,
+		rollbackStage: null
+	})),
+	writeUpdateState: vi.fn((patch: Record<string, unknown>) => {
+		Object.assign(stateStore.state, patch);
+		return { ...stateStore.state };
+	}),
+	isCheckCooldownClear: vi.fn(() => ({ clear: true, retryAfterSeconds: 0 }))
+}));
+
+vi.mock('./github-client', () => ({
+	checkLatestCommit: vi.fn()
 }));
 
 import { getCurrentVersion } from './version';
-import { saveSetting } from './settings';
+import { checkLatestCommit } from './github-client';
+import { isCheckCooldownClear } from './update-state-store';
 import { checkForUpdate } from './update-check';
 
 const CURRENT_SHA = 'a'.repeat(40);
@@ -29,155 +52,114 @@ function makeVersion(overrides: Partial<VersionInfo> = {}): VersionInfo {
 	};
 }
 
-function makeCommitResponse(sha: string, message = 'commit subject') {
-	return {
-		ok: true,
-		status: 200,
-		headers: new Headers({ 'content-type': 'application/json' }),
-		json: async () => ({
-			sha,
-			commit: {
-				committer: { date: '2026-04-10T12:00:00Z' },
-				message
-			}
-		})
-	} as unknown as Response;
-}
-
-describe('checkForUpdate', () => {
+describe('checkForUpdate (state.json + ETag)', () => {
 	beforeEach(() => {
-		vi.mocked(getCurrentVersion).mockReset();
-		vi.mocked(saveSetting).mockReset();
-		vi.mocked(saveSetting).mockResolvedValue(undefined);
-		vi.unstubAllGlobals();
+		vi.clearAllMocks();
+		stateStore.state = {};
 	});
 
-	it('success path: saves 5 settings and flags hasUpdate=true when shas differ', async () => {
+	it('returns dev_mode when running outside git', async () => {
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion({ isDev: true, sha: 'unknown' }));
+		const result = await checkForUpdate();
+		expect(result).toEqual({ error: 'dev_mode' });
+		expect(checkLatestCommit).not.toHaveBeenCalled();
+	});
+
+	it('returns success with hasUpdate=true when remote SHA differs', async () => {
 		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
-		const fetchMock = vi.fn().mockResolvedValue(makeCommitResponse(LATEST_SHA));
-		vi.stubGlobal('fetch', fetchMock);
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: {
+				status: 'ok',
+				remoteSha: LATEST_SHA,
+				remoteShaShort: LATEST_SHA.slice(0, 7),
+				message: 'feat: new thing',
+				author: 'tester',
+				date: '2026-04-10T12:00:00Z'
+			} as LastCheckResult,
+			etag: 'W/"abc"'
+		});
 
 		const result = await checkForUpdate();
-
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		expect(result.error).toBeNull();
-		if (result.error !== null) return; // type narrow
-		expect(result.hasUpdate).toBe(true);
-		expect(result.warning).toBeNull();
-		expect(result.latestSha).toBe(LATEST_SHA);
-
-		const savedKeys = vi.mocked(saveSetting).mock.calls.map((c) => c[0]);
-		expect(savedKeys).toContain('update_last_checked_at');
-		expect(savedKeys).toContain('update_latest_sha');
-		expect(savedKeys).toContain('update_latest_commit_date');
-		expect(savedKeys).toContain('update_latest_commit_message');
-		expect(savedKeys).toContain('update_last_error');
-		expect(savedKeys.length).toBe(5);
+		expect(result).toMatchObject({
+			error: null,
+			latestSha: LATEST_SHA,
+			latestCommitMessage: 'feat: new thing',
+			hasUpdate: true,
+			warning: null
+		});
 	});
 
-	it('up-to-date: hasUpdate=false when current sha matches latest', async () => {
+	it('passes If-None-Match etag when present in state', async () => {
+		stateStore.state.lastCheckEtag = 'W/"prev-etag"';
 		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeCommitResponse(CURRENT_SHA)));
-
-		const result = await checkForUpdate();
-
-		expect(result.error).toBeNull();
-		if (result.error !== null) return;
-		expect(result.hasUpdate).toBe(false);
-		expect(result.warning).toBeNull();
-	});
-
-	it('dirty working tree: hasUpdate=false, warning=dirty, still persists latest values', async () => {
-		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion({ isDirty: true }));
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeCommitResponse(LATEST_SHA)));
-
-		const result = await checkForUpdate();
-
-		expect(result.error).toBeNull();
-		if (result.error !== null) return;
-		expect(result.hasUpdate).toBe(false);
-		expect(result.warning).toBe('dirty');
-
-		const savedKeys = vi.mocked(saveSetting).mock.calls.map((c) => c[0]);
-		expect(savedKeys).toContain('update_latest_sha');
-		expect(savedKeys).toContain('update_latest_commit_date');
-		expect(savedKeys).toContain('update_latest_commit_message');
-	});
-
-	it('rate limited: returns rate_limited error without touching latest_sha', async () => {
-		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
-		const resetUnix = '1717000000';
-		const rateLimitRes = {
-			ok: false,
-			status: 403,
-			headers: new Headers({
-				'x-ratelimit-remaining': '0',
-				'x-ratelimit-reset': resetUnix
-			}),
-			json: async () => ({ message: 'API rate limit exceeded' })
-		} as unknown as Response;
-		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(rateLimitRes));
-
-		const result = await checkForUpdate();
-
-		expect(result.error).toBe('rate_limited');
-		if (result.error !== 'rate_limited') return;
-		expect(result.resetAt).toBe(new Date(parseInt(resetUnix, 10) * 1000).toISOString());
-
-		// Only update_last_error should be persisted
-		const savedKeys = vi.mocked(saveSetting).mock.calls.map((c) => c[0]);
-		expect(savedKeys).toEqual(['update_last_error']);
-		expect(vi.mocked(saveSetting).mock.calls[0][1]).toBe(
-			`rate_limited:${result.resetAt}`
-		);
-	});
-
-	it('network error: fetch throws → returns network error, only persists update_last_error', async () => {
-		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockRejectedValue(new Error('ECONNREFUSED'))
-		);
-
-		const result = await checkForUpdate();
-
-		expect(result.error).toBe('network');
-
-		const savedKeys = vi.mocked(saveSetting).mock.calls.map((c) => c[0]);
-		expect(savedKeys).toEqual(['update_last_error']);
-		expect(vi.mocked(saveSetting).mock.calls[0][1]).toBe('network');
-	});
-
-	it('dev mode: returns dev_mode error and does NOT call fetch', async () => {
-		vi.mocked(getCurrentVersion).mockResolvedValue(
-			makeVersion({ isDev: true, sha: 'unknown', version: 'dev' })
-		);
-		const fetchMock = vi.fn();
-		vi.stubGlobal('fetch', fetchMock);
-
-		const result = await checkForUpdate();
-
-		expect(result.error).toBe('dev_mode');
-		expect(fetchMock).not.toHaveBeenCalled();
-		expect(vi.mocked(saveSetting)).not.toHaveBeenCalled();
-	});
-
-	it('commit message: truncates to first line and max 200 chars', async () => {
-		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
-		const longLine = 'x'.repeat(300);
-		const multiLine = `${longLine}\n\nBody paragraph that should be stripped`;
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue(makeCommitResponse(LATEST_SHA, multiLine))
-		);
-
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: { status: 'unchanged' },
+			etag: null
+		});
 		await checkForUpdate();
+		expect(checkLatestCommit).toHaveBeenCalledWith({ etag: 'W/"prev-etag"' });
+	});
 
-		const messageCall = vi
-			.mocked(saveSetting)
-			.mock.calls.find((c) => c[0] === 'update_latest_commit_message');
-		expect(messageCall).toBeDefined();
-		expect(messageCall![1]).toBe('x'.repeat(200));
-		expect(messageCall![1]).not.toContain('\n');
+	it('handles 304 unchanged by preserving prior ok result', async () => {
+		stateStore.state.lastCheckResult = {
+			status: 'ok',
+			remoteSha: LATEST_SHA,
+			remoteShaShort: LATEST_SHA.slice(0, 7),
+			message: 'previous commit',
+			author: 'tester',
+			date: '2026-04-09T12:00:00Z'
+		} as LastCheckResult;
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: { status: 'unchanged' },
+			etag: null
+		});
+
+		const result = await checkForUpdate();
+		expect(result).toMatchObject({
+			error: null,
+			latestSha: LATEST_SHA,
+			latestCommitMessage: 'previous commit',
+			hasUpdate: true
+		});
+	});
+
+	it('returns rate_limited with reset ISO when 403/x-ratelimit-remaining=0', async () => {
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
+		const resetUnix = Math.floor(Date.now() / 1000) + 600;
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: { status: 'rate_limited', resetAt: resetUnix } as LastCheckResult,
+			etag: null
+		});
+		const result = await checkForUpdate();
+		expect(result).toMatchObject({ error: 'rate_limited' });
+	});
+
+	it('returns network on github-client error', async () => {
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: { status: 'error', error: 'timed out after 10000ms' },
+			etag: null
+		});
+		const result = await checkForUpdate();
+		expect(result).toMatchObject({ error: 'network', message: 'timed out after 10000ms' });
+	});
+
+	it('returns cooldown when enforceCooldown=true and cooldown not clear', async () => {
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
+		vi.mocked(isCheckCooldownClear).mockReturnValue({ clear: false, retryAfterSeconds: 42 });
+		const result = await checkForUpdate({ enforceCooldown: true });
+		expect(result).toEqual({ error: 'cooldown', retryAfterSeconds: 42 });
+		expect(checkLatestCommit).not.toHaveBeenCalled();
+	});
+
+	it('skips cooldown check when enforceCooldown=false (scheduler path)', async () => {
+		vi.mocked(getCurrentVersion).mockResolvedValue(makeVersion());
+		vi.mocked(checkLatestCommit).mockResolvedValue({
+			result: { status: 'unchanged' },
+			etag: null
+		});
+		await checkForUpdate({ enforceCooldown: false });
+		expect(isCheckCooldownClear).not.toHaveBeenCalled();
 	});
 });

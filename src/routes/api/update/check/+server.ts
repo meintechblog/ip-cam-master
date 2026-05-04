@@ -4,7 +4,8 @@ import { formatVersionLabel } from '$lib/server/services/version';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async () => {
-	const result = await checkForUpdate();
+	// Manual user-triggered check enforces the 5-min cooldown (UPD-AUTO-11).
+	const result = await checkForUpdate({ enforceCooldown: true });
 	// After the check (success or error), re-read the canonical stored status
 	// so the UI has a single shape to render.
 	const status = await getStoredUpdateStatus();
