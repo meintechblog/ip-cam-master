@@ -1,91 +1,184 @@
+/**
+ * Update run history — backed by the `update_runs` SQLite table
+ * (UPD-AUTO-10). Replaces the JSON blob previously stored in
+ * settings.update_run_history.
+ *
+ * Crash recovery: rows for in-flight updates start with status='running'
+ * and are reconciled at boot via the on-disk exitcode file written by
+ * scripts/update.sh. Same contract as the previous JSON-blob impl, so
+ * callers don't need to change.
+ *
+ * One-time migration: on first read, if a legacy
+ * settings.update_run_history blob exists, its entries are inserted
+ * into update_runs and the settings row is deleted.
+ */
+
 import { readFileSync, existsSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { db, sqlite } from '$lib/server/db/client';
+import { updateRuns } from '$lib/server/db/schema';
+import { desc, eq } from 'drizzle-orm';
 import { getSetting, saveSetting } from './settings';
 
-const HISTORY_KEY = 'update_run_history';
-const MAX_ENTRIES = 10;
+const LEGACY_HISTORY_KEY = 'update_run_history';
+const MAX_DEFAULT_LIMIT = 10;
+
+export type UpdateRunStatus = 'running' | 'success' | 'failed' | 'rolled_back';
+export type UpdateRunTrigger = 'manual' | 'auto';
 
 export type UpdateRunEntry = {
+	id?: number;
 	startedAt: string;
 	finishedAt: string | null;
 	preSha: string;
 	postSha: string | null;
-	result: 'running' | 'success' | 'failed' | 'rolled_back';
+	result: UpdateRunStatus;
 	logPath: string;
 	unitName: string;
 	backupPath?: string | null;
+	stage?: string | null;
+	errorMessage?: string | null;
+	rollbackStage?: 'stage1' | 'stage2' | null;
+	trigger?: UpdateRunTrigger;
+	targetSha?: string | null;
 };
 
-async function loadHistory(): Promise<UpdateRunEntry[]> {
-	const raw = await getSetting(HISTORY_KEY);
-	if (!raw) return [];
+let legacyMigrated = false;
+
+async function maybeMigrateLegacy(): Promise<void> {
+	if (legacyMigrated) return;
+	legacyMigrated = true;
+
+	const raw = await getSetting(LEGACY_HISTORY_KEY);
+	if (!raw) return;
+
 	try {
 		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return [];
-		return parsed as UpdateRunEntry[];
-	} catch {
-		return [];
+		if (!Array.isArray(parsed)) return;
+		for (const entry of parsed) {
+			if (!entry || typeof entry !== 'object') continue;
+			const e = entry as Partial<UpdateRunEntry>;
+			db.insert(updateRuns)
+				.values({
+					startedAt: e.startedAt ?? new Date().toISOString(),
+					finishedAt: e.finishedAt ?? null,
+					preSha: e.preSha ?? null,
+					postSha: e.postSha ?? null,
+					targetSha: null,
+					status: (e.result as UpdateRunStatus) ?? 'failed',
+					stage: e.stage ?? null,
+					errorMessage: e.errorMessage ?? null,
+					rollbackStage: e.rollbackStage ?? null,
+					unitName: e.unitName ?? null,
+					logPath: e.logPath ?? null,
+					backupPath: e.backupPath ?? null,
+					trigger: 'manual'
+				})
+				.run();
+		}
+		// Drop the legacy blob. saveSetting('', '') would not delete; use raw SQL.
+		sqlite.prepare('DELETE FROM settings WHERE key = ?').run(LEGACY_HISTORY_KEY);
+		console.log(`[update-history] migrated ${parsed.length} legacy entries to update_runs`);
+	} catch (err) {
+		console.error('[update-history] legacy migration failed:', (err as Error).message);
 	}
 }
 
-async function saveHistory(entries: UpdateRunEntry[]): Promise<void> {
-	await saveSetting(HISTORY_KEY, JSON.stringify(entries));
+function rowToEntry(row: typeof updateRuns.$inferSelect): UpdateRunEntry {
+	return {
+		id: row.id,
+		startedAt: row.startedAt,
+		finishedAt: row.finishedAt,
+		preSha: row.preSha ?? '',
+		postSha: row.postSha,
+		result: row.status as UpdateRunStatus,
+		logPath: row.logPath ?? '',
+		unitName: row.unitName ?? '',
+		backupPath: row.backupPath,
+		stage: row.stage,
+		errorMessage: row.errorMessage,
+		rollbackStage: row.rollbackStage as 'stage1' | 'stage2' | null,
+		trigger: (row.trigger ?? 'manual') as UpdateRunTrigger,
+		targetSha: row.targetSha
+	};
 }
 
 /**
- * Append a new update run entry to the persisted history.
- *
- * The history is bounded to the last {@link MAX_ENTRIES} entries — when the
- * limit is exceeded the oldest entry (first in the array) is dropped. Entries
- * are stored in chronological order (oldest first) in the settings table; the
- * reader reverses them for display.
+ * Insert a new entry. Returns the inserted row id.
  */
-export async function appendUpdateRun(entry: UpdateRunEntry): Promise<void> {
-	const current = await loadHistory();
-	current.push(entry);
-	const trimmed = current.slice(-MAX_ENTRIES);
-	await saveHistory(trimmed);
+export async function appendUpdateRun(entry: UpdateRunEntry): Promise<number> {
+	await maybeMigrateLegacy();
+	const result = db
+		.insert(updateRuns)
+		.values({
+			startedAt: entry.startedAt,
+			finishedAt: entry.finishedAt,
+			preSha: entry.preSha,
+			postSha: entry.postSha,
+			targetSha: entry.targetSha ?? null,
+			status: entry.result,
+			stage: entry.stage ?? null,
+			errorMessage: entry.errorMessage ?? null,
+			rollbackStage: entry.rollbackStage ?? null,
+			unitName: entry.unitName,
+			logPath: entry.logPath,
+			backupPath: entry.backupPath ?? null,
+			trigger: entry.trigger ?? 'manual'
+		})
+		.returning({ id: updateRuns.id })
+		.all();
+	return result[0]?.id ?? 0;
 }
 
 /**
- * Patch an existing entry in place by unitName. No-op if not found.
- * Typically called from the SSE endpoint when the `done` event fires so the
- * finishedAt, result, and postSha fields are persisted.
+ * Patch an existing entry by unitName. No-op if not found.
  */
 export async function updateUpdateRun(
 	unitName: string,
 	patch: Partial<UpdateRunEntry>
 ): Promise<void> {
-	const current = await loadHistory();
-	const idx = current.findIndex((entry) => entry.unitName === unitName);
-	if (idx === -1) return;
-	current[idx] = { ...current[idx], ...patch };
-	await saveHistory(current);
+	await maybeMigrateLegacy();
+	const updates: Partial<typeof updateRuns.$inferInsert> = {};
+	if (patch.finishedAt !== undefined) updates.finishedAt = patch.finishedAt;
+	if (patch.preSha !== undefined) updates.preSha = patch.preSha;
+	if (patch.postSha !== undefined) updates.postSha = patch.postSha;
+	if (patch.targetSha !== undefined) updates.targetSha = patch.targetSha;
+	if (patch.result !== undefined) updates.status = patch.result;
+	if (patch.stage !== undefined) updates.stage = patch.stage;
+	if (patch.errorMessage !== undefined) updates.errorMessage = patch.errorMessage;
+	if (patch.rollbackStage !== undefined) updates.rollbackStage = patch.rollbackStage;
+	if (patch.logPath !== undefined) updates.logPath = patch.logPath;
+	if (patch.backupPath !== undefined) updates.backupPath = patch.backupPath;
+	if (Object.keys(updates).length === 0) return;
+
+	db.update(updateRuns).set(updates).where(eq(updateRuns.unitName, unitName)).run();
+}
+
+export async function readUpdateRuns(limit: number = MAX_DEFAULT_LIMIT): Promise<UpdateRunEntry[]> {
+	await maybeMigrateLegacy();
+	const rows = db.select().from(updateRuns).orderBy(desc(updateRuns.startedAt)).limit(limit).all();
+	return rows.map(rowToEntry);
 }
 
 /**
- * Read the last N entries in reverse-chronological order (newest first).
- */
-export async function readUpdateRuns(limit: number = MAX_ENTRIES): Promise<UpdateRunEntry[]> {
-	const current = await loadHistory();
-	// Newest first
-	const reversed = [...current].reverse();
-	return reversed.slice(0, limit);
-}
-
-/**
- * Reconcile any entries still marked `running` against their exit-code files on
- * disk. The in-memory SSE watcher that normally patches the entry dies when the
- * app itself restarts during its own update, leaving the entry stuck as
- * `running`. On next boot we check the exit-code file the script wrote and
- * retroactively mark the entry as success / failed / rolled_back.
+ * Reconcile any rows still marked `running` against their on-disk exit
+ * code files. The Node process that started the run may have died
+ * mid-flight (during its own update), leaving the row stuck. On boot,
+ * we patch each one based on the exitcode file and the final marker
+ * line in the log.
  */
 export async function reconcileRunningEntries(): Promise<number> {
-	const current = await loadHistory();
+	await maybeMigrateLegacy();
+	const rows = db
+		.select()
+		.from(updateRuns)
+		.where(eq(updateRuns.status, 'running'))
+		.all();
+
 	let patched = 0;
-	for (const entry of current) {
-		if (entry.result !== 'running') continue;
-		const exitcodePath = entry.logPath.replace(/\.log$/, '.exitcode');
+	for (const row of rows) {
+		if (!row.logPath) continue;
+		const exitcodePath = row.logPath.replace(/\.log$/, '.exitcode');
 		if (!existsSync(exitcodePath)) continue;
 		let code: number;
 		try {
@@ -93,18 +186,25 @@ export async function reconcileRunningEntries(): Promise<number> {
 		} catch {
 			continue;
 		}
-		entry.result = code === 0 ? 'success' : code === 2 ? 'rolled_back' : 'failed';
-		entry.finishedAt = new Date().toISOString();
+
+		const result: UpdateRunStatus =
+			code === 0 ? 'success' : code === 2 ? 'rolled_back' : 'failed';
+
+		const updates: Partial<typeof updateRuns.$inferInsert> = {
+			status: result,
+			finishedAt: new Date().toISOString()
+		};
 		if (code === 0) {
-			const resultLine = readMarkerLine(entry.logPath);
-			if (resultLine) {
-				const match = resultLine.match(/-> ([0-9a-f]{40})/);
-				if (match) entry.postSha = match[1];
+			const marker = readMarkerLine(row.logPath);
+			if (marker) {
+				const m = marker.match(/-> ([0-9a-f]{40})/);
+				if (m) updates.postSha = m[1];
 			}
 		}
+
+		db.update(updateRuns).set(updates).where(eq(updateRuns.id, row.id)).run();
 		patched++;
 	}
-	if (patched > 0) await saveHistory(current);
 	return patched;
 }
 
@@ -122,53 +222,48 @@ function readMarkerLine(logPath: string): string | null {
 }
 
 /**
- * Remove stale update log/exitcode files + history entries older than
- * {@link maxAgeDays}. Two-pass cleanup:
- *
- *   1. Drop history entries whose `startedAt` is older than the cutoff,
- *      unlinking their log and exitcode files if still present.
- *   2. Sweep `/tmp` for orphaned `ip-cam-master-update-*.{log,exitcode}`
- *      files that are not referenced by any remaining history entry and
- *      whose mtime is older than the cutoff.
- *
- * Never touches files younger than the cutoff (running update is always safe).
- * Returns a summary for logging.
+ * Remove stale entries + log/exitcode files older than `maxAgeDays`.
+ * Drops the row from update_runs if older than cutoff. Sweeps /tmp for
+ * orphaned log files older than cutoff that aren't referenced by any
+ * remaining row.
  */
 export async function cleanupOldUpdateLogs(maxAgeDays: number = 30): Promise<{
 	entriesDropped: number;
 	filesRemoved: number;
 }> {
+	await maybeMigrateLegacy();
 	const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-	const current = await loadHistory();
+	const allRows = db.select().from(updateRuns).all();
 
-	const kept: UpdateRunEntry[] = [];
 	const referencedFiles = new Set<string>();
 	let entriesDropped = 0;
 	let filesRemoved = 0;
 
-	for (const entry of current) {
-		const entryMs = Date.parse(entry.startedAt);
-		if (Number.isFinite(entryMs) && entryMs < cutoffMs) {
+	for (const row of allRows) {
+		const startedMs = Date.parse(row.startedAt);
+		if (Number.isFinite(startedMs) && startedMs < cutoffMs) {
+			db.delete(updateRuns).where(eq(updateRuns.id, row.id)).run();
 			entriesDropped++;
-			const exitcode = entry.logPath.replace(/\.log$/, '.exitcode');
-			for (const p of [entry.logPath, exitcode]) {
-				try {
-					if (existsSync(p)) {
-						unlinkSync(p);
-						filesRemoved++;
+			if (row.logPath) {
+				const exitcode = row.logPath.replace(/\.log$/, '.exitcode');
+				for (const p of [row.logPath, exitcode]) {
+					try {
+						if (existsSync(p)) {
+							unlinkSync(p);
+							filesRemoved++;
+						}
+					} catch {
+						/* tolerate */
 					}
-				} catch {
-					/* tolerate permission / not-found */
 				}
 			}
 			continue;
 		}
-		kept.push(entry);
-		referencedFiles.add(entry.logPath);
-		referencedFiles.add(entry.logPath.replace(/\.log$/, '.exitcode'));
+		if (row.logPath) {
+			referencedFiles.add(row.logPath);
+			referencedFiles.add(row.logPath.replace(/\.log$/, '.exitcode'));
+		}
 	}
-
-	if (entriesDropped > 0) await saveHistory(kept);
 
 	try {
 		const tmpFiles = readdirSync('/tmp');
@@ -187,7 +282,7 @@ export async function cleanupOldUpdateLogs(maxAgeDays: number = 30): Promise<{
 			}
 		}
 	} catch {
-		/* /tmp unreadable — unusual but survivable */
+		/* /tmp unreadable */
 	}
 
 	return { entriesDropped, filesRemoved };
