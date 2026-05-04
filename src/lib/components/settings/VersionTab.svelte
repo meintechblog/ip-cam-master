@@ -1,6 +1,13 @@
 <script lang="ts">
-	import { RefreshCw, AlertTriangle, CheckCircle2, ArrowUpCircle } from 'lucide-svelte';
+	import {
+		RefreshCw,
+		AlertTriangle,
+		CheckCircle2,
+		ArrowUpCircle,
+		RotateCcw
+	} from 'lucide-svelte';
 	import UpdateRunPanel from './UpdateRunPanel.svelte';
+	import AutoUpdateCard from './AutoUpdateCard.svelte';
 
 	type CurrentShape = {
 		label: string;
@@ -8,6 +15,12 @@
 		tag: string | null;
 		isDev: boolean;
 		isDirty: boolean;
+	};
+
+	type AutoUpdateShape = {
+		enabled: boolean;
+		hour: number;
+		lastAutoUpdateAt: string | null;
 	};
 
 	type StatusShape = {
@@ -18,11 +31,18 @@
 		latestCommitMessage: string | null;
 		lastError: string | null;
 		hasUpdate: boolean;
+		updateStatus?: string;
+		rollbackHappened?: boolean;
+		rollbackReason?: string | null;
+		rollbackStage?: 'stage1' | 'stage2' | null;
+		inProgressUpdate?: { targetSha: string | null; startedAt: string | null } | null;
+		autoUpdate?: AutoUpdateShape;
 	};
 
 	type CheckResponse = StatusShape & {
 		checkResult:
 			| { error: null }
+			| { error: 'cooldown'; retryAfterSeconds: number }
 			| { error: 'rate_limited'; resetAt: string }
 			| { error: 'network'; message: string }
 			| { error: 'dev_mode' };
@@ -31,6 +51,7 @@
 	let status = $state<StatusShape | null>(null);
 	let loading = $state(false);
 	let errorBanner = $state<string | null>(null);
+	let dismissingRollback = $state(false);
 
 	function formatRelativeTime(iso: string | null): string {
 		if (!iso) return 'nie';
@@ -82,8 +103,8 @@
 			const res = await fetch('/api/update/check', { method: 'POST' });
 			const body = (await res.json()) as CheckResponse;
 
-			// Always refresh the status fields from the response
 			status = {
+				...status,
 				current: body.current,
 				lastCheckedAt: body.lastCheckedAt,
 				latestSha: body.latestSha,
@@ -91,10 +112,12 @@
 				latestCommitMessage: body.latestCommitMessage,
 				lastError: body.lastError,
 				hasUpdate: body.hasUpdate
-			};
+			} as StatusShape;
 
 			const result = body.checkResult;
-			if (result.error === 'rate_limited') {
+			if (result.error === 'cooldown') {
+				errorBanner = `Cooldown — bitte in ${result.retryAfterSeconds}s erneut versuchen`;
+			} else if (result.error === 'rate_limited') {
 				errorBanner = `Rate limit — nächste Prüfung möglich um ${formatResetTime(result.resetAt)}`;
 			} else if (result.error === 'network') {
 				errorBanner = 'Netzwerkfehler — GitHub nicht erreichbar';
@@ -105,6 +128,16 @@
 			errorBanner = `Netzwerkfehler: ${(e as Error).message}`;
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function dismissRollback() {
+		dismissingRollback = true;
+		try {
+			await fetch('/api/update/ack-rollback', { method: 'POST' });
+			await loadStatus();
+		} finally {
+			dismissingRollback = false;
 		}
 	}
 
@@ -130,9 +163,7 @@
 					class="mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded flex items-start gap-2"
 				>
 					<AlertTriangle class="w-5 h-5 flex-shrink-0 mt-0.5" />
-					<span
-						>Lokale Änderungen im Installationsverzeichnis — Update blockiert.</span
-					>
+					<span>Lokale Änderungen im Installationsverzeichnis — Update blockiert.</span>
 				</div>
 			{/if}
 
@@ -145,7 +176,46 @@
 			{/if}
 		</div>
 
-		<!-- Card 2: Update status -->
+		<!-- Rollback banner (Phase 24) -->
+		{#if status.rollbackHappened}
+			<div class="bg-orange-500/10 border border-orange-500/30 text-orange-400 px-4 py-3 rounded space-y-2">
+				<div class="flex items-start gap-2">
+					<RotateCcw class="w-5 h-5 flex-shrink-0 mt-0.5" />
+					<div class="space-y-1">
+						<div class="font-semibold">Letztes Update wurde zurückgesetzt</div>
+						{#if status.rollbackStage}
+							<div class="text-sm">
+								Rollback-Stufe: {status.rollbackStage === 'stage2' ? 'Snapshot-Restore (Stufe 2)' : 'Git-Reset (Stufe 1)'}
+							</div>
+						{/if}
+						{#if status.rollbackReason}
+							<div class="text-sm">Grund: {status.rollbackReason}</div>
+						{/if}
+					</div>
+				</div>
+				<div>
+					<button
+						type="button"
+						onclick={dismissRollback}
+						disabled={dismissingRollback}
+						class="text-sm px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 rounded transition-colors disabled:opacity-50"
+					>
+						Verstanden
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Card 2: Auto-Update (Phase 24) -->
+		{#if !status.current.isDev && status.autoUpdate}
+			<AutoUpdateCard
+				initialEnabled={status.autoUpdate.enabled}
+				initialHour={status.autoUpdate.hour}
+				lastAutoUpdateAt={status.autoUpdate.lastAutoUpdateAt}
+			/>
+		{/if}
+
+		<!-- Card 3: Update status -->
 		<div class="bg-bg-card rounded-lg border border-border p-6 space-y-4">
 			<h2 class="text-lg font-semibold text-text-primary">Update-Status</h2>
 
@@ -184,6 +254,11 @@
 				<div
 					class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 font-semibold"
 				>
+					<span class="relative flex h-2 w-2">
+						<span class="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"
+						></span>
+						<span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+					</span>
 					<ArrowUpCircle class="w-4 h-4" />
 					Update verfügbar
 				</div>
@@ -228,7 +303,7 @@
 			</div>
 		</div>
 
-		<!-- Card 3: Update runner -->
+		<!-- Card 4: Update runner -->
 		<div class="bg-bg-card rounded-lg border border-border p-6">
 			<UpdateRunPanel {status} />
 		</div>

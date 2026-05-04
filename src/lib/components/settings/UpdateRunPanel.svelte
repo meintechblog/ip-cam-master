@@ -5,8 +5,12 @@
 		CheckCircle2,
 		XCircle,
 		RotateCcw,
-		AlertTriangle
+		AlertTriangle,
+		Clock
 	} from 'lucide-svelte';
+	import UpdateStageStepper, { type StageName, type StageState } from './UpdateStageStepper.svelte';
+	import ReconnectOverlay from './ReconnectOverlay.svelte';
+	import InstallModal, { type PreflightShape } from './InstallModal.svelte';
 
 	type VersionCurrent = {
 		label: string;
@@ -41,6 +45,7 @@
 		result: 'running' | 'success' | 'failed' | 'rolled_back';
 		logPath: string;
 		unitName: string;
+		trigger?: 'manual' | 'auto';
 	};
 
 	type DoneResult = { exitCode: number; result: string; postSha: string | null };
@@ -55,8 +60,12 @@
 	let doneResult = $state<DoneResult | null>(null);
 	let errorBanner = $state<string | null>(null);
 	let history = $state<UpdateRunEntry[]>([]);
+	let preflight = $state<PreflightShape | null>(null);
+	let modalOpen = $state(false);
+	let showReconnect = $state(false);
+	let currentStage = $state<StageName | null>(null);
+	let stageStatuses = $state<Partial<Record<StageName, StageState>>>({});
 
-	// Non-reactive EventSource ref
 	let eventSource: EventSource | null = null;
 	let logPanel = $state<HTMLPreElement | null>(null);
 
@@ -93,6 +102,13 @@
 		}
 	}
 
+	function parseStageMarker(line: string): StageName | null {
+		const m = line.match(
+			/\[stage=(preflight|snapshot|drain|stop|fetch|install|build|start|verify)\]/
+		);
+		return (m?.[1] as StageName) ?? null;
+	}
+
 	async function loadHistory() {
 		try {
 			const res = await fetch('/api/update/run/history');
@@ -100,7 +116,7 @@
 				history = (await res.json()) as UpdateRunEntry[];
 			}
 		} catch {
-			/* ignore — history is a nice-to-have */
+			/* ignore */
 		}
 	}
 
@@ -114,14 +130,14 @@
 	function openStream(info: RunInfo) {
 		closeStream();
 		logLines = [];
+		stageStatuses = {};
+		currentStage = null;
+		showReconnect = false;
 		const url = `/api/update/run/stream?logPath=${encodeURIComponent(info.logPath)}&exitcodeFile=${encodeURIComponent(info.exitcodeFile)}`;
 		const es = new EventSource(url);
 		eventSource = es;
 
 		es.addEventListener('open', () => {
-			// Clear on every (re)connect: the log file is the source of truth and
-			// the server will replay it from position 0, so we want to start fresh
-			// each time rather than duplicate lines.
 			logLines = [];
 			runState = 'running';
 		});
@@ -130,8 +146,21 @@
 			try {
 				const { line } = JSON.parse(e.data) as { line: string };
 				logLines = [...logLines, line].slice(-1000);
+				const next = parseStageMarker(line);
+				if (next) {
+					if (currentStage && currentStage !== next) {
+						stageStatuses = { ...stageStatuses, [currentStage]: 'done' };
+					}
+					currentStage = next;
+				}
+				if (line.includes('rolled back stage1')) {
+					stageStatuses = { ...stageStatuses, [currentStage ?? 'verify']: 'rolled_back' };
+				}
+				if (line.includes('rolled back stage2')) {
+					stageStatuses = { ...stageStatuses, [currentStage ?? 'verify']: 'rolled_back' };
+				}
 			} catch {
-				/* ignore bad payload */
+				/* ignore */
 			}
 		});
 
@@ -140,22 +169,51 @@
 				const parsed = JSON.parse(e.data) as DoneResult;
 				doneResult = parsed;
 				runState = parsed.result as typeof runState;
+				if (parsed.result === 'success' && currentStage) {
+					stageStatuses = { ...stageStatuses, [currentStage]: 'done' };
+				} else if (parsed.result === 'failed' && currentStage) {
+					stageStatuses = { ...stageStatuses, [currentStage]: 'failed' };
+				}
 			} catch {
 				runState = 'failed';
 			}
 			closeStream();
+			showReconnect = false;
 			loadHistory();
 		});
 
 		es.onerror = () => {
-			// Browser auto-reconnects on network drop — do nothing here, the `open`
-			// handler will clear logLines on the next connection.
+			// SSE drop while running install — show reconnect overlay so the
+			// user knows we're waiting for the new server to come up.
+			if (runState === 'running' && currentStage && ['stop', 'start', 'verify'].includes(currentStage)) {
+				showReconnect = true;
+			}
 		};
 	}
 
-	async function startUpdate() {
-		runState = 'starting';
+	async function fetchPreflight(): Promise<PreflightShape | null> {
+		try {
+			const res = await fetch('/api/update/run-preflight');
+			if (!res.ok) return null;
+			return (await res.json()) as PreflightShape;
+		} catch {
+			return null;
+		}
+	}
+
+	async function startUpdateClick() {
 		errorBanner = null;
+		preflight = await fetchPreflight();
+		if (!preflight) {
+			errorBanner = 'Pre-flight konnte nicht geladen werden';
+			return;
+		}
+		modalOpen = true;
+	}
+
+	async function confirmInstall(overrideConflicts: boolean) {
+		modalOpen = false;
+		runState = 'starting';
 		doneResult = null;
 		logLines = [];
 
@@ -163,17 +221,20 @@
 			const res = await fetch('/api/update/run', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({})
+				body: JSON.stringify({ ignoreConflicts: overrideConflicts })
 			});
 
 			if (!res.ok) {
-				let body: { error?: string; dirtyFiles?: string[] } = {};
+				let body: { error?: string; dirtyFiles?: string[]; conflicts?: { detail: string }[] } = {};
 				try {
 					body = await res.json();
 				} catch {
 					/* empty */
 				}
 				switch (body.error) {
+					case 'localhost_only':
+						errorBanner = 'Update kann nur lokal ausgelöst werden (localhost-Schutz)';
+						break;
 					case 'dev_mode':
 						errorBanner = 'Dev-Modus — Update deaktiviert';
 						break;
@@ -182,6 +243,9 @@
 						break;
 					case 'already_up_to_date':
 						errorBanner = 'Bereits auf dem neuesten Stand';
+						break;
+					case 'active_flows':
+						errorBanner = `Aktive Vorgänge: ${(body.conflicts ?? []).map((c) => c.detail).join('; ')}`;
 						break;
 					default:
 						errorBanner = `Fehler: ${body.error ?? res.statusText}`;
@@ -198,19 +262,20 @@
 		}
 	}
 
-	// Auto-scroll log panel to bottom when new lines arrive
+	function onReconnectComplete(_newSha: string) {
+		showReconnect = false;
+		loadHistory();
+	}
+
 	$effect(() => {
-		// Re-run whenever logLines changes
 		void logLines.length;
 		if (logPanel) {
 			logPanel.scrollTop = logPanel.scrollHeight;
 		}
 	});
 
-	// Mount effect: load history + auto-resume in-flight run
 	$effect(() => {
 		loadHistory().then(() => {
-			// If the most recent entry is still "running", resume the stream
 			const latest = history[0];
 			if (latest && latest.result === 'running') {
 				const resumedInfo: RunInfo = {
@@ -237,7 +302,7 @@
 		<div>
 			<button
 				type="button"
-				onclick={startUpdate}
+				onclick={startUpdateClick}
 				disabled={buttonDisabled()}
 				title={buttonTooltip()}
 				class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -264,6 +329,8 @@
 
 	{#if runState !== 'idle'}
 		<div class="space-y-3">
+			<UpdateStageStepper currentStage={currentStage} statuses={stageStatuses} />
+
 			<pre
 				bind:this={logPanel}
 				class="bg-black/60 border border-border text-xs text-green-300 font-mono p-4 rounded max-h-96 overflow-auto whitespace-pre-wrap break-all">{logLines.join('\n')}</pre>
@@ -282,7 +349,7 @@
 					</div>
 				{:else if doneResult.result === 'rolled_back'}
 					<div
-						class="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded flex items-start gap-2"
+						class="bg-orange-500/10 border border-orange-500/30 text-orange-400 px-4 py-3 rounded flex items-start gap-2"
 					>
 						<RotateCcw class="w-5 h-5 flex-shrink-0 mt-0.5" />
 						<span>
@@ -310,27 +377,33 @@
 						<tr class="text-left text-text-secondary border-b border-border">
 							<th class="py-2 pr-2">Zeitpunkt</th>
 							<th class="py-2 pr-2">SHA</th>
+							<th class="py-2 pr-2">Auslöser</th>
 							<th class="py-2">Ergebnis</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each history.slice(0, 5) as entry (entry.unitName)}
+						{#each history.slice(0, 10) as entry (entry.unitName)}
 							<tr class="border-b border-border/50">
 								<td class="py-2 pr-2 text-text-secondary">{formatTimestamp(entry.startedAt)}</td>
 								<td class="py-2 pr-2 font-mono text-text-secondary">
 									{shortSha(entry.preSha)} → {shortSha(entry.postSha)}
 								</td>
+								<td class="py-2 pr-2">
+									{#if entry.trigger === 'auto'}
+										<span class="inline-flex items-center gap-1 text-blue-400 text-xs">
+											<Clock class="w-3 h-3" /> auto
+										</span>
+									{:else}
+										<span class="text-text-secondary text-xs">manuell</span>
+									{/if}
+								</td>
 								<td class="py-2">
 									{#if entry.result === 'success'}
-										<span
-											class="inline-flex items-center gap-1 text-green-400"
-										>
+										<span class="inline-flex items-center gap-1 text-green-400">
 											<CheckCircle2 class="w-3 h-3" /> Erfolg
 										</span>
 									{:else if entry.result === 'rolled_back'}
-										<span
-											class="inline-flex items-center gap-1 text-orange-400"
-										>
+										<span class="inline-flex items-center gap-1 text-orange-400">
 											<RotateCcw class="w-3 h-3" /> Zurückgesetzt
 										</span>
 									{:else if entry.result === 'failed'}
@@ -338,9 +411,7 @@
 											<XCircle class="w-3 h-3" /> Fehler
 										</span>
 									{:else}
-										<span
-											class="inline-flex items-center gap-1 text-blue-400"
-										>
+										<span class="inline-flex items-center gap-1 text-blue-400">
 											<Loader2 class="w-3 h-3 animate-spin" /> Läuft
 										</span>
 									{/if}
@@ -353,3 +424,19 @@
 		</div>
 	{/if}
 </div>
+
+{#if modalOpen && preflight}
+	<InstallModal
+		{preflight}
+		onConfirm={confirmInstall}
+		onClose={() => (modalOpen = false)}
+	/>
+{/if}
+
+{#if showReconnect && status.current.sha}
+	<ReconnectOverlay
+		startSha={status.current.sha}
+		expectedSha={preflight?.target.sha ?? null}
+		onComplete={onReconnectComplete}
+	/>
+{/if}
