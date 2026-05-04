@@ -28,19 +28,17 @@
 		saving = true;
 		saveError = null;
 		try {
-			const r1 = await fetch('/api/settings', {
+			// PUT /api/settings expects a flat { key1: val1, key2: val2 } object,
+			// NOT { key, value } envelope.
+			const res = await fetch('/api/settings', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ key: 'update.autoUpdate', value: enabled ? 'true' : 'false' })
+				body: JSON.stringify({
+					'update.autoUpdate': enabled ? 'true' : 'false',
+					'update.autoUpdateHour': String(hour)
+				})
 			});
-			if (!r1.ok) throw new Error(`autoUpdate save: HTTP ${r1.status}`);
-
-			const r2 = await fetch('/api/settings', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ key: 'update.autoUpdateHour', value: String(hour) })
-			});
-			if (!r2.ok) throw new Error(`autoUpdateHour save: HTTP ${r2.status}`);
+			if (!res.ok) throw new Error(`save: HTTP ${res.status}`);
 
 			lastSaveAt = Date.now();
 		} catch (err) {
