@@ -1,9 +1,18 @@
-import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { promisify } from 'node:util';
+/**
+ * Version info for the running app — see UPD-AUTO-13.
+ *
+ * Backed by `src/lib/version.ts` which is generated at build time by
+ * `scripts/build/generate-version.mjs` (npm run gen:version, chained
+ * into both `dev` and `build`). This removes the runtime dependency on
+ * a `.git/` directory being present, which was a source of post-deploy
+ * problems on rsync'd installs.
+ *
+ * `isDirty` is no longer derived (build artifacts can't tell us about
+ * post-build worktree edits) — kept on the type for backwards
+ * compatibility but always false in production builds.
+ */
 
-const execFileAsync = promisify(execFile);
+import { CURRENT_SHA, CURRENT_SHA_SHORT, BUILD_TIME } from '$lib/version';
 
 export type VersionInfo = {
 	version: string;
@@ -11,52 +20,14 @@ export type VersionInfo = {
 	tag: string | null;
 	isDev: boolean;
 	isDirty: boolean;
-};
-
-type ParsedDescribe = {
-	tag: string | null;
-	sha: string | null;
-	isDirty: boolean;
+	buildTime?: string;
 };
 
 let cachedVersion: VersionInfo | null = null;
 
 /**
- * Parse the output of `git describe --tags --always --dirty --abbrev=7`.
- * Returns the tag, short sha, and dirty flag.
- */
-export function parseDescribe(describe: string): ParsedDescribe {
-	let isDirty = false;
-	let value = describe.trim();
-	if (value.endsWith('-dirty')) {
-		isDirty = true;
-		value = value.slice(0, -'-dirty'.length);
-	}
-
-	// Tag + parent count + sha: v0.1.0-5-gabc1234
-	const tagWithCommits = value.match(/^(v[^-]+)-\d+-g([0-9a-f]{7,})$/);
-	if (tagWithCommits) {
-		return { tag: tagWithCommits[1], sha: tagWithCommits[2], isDirty };
-	}
-
-	// Tag only: v1.2.3
-	const tagOnly = value.match(/^(v[^-]+)$/);
-	if (tagOnly) {
-		return { tag: tagOnly[1], sha: null, isDirty };
-	}
-
-	// Bare short sha: abc1234
-	const bareSha = value.match(/^([0-9a-f]{7,})$/);
-	if (bareSha) {
-		return { tag: null, sha: bareSha[1], isDirty };
-	}
-
-	return { tag: null, sha: null, isDirty };
-}
-
-/**
- * Build a human-readable label from a VersionInfo.
- * Always renders SHAs as 7-char short form regardless of input length.
+ * Build a human-readable label from a VersionInfo. Always renders SHAs
+ * as 7-char short form regardless of input length.
  */
 export function formatVersionLabel(info: VersionInfo): string {
 	if (info.isDev) return 'dev';
@@ -67,62 +38,38 @@ export function formatVersionLabel(info: VersionInfo): string {
 }
 
 /**
- * Resolve the current running version by shelling out to git.
- * Caches the result in-process after the first call.
- *
- * Returns a dev-mode fallback if no .git directory is reachable.
+ * Resolve the current running version from the build-time generated
+ * constants. Caches the first lookup in-process. Returns dev-mode
+ * fallback if the generator wrote empty placeholders (fresh checkout
+ * without git).
  */
 export async function getCurrentVersion(): Promise<VersionInfo> {
 	if (cachedVersion) return cachedVersion;
 
-	const candidateDirs = ['/opt/ip-cam-master', process.cwd()];
-	const gitDir = candidateDirs.find((dir) => existsSync(path.join(dir, '.git')));
-
-	if (!gitDir) {
+	const sha = CURRENT_SHA || '';
+	if (!sha) {
 		cachedVersion = {
 			version: 'dev',
 			sha: 'unknown',
 			tag: null,
 			isDev: true,
-			isDirty: false
+			isDirty: false,
+			buildTime: BUILD_TIME
 		};
 		return cachedVersion;
 	}
 
-	try {
-		const [describeRes, revParseRes] = await Promise.all([
-			execFileAsync('git', ['describe', '--tags', '--always', '--dirty', '--abbrev=7'], {
-				cwd: gitDir
-			}),
-			execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: gitDir })
-		]);
-
-		const parsed = parseDescribe(describeRes.stdout);
-		const fullSha = revParseRes.stdout.trim();
-		const shortSha = parsed.sha ?? fullSha.slice(0, 7);
-
-		const info: VersionInfo = {
-			version: '',
-			sha: fullSha,
-			tag: parsed.tag,
-			isDev: false,
-			isDirty: parsed.isDirty
-		};
-		info.version = formatVersionLabel({ ...info, sha: shortSha });
-
-		cachedVersion = info;
-		return cachedVersion;
-	} catch (err) {
-		console.error('[version] git failed:', err);
-		cachedVersion = {
-			version: 'dev',
-			sha: 'unknown',
-			tag: null,
-			isDev: true,
-			isDirty: false
-		};
-		return cachedVersion;
-	}
+	const info: VersionInfo = {
+		version: '',
+		sha,
+		tag: null,
+		isDev: false,
+		isDirty: false,
+		buildTime: BUILD_TIME
+	};
+	info.version = formatVersionLabel({ ...info, sha: CURRENT_SHA_SHORT });
+	cachedVersion = info;
+	return cachedVersion;
 }
 
 /**
@@ -130,4 +77,34 @@ export async function getCurrentVersion(): Promise<VersionInfo> {
  */
 export function resetVersionCacheForTests(): void {
 	cachedVersion = null;
+}
+
+/**
+ * Parse the output of `git describe --tags --always --dirty --abbrev=7`.
+ * Retained as an exported helper because tests still reference it.
+ */
+export function parseDescribe(describe: string): {
+	tag: string | null;
+	sha: string | null;
+	isDirty: boolean;
+} {
+	let isDirty = false;
+	let value = describe.trim();
+	if (value.endsWith('-dirty')) {
+		isDirty = true;
+		value = value.slice(0, -'-dirty'.length);
+	}
+	const tagWithCommits = value.match(/^(v[^-]+)-\d+-g([0-9a-f]{7,})$/);
+	if (tagWithCommits) {
+		return { tag: tagWithCommits[1], sha: tagWithCommits[2], isDirty };
+	}
+	const tagOnly = value.match(/^(v[^-]+)$/);
+	if (tagOnly) {
+		return { tag: tagOnly[1], sha: null, isDirty };
+	}
+	const bareSha = value.match(/^([0-9a-f]{7,})$/);
+	if (bareSha) {
+		return { tag: null, sha: bareSha[1], isDirty };
+	}
+	return { tag: null, sha: null, isDirty };
 }

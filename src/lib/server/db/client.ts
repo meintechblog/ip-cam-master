@@ -108,3 +108,25 @@ sqlite.exec(`
 
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_stream_catalog_cam ON protect_stream_catalog(camera_id)`);
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_camera_outputs_cam ON camera_outputs(camera_id)`);
+
+// v1.3 Phase 24 — Auto-Update Parity (UPD-AUTO-10).
+// Replaces the JSON blob in settings.update_run_history with a real table.
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS update_runs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		started_at TEXT NOT NULL,
+		finished_at TEXT,
+		pre_sha TEXT,
+		post_sha TEXT,
+		target_sha TEXT,
+		status TEXT NOT NULL DEFAULT 'running',
+		stage TEXT,
+		error_message TEXT,
+		rollback_stage TEXT,
+		unit_name TEXT,
+		log_path TEXT,
+		backup_path TEXT,
+		trigger TEXT NOT NULL DEFAULT 'manual'
+	)
+`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_update_runs_started_at ON update_runs(started_at DESC)`);
