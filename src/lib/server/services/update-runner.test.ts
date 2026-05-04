@@ -3,6 +3,10 @@ import { promises as fsp, mkdtempSync, writeFileSync, readFileSync, existsSync, 
 import path from 'node:path';
 import os from 'node:os';
 
+// Redirect the updater env file to /tmp before importing the module so tests
+// can run in environments where /run isn't writable (macOS dev).
+process.env.IP_CAM_MASTER_UPDATER_ENV_FILE = `/tmp/ip-cam-master-update-test-${process.pid}.env`;
+
 vi.mock('node:child_process', () => {
 	const spawn = vi.fn();
 	const execFile = vi.fn();
@@ -26,8 +30,10 @@ import {
 	tailUpdateLog,
 	getDirtyFiles,
 	UPDATER_UNIT_NAME,
-	UPDATER_ENV_FILE
+	updaterEnvFilePath
 } from './update-runner';
+
+const UPDATER_ENV_FILE = updaterEnvFilePath();
 
 describe('spawnUpdateRun (dedicated systemd unit)', () => {
 	beforeEach(() => {

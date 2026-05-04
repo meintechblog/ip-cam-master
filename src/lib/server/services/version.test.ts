@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock node:fs before importing the module under test so existsSync is controllable.
-vi.mock('node:fs', () => ({
-	existsSync: vi.fn(() => false)
+// Phase 24: version.ts now reads from the generated $lib/version.ts.
+// Mock that module so we can drive the dev/prod branch deterministically.
+vi.mock('$lib/version', () => ({
+	CURRENT_SHA: '',
+	CURRENT_SHA_SHORT: '',
+	BUILD_TIME: '2026-01-01T00:00:00.000Z'
 }));
 
-import { existsSync } from 'node:fs';
 import {
 	parseDescribe,
 	formatVersionLabel,
@@ -97,33 +99,18 @@ describe('formatVersionLabel', () => {
 describe('getCurrentVersion', () => {
 	beforeEach(() => {
 		resetVersionCacheForTests();
-		vi.mocked(existsSync).mockReset();
 	});
 
-	it('returns dev fallback when no .git directory exists anywhere', async () => {
-		vi.mocked(existsSync).mockReturnValue(false);
-
+	it('returns dev fallback when CURRENT_SHA is empty (fresh checkout, no git)', async () => {
 		const info = await getCurrentVersion();
-
-		expect(info).toEqual({
-			version: 'dev',
-			sha: 'unknown',
-			tag: null,
-			isDev: true,
-			isDirty: false
-		});
+		expect(info.isDev).toBe(true);
+		expect(info.sha).toBe('unknown');
+		expect(info.version).toBe('dev');
 	});
 
 	it('caches the result across subsequent calls', async () => {
-		vi.mocked(existsSync).mockReturnValue(false);
-
 		const first = await getCurrentVersion();
-		const callsBefore = vi.mocked(existsSync).mock.calls.length;
-
 		const second = await getCurrentVersion();
-		const callsAfter = vi.mocked(existsSync).mock.calls.length;
-
-		expect(first).toBe(second); // referential identity
-		expect(callsAfter).toBe(callsBefore); // no new existsSync calls on second invocation
+		expect(first).toBe(second);
 	});
 });

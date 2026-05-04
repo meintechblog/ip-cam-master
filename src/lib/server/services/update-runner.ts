@@ -26,7 +26,10 @@ const execFileAsync = promisify(execFile);
 export const INSTALLED_SCRIPT_PATH = '/usr/local/bin/ip-cam-master-update.sh';
 export const UPDATER_UNIT_NAME = 'ip-cam-master-updater.service';
 export const UPDATER_UNIT_PATH = `/etc/systemd/system/${UPDATER_UNIT_NAME}`;
-export const UPDATER_ENV_FILE = '/run/ip-cam-master-update.env';
+export function updaterEnvFilePath(): string {
+	return process.env.IP_CAM_MASTER_UPDATER_ENV_FILE ?? '/run/ip-cam-master-update.env';
+}
+export const UPDATER_ENV_FILE = updaterEnvFilePath();
 
 const CANDIDATE_INSTALL_DIRS = ['/opt/ip-cam-master', process.cwd()];
 
@@ -171,7 +174,7 @@ export async function spawnUpdateRun(options: SpawnUpdateRunOptions): Promise<Sp
 		`UPDATE_TRIGGER=${trigger}`,
 		''
 	].join('\n');
-	writeFileSync(UPDATER_ENV_FILE, envContent, { mode: 0o600 });
+	writeFileSync(updaterEnvFilePath(), envContent, { mode: 0o600 });
 
 	// Mark state.json as installing — the bash script picks up the rest.
 	writeUpdateState({

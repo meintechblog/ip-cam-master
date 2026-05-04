@@ -1,44 +1,48 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '$lib/server/db/schema';
 
-// In-memory test DB. Mock the client module so update-history uses it.
-const sqlite = new Database(':memory:');
-sqlite.exec(`
-	CREATE TABLE update_runs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		started_at TEXT NOT NULL,
-		finished_at TEXT,
-		pre_sha TEXT,
-		post_sha TEXT,
-		target_sha TEXT,
-		status TEXT NOT NULL DEFAULT 'running',
-		stage TEXT,
-		error_message TEXT,
-		rollback_stage TEXT,
-		unit_name TEXT,
-		log_path TEXT,
-		backup_path TEXT,
-		trigger TEXT NOT NULL DEFAULT 'manual'
-	);
-	CREATE TABLE settings (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		key TEXT NOT NULL UNIQUE,
-		value TEXT NOT NULL,
-		encrypted INTEGER NOT NULL DEFAULT 0,
-		updated_at TEXT
-	);
-`);
-const db = drizzle(sqlite, { schema });
+// vi.mock factories are hoisted above all imports — keep no top-level state in
+// them. We initialize the in-memory DB inside the factory and re-import it
+// via dynamic import in the test body.
+vi.mock('$lib/server/db/client', () => {
+	const sqlite = new Database(':memory:');
+	sqlite.exec(`
+		CREATE TABLE update_runs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			started_at TEXT NOT NULL,
+			finished_at TEXT,
+			pre_sha TEXT,
+			post_sha TEXT,
+			target_sha TEXT,
+			status TEXT NOT NULL DEFAULT 'running',
+			stage TEXT,
+			error_message TEXT,
+			rollback_stage TEXT,
+			unit_name TEXT,
+			log_path TEXT,
+			backup_path TEXT,
+			trigger TEXT NOT NULL DEFAULT 'manual'
+		);
+		CREATE TABLE settings (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			key TEXT NOT NULL UNIQUE,
+			value TEXT NOT NULL,
+			encrypted INTEGER NOT NULL DEFAULT 0,
+			updated_at TEXT
+		);
+	`);
+	const db = drizzle(sqlite, { schema });
+	return { db, sqlite };
+});
 
-import { vi } from 'vitest';
-vi.mock('$lib/server/db/client', () => ({ db, sqlite }));
 vi.mock('./settings', () => ({
 	getSetting: vi.fn(async () => null),
 	saveSetting: vi.fn(async () => undefined)
 }));
 
+import { sqlite } from '$lib/server/db/client';
 import {
 	appendUpdateRun,
 	updateUpdateRun,
