@@ -1,9 +1,26 @@
-import { getCurrentVersion, type VersionInfo } from './version';
-import { getSettings, saveSetting } from './settings';
+/**
+ * Self-update check — wraps github-client and persists results to
+ * state.json (UPD-AUTO-03 ETag, UPD-AUTO-11 cooldown).
+ *
+ * Public API (preserved for backwards compatibility with existing
+ * routes and the settings UI):
+ *   - checkForUpdate(): UpdateCheckResult
+ *   - getStoredUpdateStatus(): StoredUpdateStatus
+ *
+ * Behavior changes vs v1.1:
+ *   - Sends If-None-Match using state.lastCheckEtag
+ *   - On 304, preserves the prior `ok` result (only updates lastCheckAt)
+ *   - 5-min server-side cooldown for manual checks
+ *   - Persists to state.json (atomic) instead of N settings rows
+ */
 
-const GITHUB_COMMITS_URL = 'https://api.github.com/repos/meintechblog/ip-cam-master/commits/main';
-const FETCH_TIMEOUT_MS = 10_000;
-const COMMIT_MESSAGE_MAX_LEN = 200;
+import { getCurrentVersion, type VersionInfo } from './version';
+import { checkLatestCommit } from './github-client';
+import {
+	readUpdateState,
+	writeUpdateState,
+	isCheckCooldownClear
+} from './update-state-store';
 
 export type UpdateCheckSuccess = {
 	error: null;
@@ -16,12 +33,17 @@ export type UpdateCheckSuccess = {
 	checkedAt: string;
 };
 
-export type UpdateCheckError =
-	| { error: 'rate_limited'; resetAt: string }
-	| { error: 'network'; message: string }
-	| { error: 'dev_mode' };
+export type UpdateCheckCooldown = { error: 'cooldown'; retryAfterSeconds: number };
+export type UpdateCheckRateLimited = { error: 'rate_limited'; resetAt: string };
+export type UpdateCheckNetwork = { error: 'network'; message: string };
+export type UpdateCheckDevMode = { error: 'dev_mode' };
 
-export type UpdateCheckResult = UpdateCheckSuccess | UpdateCheckError;
+export type UpdateCheckResult =
+	| UpdateCheckSuccess
+	| UpdateCheckCooldown
+	| UpdateCheckRateLimited
+	| UpdateCheckNetwork
+	| UpdateCheckDevMode;
 
 export type StoredUpdateStatus = {
 	lastCheckedAt: string | null;
@@ -33,105 +55,138 @@ export type StoredUpdateStatus = {
 	hasUpdate: boolean;
 };
 
-function truncateCommitMessage(message: string): string {
-	const firstLine = message.split('\n', 1)[0] ?? '';
-	return firstLine.slice(0, COMMIT_MESSAGE_MAX_LEN);
-}
-
-function nullIfEmpty(value: string | undefined): string | null {
-	if (value === undefined || value === '') return null;
-	return value;
-}
+export type CheckForUpdateOptions = {
+	/**
+	 * Manual user-triggered check enforces the 5-min cooldown
+	 * (UPD-AUTO-11). The scheduler tick passes false to bypass.
+	 */
+	enforceCooldown?: boolean;
+};
 
 /**
- * Live-check GitHub for the latest main commit and persist results in the settings table.
- *
- * Never throws. Returns a discriminated union describing success or a specific error type.
+ * Live-check GitHub for the latest commit on main and persist the
+ * result. Never throws — returns a discriminated union.
  */
-export async function checkForUpdate(): Promise<UpdateCheckResult> {
+export async function checkForUpdate(
+	options: CheckForUpdateOptions = {}
+): Promise<UpdateCheckResult> {
+	const { enforceCooldown = false } = options;
 	const current = await getCurrentVersion();
 	if (current.isDev) {
 		return { error: 'dev_mode' };
 	}
 
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+	if (enforceCooldown) {
+		const cd = isCheckCooldownClear();
+		if (!cd.clear) {
+			return { error: 'cooldown', retryAfterSeconds: cd.retryAfterSeconds };
+		}
+	}
 
-	try {
-		const res = await fetch(GITHUB_COMMITS_URL, {
-			headers: {
-				Accept: 'application/vnd.github+json',
-				'User-Agent': 'ip-cam-master-update-check'
-			},
-			signal: controller.signal
-		});
+	const state = readUpdateState();
+	const { result, etag } = await checkLatestCommit({ etag: state.lastCheckEtag });
 
-		if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
-			const resetHeader = res.headers.get('x-ratelimit-reset');
-			const resetUnix = resetHeader ? parseInt(resetHeader, 10) : 0;
-			const resetAt = new Date(resetUnix * 1000).toISOString();
-			await saveSetting('update_last_error', `rate_limited:${resetAt}`);
+	const checkedAt = new Date().toISOString();
+
+	switch (result.status) {
+		case 'ok': {
+			writeUpdateState({
+				lastCheckAt: checkedAt,
+				lastCheckEtag: etag ?? state.lastCheckEtag,
+				lastCheckResult: result
+			});
+			const hasUpdate = current.sha !== result.remoteSha && !current.isDirty;
+			return {
+				error: null,
+				current,
+				latestSha: result.remoteSha,
+				latestCommitDate: result.date,
+				latestCommitMessage: result.message,
+				hasUpdate,
+				warning: current.isDirty ? 'dirty' : null,
+				checkedAt
+			};
+		}
+		case 'unchanged': {
+			// 304 — preserve the prior `ok` result (or absence thereof) and
+			// only stamp lastCheckAt. The view-model derivation reads the
+			// preserved result for display.
+			writeUpdateState({ lastCheckAt: checkedAt });
+			const prior = state.lastCheckResult;
+			if (prior?.status === 'ok') {
+				const hasUpdate = current.sha !== prior.remoteSha && !current.isDirty;
+				return {
+					error: null,
+					current,
+					latestSha: prior.remoteSha,
+					latestCommitDate: prior.date,
+					latestCommitMessage: prior.message,
+					hasUpdate,
+					warning: current.isDirty ? 'dirty' : null,
+					checkedAt
+				};
+			}
+			// No prior ok — treat as success but with empty latest fields
+			return {
+				error: null,
+				current,
+				latestSha: current.sha,
+				latestCommitDate: '',
+				latestCommitMessage: '',
+				hasUpdate: false,
+				warning: current.isDirty ? 'dirty' : null,
+				checkedAt
+			};
+		}
+		case 'rate_limited': {
+			writeUpdateState({
+				lastCheckAt: checkedAt,
+				lastCheckResult: result
+			});
+			const resetAt = new Date(result.resetAt * 1000).toISOString();
 			return { error: 'rate_limited', resetAt };
 		}
-
-		if (!res.ok) {
-			await saveSetting('update_last_error', 'network');
-			return { error: 'network', message: `HTTP ${res.status}` };
+		case 'error': {
+			writeUpdateState({
+				lastCheckAt: checkedAt,
+				lastCheckResult: result
+			});
+			return { error: 'network', message: result.error };
 		}
-
-		const body = (await res.json()) as {
-			sha: string;
-			commit: { committer: { date: string }; message: string };
-		};
-
-		const latestSha = body.sha;
-		const latestCommitDate = body.commit.committer.date;
-		const latestCommitMessage = truncateCommitMessage(body.commit.message);
-		const hasUpdate = current.sha !== latestSha && !current.isDirty;
-		const warning: 'dirty' | null = current.isDirty ? 'dirty' : null;
-		const checkedAt = new Date().toISOString();
-
-		await saveSetting('update_last_checked_at', checkedAt);
-		await saveSetting('update_latest_sha', latestSha);
-		await saveSetting('update_latest_commit_date', latestCommitDate);
-		await saveSetting('update_latest_commit_message', latestCommitMessage);
-		await saveSetting('update_last_error', '');
-
-		return {
-			error: null,
-			current,
-			latestSha,
-			latestCommitDate,
-			latestCommitMessage,
-			hasUpdate,
-			warning,
-			checkedAt
-		};
-	} catch (err) {
-		const message = (err as Error)?.message ?? 'unknown';
-		await saveSetting('update_last_error', 'network');
-		return { error: 'network', message };
-	} finally {
-		clearTimeout(timeoutId);
 	}
 }
 
 /**
- * Read the persisted update-check state from settings and compose it
- * with the current running version for display purposes.
+ * Read persisted state from state.json and compose with current version
+ * for display. Used by the cached `/api/update/status` endpoint.
  */
 export async function getStoredUpdateStatus(): Promise<StoredUpdateStatus> {
-	const [settingsMap, current] = await Promise.all([getSettings('update_'), getCurrentVersion()]);
+	const [current, state] = [await getCurrentVersion(), readUpdateState()];
+	const last = state.lastCheckResult;
 
-	const latestSha = nullIfEmpty(settingsMap.update_latest_sha);
-	const lastError = nullIfEmpty(settingsMap.update_last_error);
+	let latestSha: string | null = null;
+	let latestCommitDate: string | null = null;
+	let latestCommitMessage: string | null = null;
+	let lastError: string | null = null;
+
+	if (last?.status === 'ok') {
+		latestSha = last.remoteSha;
+		latestCommitDate = last.date || null;
+		latestCommitMessage = last.message || null;
+	} else if (last?.status === 'rate_limited') {
+		const resetAt = new Date(last.resetAt * 1000).toISOString();
+		lastError = `rate_limited:${resetAt}`;
+	} else if (last?.status === 'error') {
+		lastError = 'network';
+	}
+
 	const hasUpdate = !!latestSha && latestSha !== current.sha && !current.isDirty;
 
 	return {
-		lastCheckedAt: nullIfEmpty(settingsMap.update_last_checked_at),
+		lastCheckedAt: state.lastCheckAt,
 		latestSha,
-		latestCommitDate: nullIfEmpty(settingsMap.update_latest_commit_date),
-		latestCommitMessage: nullIfEmpty(settingsMap.update_latest_commit_message),
+		latestCommitDate,
+		latestCommitMessage,
 		lastError,
 		current,
 		hasUpdate
