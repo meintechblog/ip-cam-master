@@ -28,6 +28,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 - [ ] **Phase 21: Multi-Cam YAML + Reconciliation Loop** — Heart of the milestone. yaml-builder for Loxone-MJPEG (VAAPI transcode) + Frigate-RTSP (copy passthrough); reconcile with canonical-form sha256 dedupe, single-flight + dirty-flag retry; WS exp backoff; bridge health probe (18 reqs).
 - [ ] **Phase 22: Onboarding Wizard + `/cameras` Integration** — Wizard Steps 3–6 (resumable via `hub_onboarding_state`), `/cameras` partition (managed/external), Protect Hub badge + first/third-party qualifier, Outputs subsection with copy-buttons + per-target snippets, "All Hub URLs" page (14 reqs).
 - [ ] **Phase 23: Offboarding + Lifecycle Polish + Stream-Sharing API** — 3-tier offboarding (Pause / Disable+Keep / Full Uninstall), idempotent cleanup, soft-delete with 7-day grace, Protect RTSP-share cleanup gated by `share_enabled_by_us`, drift indicator, reconcile event log, per-stream metrics, "Export Hub config" pre-uninstall (12 reqs).
+- [ ] **Phase 24: Auto-Update Parity** — Bring self-update to charging-master parity (parallel-track maintenance, precedent: P16). Adds auto-update toggle + configurable hour (Europe/Berlin), background scheduler (6h GitHub check + 5min auto-update tick), ETag caching, 9-stage pipeline stepper UI, reconnect overlay polling `/api/version`, install confirmation modal, two-stage rollback (git + tarball snapshot), 23h auto-update minimum spacing, atomic `state.json` cross-process, dedicated `update_runs` table.
 
 ## Phase Details
 
@@ -137,6 +138,42 @@ Plans:
   - `unifi-protect.updateDevice` exact PATCH semantics for `isRtspEnabled=false` per channel (PITFALLS #6 / SUMMARY §"Research Flags"): is per-channel granularity supported in v4.29.0, or does it flip all channels?
 **UI hint**: yes
 
+### Phase 24: Auto-Update Parity
+**Goal**: User can enable Auto-Update in `/settings → Version`, pick a daily hour in Europe/Berlin, and the app autonomously checks GitHub every 6 h, applies updates within the configured window (skipping if active onboarding/reconcile is running, with 23 h minimum spacing), shows a 9-stage visual pipeline stepper during manual or auto installs, recovers from disconnects via a reconnect overlay polling `/api/version`, and rolls back through git → tarball-snapshot if anything fails — all matching the charging-master `/settings` reference implementation
+**Depends on**: Nothing in v1.3 (parallel-track maintenance, like P16). Builds on v1.1 update-runner (`scripts/update.sh`, `update-runner.ts`, `update-check.ts`, `update-history.ts`, `backup.ts`).
+**Reference**: `/Users/hulki/codex/charging-master` — full feature, port one-for-one. See research notes in `.planning/phases/24-auto-update-parity/24-RESEARCH.md` after planning.
+**Requirements** (new, not in REQUIREMENTS.md yet — to be added during plan-phase):
+  - UPD-AUTO-01: Settings UI with auto-update enable/disable toggle and 0-23 hour dropdown (Europe/Berlin label)
+  - UPD-AUTO-02: Background scheduler with 6 h GitHub check tick + 5 min auto-update opportunity tick, started from `hooks.server.ts`
+  - UPD-AUTO-03: ETag-based GitHub commit polling (`If-None-Match` → 304 = no rate-limit hit), persisted across checks
+  - UPD-AUTO-04: 9-stage pipeline stepper UI (preflight → snapshot → drain → stop → fetch → install → build → start → verify) parsed from log markers
+  - UPD-AUTO-05: Reconnect overlay during install: polls `/api/version` every 2 s for SHA change + `dbHealthy=true`, 90 s timeout
+  - UPD-AUTO-06: Install confirmation modal showing current → target SHA, commit message/author/date, warning if onboarding/reconcile in flight
+  - UPD-AUTO-07: Two-stage rollback in `update.sh`: stage 1 = `git reset --hard PRE_SHA` + reinstall; stage 2 = tarball restore from pre-update snapshot
+  - UPD-AUTO-08: 23 h minimum between auto-updates (read `update.lastAutoUpdateAt` from settings)
+  - UPD-AUTO-09: Atomic `state.json` (`.update-state/state.json`, tmp+rename), shared between Node and bash via simple JSON
+  - UPD-AUTO-10: Dedicated `update_runs` table (Drizzle schema): startAt, endAt, fromSha, toSha, status, stage, errorMessage, rollbackStage; replaces JSON blob in settings
+  - UPD-AUTO-11: 5 min server-side cooldown for manual `POST /api/update/check`
+  - UPD-AUTO-12: Localhost-only guard on `POST /api/update/run` and `POST /api/update/ack-rollback` (Host header)
+  - UPD-AUTO-13: Generated `version.ts` (CURRENT_SHA, SHORT, BUILD_TIME) via prebuild step, replacing runtime `git describe`
+**Success Criteria** (what must be TRUE):
+  1. User opens `/settings → Version` and sees: current version card, last-checked card with "Jetzt prüfen" + cooldown, **new** Auto-Update card with toggle + hour dropdown (default OFF, hour=3), update history (last 10), and update-available banner with green pulsing dot when remote SHA ≠ current
+  2. With Auto-Update enabled at hour=3, the app autonomously triggers an update at the next 3 AM Europe/Berlin if a newer commit exists on `origin/main` AND no Hub onboarding/reconcile is running AND the last auto-update was >23 h ago — verifiable in `update_runs` table with a row tagged auto-trigger
+  3. During any install (manual or auto), the UI shows the 9-stage stepper with the active stage pulsing blue, completed stages green, failed stages red, rolled-back stages amber — driven by `[stage=<name>]` markers in the log SSE stream
+  4. When systemd restarts the app mid-install (between `start` and `verify`), the UI shows a non-dismissable reconnect overlay polling `/api/version` every 2 s; once new SHA + `dbHealthy=true` arrive, overlay auto-closes and reveals success state
+  5. Triggering install when an active flow exists (Protect Hub reconcile in flight per `protectHubReconcileInterval`, or wizard `hub_state IN ('starting','stopping')`) opens the install modal with a red warning bar listing the conflict — user must explicitly confirm to override
+  6. Force a build failure (e.g., introduce a TypeScript error commit on `origin/main`): stage 1 rollback (`git reset --hard PRE_SHA` + reinstall + restart) succeeds, service comes back, history row marked `rolled_back` with `rollbackStage='stage1'`; corrupt the .git dir to force stage 1 fail: stage 2 (tar restore from `.update-state/snapshots/<SHA>.tar.gz`) succeeds, history row marked `rolled_back` with `rollbackStage='stage2'`
+  7. After `npm run build` runs, `src/lib/version.ts` exists with `CURRENT_SHA`, `CURRENT_SHA_SHORT`, `BUILD_TIME` — the running app exposes these via `/api/version` without spawning `git`; deleting `.git` post-build does NOT break the version display
+  8. GitHub rate-limit defense works: after the first `200 OK` check, the next check sends `If-None-Match: <etag>` → `304 Not Modified` consumes 0 from the unauthenticated 60-req/h budget (verifiable via `x-ratelimit-remaining` header in logs)
+  9. State file `.update-state/state.json` survives concurrent reads from Node (status endpoint) and writes from the bash updater script (stage transitions): atomic `tmp + rename` is used in both Node and bash, no partial JSON ever observed
+  10. Final step: deployed to running VM via `./scripts/dev-deploy.sh` and verified end-to-end against the live `ip-cam-master.local` instance (auto-update toggle persists across restart, manual install completes, history visible)
+**Plans**: TBD — to be split during `/gsd:plan-phase 24`. Likely waves: (W1) DB schema + version-gen + state-store; (W2) GitHub client w/ ETag + scheduler + auto-update decision engine; (W3) update.sh two-stage rollback + snapshot + stage markers; (W4) UI (stepper, reconnect overlay, install modal, auto-update settings card) + API routes; (W5) deploy to VM + UAT.
+**Research flags**:
+  - GitHub API rate-limit budget on the unauthenticated path: 60 req/h shared across the VM. Confirm 6 h interval × 1 = 4 req/day fits comfortably, even with manual checks
+  - `systemd-run` vs dedicated `ip-cam-master-updater.service` unit: charging-master uses a dedicated `oneshot` unit (sibling cgroup, prevents parent-kill on `systemctl stop`); current ip-cam-master uses transient `systemd-run` per-update. Decision needed: keep transient (simpler) or adopt dedicated unit (charging-master pattern, safer for `stop` stage)
+  - `unifi-protect` WS reconnect during install drain: must trigger `disconnect()` before stop stage so reconnect on restart is clean (charging-master uses `/api/internal/prepare-for-shutdown`); add `drain` stage to `update.sh`
+**UI hint**: yes (settings card + stepper + overlay + modal — significant UI surface)
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -146,6 +183,7 @@ Plans:
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
 | 23. Offboarding + Lifecycle Polish + Stream-Sharing API | 0/? | Not started | - |
+| 24. Auto-Update Parity (parallel-track maintenance) | 0/? | Not started | - |
 
 ## Coverage
 
@@ -178,6 +216,8 @@ P23 (offboarding + polish)
 ```
 
 No circular deps. P19 and P20 each ship demoable value standalone. P21 is technically usable by a developer who can INSERT into `camera_outputs` manually. P22 turns it into an end-user product. P23 cannot meaningfully precede P22.
+
+**P24 (Auto-Update Parity)** runs as a parallel-track maintenance phase — no dependency on P19–P23, can ship at any time alongside the milestone (precedent: P16 in v1.2). Touches a disjoint code area (`src/routes/settings/`, `src/lib/server/services/update-*`, `scripts/update.sh`, new `update_runs` table) so file conflicts with v1.3 work are unlikely.
 
 ---
 
