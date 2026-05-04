@@ -179,3 +179,40 @@ export const protectStreamCatalog = sqliteTable('protect_stream_catalog', {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
 });
+
+// v1.3 Phase 24 — Auto-Update Parity (per UPD-AUTO-10).
+// One row per update run (manual or auto). Replaces the JSON blob in
+// settings.update_run_history. Crash-safe: rows for in-flight updates start
+// with status='running' and are reconciled at boot via the exitcode file.
+export type UpdateRunStatus = 'running' | 'success' | 'failed' | 'rolled_back';
+export type UpdateRunTrigger = 'manual' | 'auto';
+export type UpdateRunRollbackStage = 'stage1' | 'stage2';
+export type UpdateRunStage =
+	| 'preflight'
+	| 'snapshot'
+	| 'drain'
+	| 'stop'
+	| 'fetch'
+	| 'install'
+	| 'build'
+	| 'start'
+	| 'verify';
+
+export const updateRuns = sqliteTable('update_runs', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	startedAt: text('started_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	finishedAt: text('finished_at'),
+	preSha: text('pre_sha'),
+	postSha: text('post_sha'),
+	targetSha: text('target_sha'),
+	status: text('status').notNull().default('running'),
+	stage: text('stage'),
+	errorMessage: text('error_message'),
+	rollbackStage: text('rollback_stage'),
+	unitName: text('unit_name'),
+	logPath: text('log_path'),
+	backupPath: text('backup_path'),
+	trigger: text('trigger').notNull().default('manual')
+});
