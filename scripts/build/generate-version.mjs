@@ -28,7 +28,19 @@ const outPath = join(repoRoot, 'src', 'lib', 'version.ts');
 
 function tryGit(args) {
 	try {
-		return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+		// Unset GIT_DIR / GIT_WORK_TREE in case we're invoked from a
+		// post-receive hook where they point at a bare-style worktree
+		// that breaks `git rev-parse HEAD`. Use the install dir explicitly.
+		const env = { ...process.env };
+		delete env.GIT_DIR;
+		delete env.GIT_WORK_TREE;
+		delete env.GIT_INDEX_FILE;
+		return execFileSync('git', args, {
+			cwd: repoRoot,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore'],
+			env
+		}).trim();
 	} catch {
 		return null;
 	}
