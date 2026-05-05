@@ -302,6 +302,12 @@ export async function cloneFromTemplate(params: {
 	 * too tight — pass >= 1024 for A1 to avoid swap thrash + clean exits.
 	 */
 	memory?: number;
+	/**
+	 * Override container CPU core count after cloning. Default (unset) keeps
+	 * the template's `cores` config (1). Phase 20 bridge LXC needs 2 per
+	 * locked decision (P20 §"Bridge sizing: 1024 MB / 2 cores").
+	 */
+	cores?: number;
 }): Promise<{ status: 'cloned'; vmid: number }> {
 	const { connectToProxmox: connectSSH } = await import('./ssh');
 	const ssh = await connectSSH();
@@ -324,6 +330,16 @@ export async function cloneFromTemplate(params: {
 			);
 			if (memResult.code && memResult.code !== 0) {
 				throw new Error(`Memory override failed: ${memResult.stderr}`);
+			}
+		}
+
+		// Apply CPU cores override post-clone.
+		if (params.cores && Number.isInteger(params.cores) && params.cores >= 1) {
+			const coresResult = await ssh.execCommand(
+				`pct set ${params.vmid} -cores ${params.cores}`
+			);
+			if (coresResult.code && coresResult.code !== 0) {
+				throw new Error(`Cores override failed: ${coresResult.stderr}`);
 			}
 		}
 

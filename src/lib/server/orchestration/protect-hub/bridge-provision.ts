@@ -81,6 +81,7 @@ export async function provisionBridge(): Promise<ProvisionResult> {
 				vmid,
 				hostname: BRIDGE_HOSTNAME,
 				memory: BRIDGE_MEMORY,
+				cores: BRIDGE_CORES,
 				cameraName: 'Protect Hub Bridge',
 				cameraType: 'protect-hub'
 			});
@@ -128,7 +129,16 @@ export async function provisionBridge(): Promise<ProvisionResult> {
 		// Deploy systemd unit
 		const unit = generateBridgeSystemdUnit();
 		await pushFileToContainer(ssh, vmid, unit, '/etc/systemd/system/go2rtc.service');
-		await executeOnContainer(ssh, vmid, 'systemctl daemon-reload && systemctl enable --now go2rtc');
+		// `enable --now` is a no-op for already-running services. The clone-from-template
+		// path inherits a started go2rtc with the template's residual config in memory,
+		// so we must `restart` to force the process to re-read /etc/go2rtc/go2rtc.yaml.
+		// Without this, the bridge serves whatever streams the source template was
+		// configured for instead of our hello-world `test:` stream.
+		await executeOnContainer(
+			ssh,
+			vmid,
+			'systemctl daemon-reload && systemctl enable go2rtc && systemctl restart go2rtc'
+		);
 
 		// Poll for container IP
 		let containerIp: string | null = null;

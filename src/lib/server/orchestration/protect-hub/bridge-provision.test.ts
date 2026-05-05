@@ -202,12 +202,31 @@ describe('provisionBridge()', () => {
 				templateVmid: 999,
 				vmid: 2000,
 				hostname: 'protect-hub',
-				memory: 1024
+				memory: 1024,
+				cores: 2
 			})
 		);
 		expect(mockCreateContainer).not.toHaveBeenCalled();
 		// Should NOT fire-and-forget template creation (template already exists)
 		expect(mockCreateTemplateFromContainer).not.toHaveBeenCalled();
+	});
+
+	it('explicitly restarts go2rtc after pushing the bridge config', async () => {
+		// Regression for the cam-2000-streams bug: the per-cam template inherits a
+		// running go2rtc service with residual config in memory; `enable --now` is
+		// a no-op for already-running services, so without an explicit `restart`
+		// the bridge keeps serving the template's streams instead of our hello-world.
+		await provisionBridge();
+
+		const calls = mockExecuteOnContainer.mock.calls;
+		const systemctlCall = calls.find(
+			(call: unknown[]) =>
+				typeof call[2] === 'string' && (call[2] as string).includes('systemctl')
+		);
+		expect(systemctlCall).toBeDefined();
+		const cmd = systemctlCall![2] as string;
+		expect(cmd).toContain('systemctl daemon-reload');
+		expect(cmd).toContain('systemctl restart go2rtc');
 	});
 
 	it('falls back to createContainer when no template (slow path)', async () => {
