@@ -20,7 +20,8 @@
 		Server,
 		Play,
 		Square,
-		RotateCcw
+		RotateCcw,
+		Share2
 	} from 'lucide-svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 
@@ -155,6 +156,52 @@
 			</button>
 		</div>
 	{:else}
+		<!-- "Why" intro card: erklärt Zweck des Hub + konkrete Use-Cases (Loxone, Frigate, …) -->
+		<div class="bg-bg-card rounded-lg border border-border p-6">
+			<div class="flex items-start gap-3">
+				<div class="rounded bg-accent/10 p-2 text-accent flex-shrink-0">
+					<Share2 class="w-5 h-5" />
+				</div>
+				<div class="space-y-3">
+					<div>
+						<h2 class="text-lg font-semibold text-text-primary">
+							Wofür ist der Protect Hub?
+						</h2>
+						<p class="text-sm text-text-secondary mt-1">
+							Stellt deine UniFi-Protect-Kameras über einen einzigen LXC-Bridge-Container in
+							Formaten bereit, die andere Tools verstehen — pro Cam wahlweise mehrere Outputs
+							gleichzeitig. Du musst dafür keine Cam neu anschließen; der Hub greift auf die in
+							Protect bereits adoptierten Streams zurück und teilt sie im LAN weiter.
+						</p>
+					</div>
+					<ul class="text-sm space-y-2">
+						<li class="flex gap-2">
+							<span class="text-accent flex-shrink-0">→</span>
+							<span class="text-text-secondary">
+								<span class="text-text-primary font-medium">Loxone Intercom</span> — Protect-Cam
+								auf der Türstation-Kachel ("Benutzerdefinierte Intercom") in der Loxone-App
+								anzeigen. Hub liefert MJPEG bei 640×360 @ 10 fps direkt aus dem Bridge-Container.
+							</span>
+						</li>
+						<li class="flex gap-2">
+							<span class="text-accent flex-shrink-0">→</span>
+							<span class="text-text-secondary">
+								<span class="text-text-primary font-medium">Frigate, Home Assistant, NVRs</span> —
+								nativer H.264-RTSP-Passthrough ohne Re-Encoding, volle Auflösung, keine VAAPI-Last.
+							</span>
+						</li>
+						<li class="flex gap-2">
+							<span class="text-accent flex-shrink-0">→</span>
+							<span class="text-text-secondary">
+								<span class="text-text-primary font-medium">Sonstige Tools</span> — alles, was
+								MJPEG-HTTP oder RTSP konsumiert (Browser-Embed, Synology, ältere NVR-Software).
+							</span>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
 		<!-- Bridge status panel (P20) -->
 		{#if hub.bridge === null}
 			<div class="bg-bg-card rounded-lg border border-border p-6">
