@@ -46,7 +46,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
   7. The two new npm deps (`unifi-protect@^4.29.0` and `yaml@^2.6.0`) are installed and pinned in `package.json` with no version-bumps to existing dependencies
 **Plans**: 4 plans (in 3 waves)
 Plans:
-- [ ] 19-01-PLAN.md — TLS spike against UDM 192.168.3.1 (throwaway LXC + ffprobe; commit findings to .planning/research/v1.3/spikes/p19-tls-rtspx.md)
+- [x] 19-01-PLAN.md — TLS spike against UDM 192.168.3.1 (ffprobe from local LAN host as pragmatic deviation; locked TLS_SCHEME='rtsps-tls-verify-0'; rtspx:// confirmed unsupported by ffmpeg)
 - [x] 19-02-PLAN.md — Schema lock (cameras +7 columns; +3 new tables: protect_hub_bridges, camera_outputs, protect_stream_catalog) + install unifi-protect@^4.29.0 + yaml@^2.6.0
 - [x] 19-03-PLAN.md — protect-bridge.ts (lib boundary, classifyKind via isThirdPartyCamera, TLS_SCHEME const) + orchestration/protect-hub/catalog.ts (discover + loadCatalog) + /api/protect-hub/discover endpoint + Vitest suites
 - [x] 19-04-PLAN.md — ProtectHubTab.svelte (auto-discover on empty cache, manual refresh, controller-unreachable banner, no-creds deep-link) + 7th settings tab + saveSetting() resets lib client on unifi_ keys + manual UAT against real UDM

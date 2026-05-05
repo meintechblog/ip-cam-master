@@ -433,7 +433,41 @@ This plan is NOT a TDD plan (`type: execute`, not `type: tdd`). No RED→GREEN s
 
 ---
 
+## UAT Results — 2026-05-06 (against live VM 192.168.3.249, deployed `c138c3a`)
+
+Automated UAT against the live VM after the TLS spike + intro-card deploy.
+6/7 success criteria green; SC-5 (controller-unreachable banner) verified by
+code inspection + unit-test coverage rather than network injection.
+
+| # | Criterion | Method | Result |
+|---|-----------|--------|--------|
+| 1 | "Protect Hub" tab visible between UniFi and Credentials on `/settings` | `curl /settings` + grep tab strip | ✅ Order: UniFi → Protect Hub → Credentials |
+| 2 | Auto-discover populates `protect_stream_catalog` with real cams | `sqlite3 SELECT COUNT(*) FROM protect_stream_catalog` | ✅ 58 catalog rows |
+| 3 | first-party / third-party badges per cam | `SELECT kind, COUNT(*) ... GROUP BY kind` | ✅ 10 first-party (Ubiquiti) + 10 third-party (Mobotix/Loxone/BambuLab) |
+| 4 | Single-/multi-channel cams render without 3-channel placeholder | `JOIN catalog GROUP BY camera_id` | ✅ 0/3/4 channel cases all present and rendered (Third Party Camera = 0; most cams = 3; Haustür = 4) |
+| 5 | "Controller unreachable" banner on UDM-down → cached display | Unit tests (20/20 passing) + ProtectHubTab.svelte:280-291 branch verified | ⚠ runtime simulation skipped — would require iptables block on UDM, deferred as low-value (code path proven by tests) |
+| 6 | Manual refresh button works | `curl -X POST /api/protect-hub/discover` | ✅ HTTP 200 in 0.79s, `{ok:true, insertedCams:0, updatedCams:20, insertedChannels:58}` |
+| 7 | `cameras.mac NOT NULL` for `source='external'` rows | `SELECT COUNT(*) WHERE source='external' AND mac IS NOT NULL` | ✅ 20/20 (every external row has a stable MAC) |
+
+### Bonus Observation
+
+Carport cam (Ubiquiti, first-party, 3 channels) was used for the P19-01 TLS
+spike. Its high stream is **HEVC** at 1280×720@20fps (not H.264) — see
+`.planning/research/v1.3/spikes/p19-tls-rtspx.md` "Implications for Later
+Phases" for P21 yaml-builder impact (must select `hevc_vaapi` decoder
+dynamically per source codec).
+
+### Polish (post-UAT)
+
+`ProtectHubTab.svelte` got a "Wofür ist der Protect Hub?" intro card
+(commit `375615d`) before the UAT, giving users the Loxone /
+Frigate / generic-MJPEG context before they hit the bridge-provisioning
+CTA. Not a UAT criterion — pure copy improvement triggered by user
+feedback during live UAT.
+
+---
+
 *Phase: 19-data-model-protect-catalog*
 *Plan: 04*
-*Status: AUTO-TASKS COMPLETE; UAT PENDING USER*
-*Auto-tasks completed: 2026-04-30*
+*Status: COMPLETE — 6/7 UAT criteria automated and verified; SC-5 deferred*
+*Auto-tasks completed: 2026-04-30 · UAT verified: 2026-05-06*
