@@ -15,17 +15,18 @@ import { ProtectApi, type ProtectCameraConfig } from 'unifi-protect';
 import { getSettings } from './settings';
 
 // ────────────────────────────────────────────────────────────────────────────
-// TLS scheme — locked by P19 spike, see .planning/research/v1.3/spikes/p19-tls-rtspx.md
+// TLS scheme — locked by P19-01 spike against UDM 192.168.3.1 (2026-05-06).
+// Findings: .planning/research/v1.3/spikes/p19-tls-rtspx.md
 // DO NOT change this without re-running the spike against the same UDM firmware.
 //
-// TODO(p19-01): Lock this const based on the spike findings file
-// `.planning/research/v1.3/spikes/p19-tls-rtspx.md` once Plan 01 runs.
-// Until then, defaulting to 'rtspx' per meintechblog 2025-11-07 working recipe.
-// The catalog.ts discover() does NOT use TLS_SCHEME directly — it's stored
-// for P21 yaml-builder consumption. Safe to ship as placeholder for v1.3 plan-set.
+// `rtspx://` is a UniFi-internal URL convention that ffmpeg does NOT register
+// as a protocol ("Protocol not found"). Real ffmpeg consumers (go2rtc) must
+// use `rtsps://`. Bonus finding: the UDM's certificate currently passes
+// ffmpeg 8.0's default TLS validation, but `tls_verify=0` is set defensively
+// for portability across firmware versions.
 // ────────────────────────────────────────────────────────────────────────────
 export type TlsScheme = 'rtspx' | 'rtsps-tls-verify-0';
-export const TLS_SCHEME: TlsScheme = 'rtspx';
+export const TLS_SCHEME: TlsScheme = 'rtsps-tls-verify-0';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Lib client singleton (mirrors the session-TTL pattern from the legacy
