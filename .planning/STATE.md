@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: "Protect Stream Hub"
 status: phase_in_progress
-stopped_at: "P19 ✅ FULLY COMPLETE on 2026-05-06 (TLS spike + 6/7 UAT live-verified, SC-5 banner deferred as low-value). VM at SHA c138c3a. Next: P20-03 UAT (real Proxmox bridge provisioning) → P21 build."
-last_updated: "2026-05-06T00:00:00.000Z"
-last_activity: 2026-05-06 — P19 closed end-to-end. P19-01 TLS spike fired against Carport cam: rtspx:// is not an ffmpeg protocol; rtsps:// + tls_verify=0 is the locked TLS_SCHEME. protect-bridge.ts patched (placeholder → real value). P19-04 UAT automated against live VM 192.168.3.249 — 6/7 ROADMAP success criteria green (tab visible, 58 catalog rows, 10/10 first/third-party split, dynamic 0/3/4-channel rendering, manual refresh 200 in 0.79s, all 20 external cams have stable MAC). SC-5 banner branch verified by code + 20/20 unit tests. Polish: ProtectHubTab intro card (Loxone/Frigate Why-card) shipped before UAT. Two commits: 375615d (intro card) + c138c3a (TLS spike + protect-bridge patch). VM live on c138c3a.
+stopped_at: "P19 ✅ + P20 ✅ FULLY COMPLETE on 2026-05-06. P20-03 live UAT against Proxmox 192.168.3.6 found and fixed 3 source bugs (go2rtc-restart-after-clone, cores override, onboot=1 default), then verified all 11 criteria green on the third re-provision. Bridge live: vmid 2014 at 192.168.3.139. Next: P21 (yaml-builder + reconciler — the heart of v1.3, where Loxone-MJPEG actually starts flowing). Toolchain: gsd-sdk shim at ~/.local/bin restored the legacy `query` API surface — the proper multi-agent pipeline is back."
+last_updated: "2026-05-06T01:40:00.000Z"
+last_activity: 2026-05-06 — P19 + P20 both closed live. Three bridge-provision bugs surfaced and fixed during P20-03 UAT (commits 2b1d44a + 374e8a3): (1) cam-2000 streams persisted in memory after clone because `enable --now` doesn't restart, fixed via explicit `systemctl restart go2rtc`; (2) bridge inherited 1 core from template instead of locked 2, fixed by adding `cores?` override to cloneFromTemplate; (3) bridge had no onboot=1, fixed by setting onboot=1 default in cloneFromTemplate (closed latent per-cam bug too). Final UAT all green on third re-provision (12.2s wall, vmid 2014, ip 192.168.3.139). Also restored gsd-sdk via ~/.local/bin/gsd-sdk shim that translates legacy `query ns.cmd` to `gsd-tools ns cmd` — the multi-agent pipeline (planner, researcher, executor, verifier) is operational again.
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -95,8 +95,8 @@ Cannot be auto-fired via `/gsd:plan-phase 21` until the SDK is fixed. Options:
 | # | Phase | Reqs | Status |
 |---|-------|------|--------|
 | 19 | Data Model + Protect Catalog (Read-Only) | 7 | ✅ **COMPLETE** — 4/4 plans done, UAT 6/7 verified live (SC-5 banner deferred) |
-| 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | Plans 01-02 complete (backend + wizard UI); Plan 03 UAT pending (real Proxmox provisioning) |
-| 21 | Multi-Cam YAML + Reconciliation Loop | 18 | Not started |
+| 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | ✅ **COMPLETE** — 3/3 plans done, 3 bugs found+fixed during live UAT, 11/11 criteria verified (vmid 2014 @ 192.168.3.139) |
+| 21 | Multi-Cam YAML + Reconciliation Loop | 18 | Not started — multi-agent pipeline ready (gsd-sdk shim live) |
 | 22 | Onboarding Wizard + `/cameras` Integration | 14 | Not started |
 | 23 | Offboarding + Lifecycle Polish + Stream-Sharing API | 12 | Not started |
 

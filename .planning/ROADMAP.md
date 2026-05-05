@@ -24,7 +24,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 ## Phases
 
 - [x] **Phase 19: Data Model + Protect Catalog (Read-Only)** — Schema lock (MAC-as-PK), Protect bootstrap fetch, first-party/third-party classification, read-only stream catalog UI; settings tab shell. No bridge, no reconcile, no outputs. Ships demoable value alone (7 reqs). (completed 2026-05-02)
-- [ ] **Phase 20: Bridge LXC Provisioning + Hello-World YAML** — Provision the single shared bridge LXC from existing template, deploy a hardcoded go2rtc.yaml, bind go2rtc API to localhost, expose `:1984` + `:8554`. Wizard Steps 1–2. Ships demoable value alone (11 reqs).
+- [x] **Phase 20: Bridge LXC Provisioning + Hello-World YAML** — Provision the single shared bridge LXC from existing template, deploy a hardcoded go2rtc.yaml, bind go2rtc API to localhost, expose `:1984` + `:8554`. Wizard Steps 1–2. Ships demoable value alone (11 reqs). (completed 2026-05-06; 3 source bugs found+fixed during live UAT — restart-after-config-push, cores override, onboot default)
 - [ ] **Phase 21: Multi-Cam YAML + Reconciliation Loop** — Heart of the milestone. yaml-builder for Loxone-MJPEG (VAAPI transcode) + Frigate-RTSP (copy passthrough); reconcile with canonical-form sha256 dedupe, single-flight + dirty-flag retry; WS exp backoff; bridge health probe (18 reqs).
 - [ ] **Phase 22: Onboarding Wizard + `/cameras` Integration** — Wizard Steps 3–6 (resumable via `hub_onboarding_state`), `/cameras` partition (managed/external), Protect Hub badge + first/third-party qualifier, Outputs subsection with copy-buttons + per-target snippets, "All Hub URLs" page (14 reqs).
 - [ ] **Phase 23: Offboarding + Lifecycle Polish + Stream-Sharing API** — 3-tier offboarding (Pause / Disable+Keep / Full Uninstall), idempotent cleanup, soft-delete with 7-day grace, Protect RTSP-share cleanup gated by `share_enabled_by_us`, drift indicator, reconcile event log, per-stream metrics, "Export Hub config" pre-uninstall (12 reqs).
@@ -73,7 +73,7 @@ Plans:
 Plans:
 - [x] 20-01-PLAN.md — Bridge provisioning backend: bridge-provision.ts + bridge-lifecycle.ts + generateBridgeConfig() + 5 API endpoints + Vitest suites
 - [x] 20-02-PLAN.md — Wizard route /settings/protect-hub/onboarding (Steps 1-2) + ProtectHubTab bridge controls + scheduler health probe
-- [ ] 20-03-PLAN.md — UAT against real Proxmox: provision bridge, verify SC-1..8, state sync
+- [x] 20-03-PLAN.md — UAT against real Proxmox: provision bridge, verify SC-1..8, state sync (closed 2026-05-06; 3 bugs fixed mid-UAT, 11/11 verified)
 **Amended decisions**:
   - L-9 amended to `api.listen: "0.0.0.0:1984"` + `ui_editor: false` (D-API-BIND-01) — MJPEG streams live under API HTTP, localhost-only would block Loxone
   - Bridge sizing: 1024 MB / 2 cores for P20; P21 may bump to 2048 MB
