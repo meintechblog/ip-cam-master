@@ -229,6 +229,21 @@ describe('provisionBridge()', () => {
 		expect(cmd).toContain('systemctl restart go2rtc');
 	});
 
+	it('does not pass onboot override (cloneFromTemplate default of 1 takes effect)', async () => {
+		// UAT-7 regression: bridge LXC must autostart after Proxmox host reboot.
+		// `cloneFromTemplate` defaults onboot to 1; we just need to NOT override
+		// it to 0. Documents the contract so a future refactor doesn't silently
+		// flip the default.
+		mockGetTemplateVmid.mockResolvedValue(999);
+		await provisionBridge();
+
+		const cloneArgs = mockCloneFromTemplate.mock.calls[0]?.[0] as
+			| { onboot?: number }
+			| undefined;
+		// Either omitted (relies on default=1) or explicitly 1; never 0.
+		expect(cloneArgs?.onboot ?? 1).toBe(1);
+	});
+
 	it('falls back to createContainer when no template (slow path)', async () => {
 		mockGetTemplateVmid.mockResolvedValue(null);
 

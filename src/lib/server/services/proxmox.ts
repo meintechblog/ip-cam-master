@@ -308,6 +308,12 @@ export async function cloneFromTemplate(params: {
 	 * locked decision (P20 §"Bridge sizing: 1024 MB / 2 cores").
 	 */
 	cores?: number;
+	/**
+	 * Set Proxmox onboot flag (auto-start after host reboot). Default is 1 —
+	 * matches createContainer's behavior so bridges and cams come back online
+	 * automatically. Set to 0 for one-shot/throwaway LXCs (e.g. spike runs).
+	 */
+	onboot?: number;
 }): Promise<{ status: 'cloned'; vmid: number }> {
 	const { connectToProxmox: connectSSH } = await import('./ssh');
 	const ssh = await connectSSH();
@@ -341,6 +347,18 @@ export async function cloneFromTemplate(params: {
 			if (coresResult.code && coresResult.code !== 0) {
 				throw new Error(`Cores override failed: ${coresResult.stderr}`);
 			}
+		}
+
+		// Set onboot=1 by default so the container auto-starts after a Proxmox
+		// host reboot — matches createContainer's slow-path default. The clone
+		// otherwise inherits the template's onboot=0 and would stay stopped on
+		// host boot. Pass `onboot: 0` to opt out (e.g. one-shot spike LXCs).
+		const onbootValue = params.onboot ?? 1;
+		const onbootResult = await ssh.execCommand(
+			`pct set ${params.vmid} -onboot ${onbootValue}`
+		);
+		if (onbootResult.code && onbootResult.code !== 0) {
+			throw new Error(`onboot override failed: ${onbootResult.stderr}`);
 		}
 
 		// Configure VAAPI passthrough
