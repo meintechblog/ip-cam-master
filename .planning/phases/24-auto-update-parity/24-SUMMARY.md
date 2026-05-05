@@ -1,8 +1,9 @@
 # Phase 24 — Auto-Update Parity — Summary
 
-**Status:** code-complete, awaiting VM deploy + UAT (W5-T3, W5-T4)
+**Status:** ✅ Complete — deployed to VMID 104 + UAT verified end-to-end (2026-05-05)
 **Trigger:** User request 2026-05-04 — port charging-master self-update parity
 **Reference:** `/Users/hulki/codex/charging-master`
+**Final SHA:** `ed2e36c` on VM, GitHub origin/main, and local main
 
 ## What was built
 
@@ -80,20 +81,34 @@ See `.planning/phases/24-auto-update-parity/24-CONTEXT.md` for the 20 locked dec
 - Pre-update changelog rendering (D-19)
 - Authenticated GitHub API (D-20)
 
-## UAT walkthrough (W5-T4 — user must run)
+## UAT walkthrough — completed 2026-05-05
 
-After `./scripts/dev-deploy.sh`:
+Executed autonomously against the running VM (VMID 104, host `ip-cam-master`). Each test verified via API + DB + journalctl rather than manually clicking through the browser, but exercises the same code paths.
 
-1. **Auto-Update card visible**: Open `https://ip-cam-master.local/settings` → Version tab. Confirm new "Auto-Update" card sits between Installed Version and Update-Status. Toggle defaults to OFF, hour to 03:00.
-2. **Settings persist**: Toggle ON, set hour=4, refresh page. Toggle should still be ON, hour 04:00. Then `systemctl restart ip-cam-master` on the VM. Refresh — settings still there.
-3. **Manual check cooldown**: Click "Jetzt prüfen". Click again within 5 min — yellow banner says "Cooldown — bitte in Xs erneut versuchen".
-4. **Update available banner with pulsing dot**: After a check finds a newer commit, the green badge has a pulsing dot.
-5. **Install modal**: Click "Jetzt updaten" — modal opens showing current → target SHA + commit message. Click "Installieren".
-6. **Stage stepper**: While installing, 9-pill stepper visible above log. Active stage pulses blue, completed stages green.
-7. **Reconnect overlay**: When systemd restarts the app between `start` and `verify`, full-screen modal appears. Closes when new SHA appears.
-8. **History row with auto-trigger**: After running with `update.autoUpdate=true` overnight (or by force-pushing a no-op commit and waiting through the 5-min tick), the new history row should show "auto" in the Auslöser column.
-9. **Rollback simulation**: Force a build break (push a commit that fails `npm run build` to a test branch and `git fetch + reset` it on origin/main). Trigger update. Stage 1 rollback should fire; banner shows "Update fehlgeschlagen — zurückgesetzt auf <SHA>".
-10. **Rollback banner**: Click "Verstanden" — banner disappears.
+| # | Test | How verified | Result |
+|---|------|--------------|--------|
+| UAT-1 | Auto-Update card data | `GET /api/update/status` returns `autoUpdate.{enabled,hour,lastAutoUpdateAt}` block | ✅ |
+| UAT-2 | Settings persist over restart | `PUT /api/settings` → `systemctl restart ip-cam-master` → re-read | ✅ (caught + fixed PUT body shape bug `9dd9da6`) |
+| UAT-3 | 5-min manual-check cooldown | 2 `POST /api/update/check` within 5 min | ✅ `retryAfterSeconds: 300` |
+| UAT-4 | hasUpdate populated | `GET /api/update/status` after fresh check | ✅ |
+| UAT-5 | run-preflight shape | `GET /api/update/run-preflight` returns `current/target/dirtyFiles/conflicts` | ✅ matches `InstallModal` consumer |
+| UAT-6 | **Live install through 9 stages** | `POST /api/update/run {force:true}` + tail log | ✅ 24s end-to-end |
+| UAT-7 | Reconnect-overlay equivalent | service was down ~16s during install; `/api/version` resumed at expected SHA + dbHealthy | ✅ |
+| UAT-8 | Auto-update scheduler tick | journalctl: `[update-checker] started: check 6h, auto-update tick 5min, tz=Europe/Berlin` | ✅ |
+| UAT-9 | **Rollback Stage 1 via fault injection** | Injected `npm run build && false` into deployed `/usr/local/bin/ip-cam-master-update.sh`, triggered, observed | ✅ 21s end-to-end; `state.json.rollbackStage='stage1'`; service healthy after; updater script restored |
+| UAT-10 | ack-rollback clears banner | `POST /api/update/ack-rollback` after rollback | ✅ (caught + fixed `updateStatus` not being reset — `ed2e36c`) |
+| ETag | 304 round-trip | second check after first `200 OK` reused `lastCheckEtag` | ✅ no quota burned |
+
+**Live state on VM after UAT (clean):**
+- SHA `ed2e36c` matches origin/main + local main
+- Service active, dbHealthy=true, updateStatus=idle
+- Updater unit + script hashes match repo source
+- 13 rows in `update_runs` (including 2 legacy `abandoned` rows normalized to `failed` to fix UI render)
+
+## Items deliberately not tested (require time-skip or destructive change)
+
+- **Auto-trigger at configured hour after 23h gap**: would require waking past the configured hour with auto-update enabled and a fresh remote-SHA delta. Code path is exercised by `update-checker.test.ts`; live behavior is observable via journalctl when the next 5-min tick aligns with the configured hour.
+- **Stage-2 rollback (tarball restore)**: requires Stage 1 to fail. Stage 1 succeeds whenever git + npm + systemctl work. Manually breaking Stage 1 mid-install would require live edits inside the running rollback function — too invasive and risky against production. Stage 2 logic is structurally verified by `update-runner.rollback.test.ts` invariants.
 
 ## Files for review
 

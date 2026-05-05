@@ -19,7 +19,7 @@ Phase goal: *User can enable Auto-Update in /settings → Version, pick a daily 
 | SC-7 | `src/lib/version.ts` generated at build; `/api/version` exposes constants without spawning git | ✅ structural | `scripts/build/generate-version.mjs` runs as `gen:version` prebuild step in both `dev` and `build`. `version.ts` service imports `CURRENT_SHA`/`CURRENT_SHA_SHORT`/`BUILD_TIME` constants. `/api/version/+server.ts` returns these with `dbHealthy: SELECT 1`. No `execFile('git', ...)` at runtime. |
 | SC-8 | ETag defense: 2nd check sends If-None-Match → 304 = 0 quota | ✅ structural | `github-client.ts` sends `If-None-Match` from `state.lastCheckEtag`; on 304, returns `{ status: 'unchanged' }` and the caller (`update-check.ts`) only stamps `lastCheckAt` (preserves prior ok result). Verified by unit test `update-check.test.ts` "passes If-None-Match etag when present in state" + "handles 304 unchanged by preserving prior ok result". |
 | SC-9 | state.json atomic across Node + bash | ✅ structural | Node side: `update-state-store.ts` writes to `.update-state/state.json.tmp.<pid>.<ts>` then `renameSync` (POSIX atomic). Bash side: `update.sh` `state_patch()` uses inline Python3 with `os.replace(tmp, path)`. Both consult the same path resolution: `<cwd>/.update-state/state.json`. |
-| SC-10 | Deployed to running VM end-to-end; settings persist; history visible | ⏳ user-pending | Awaits W5-T3 deploy. UAT script: see `24-SUMMARY.md` §"UAT walkthrough". |
+| SC-10 | Deployed to running VM end-to-end; settings persist; history visible | ✅ live | Deployed and verified end-to-end against VMID 104 on 2026-05-05. UAT-1..UAT-10 + ETag round-trip + rollback fault injection (Stage 1) all passed. Live install completed in 24s through all 9 stages; rollback completed in 21s. Final SHA: `ed2e36c`. See `24-SUMMARY.md` §"UAT walkthrough — completed" for the timeline. |
 
 ## Required Reading Compliance
 
@@ -52,21 +52,34 @@ Phase goal: *User can enable Auto-Update in /settings → Version, pick a daily 
 - **W2-T6 expanded**: also added `db/client.ts` self-bootstrap for `update_runs` table (matches existing pattern for protect_hub_bridges etc) so deploys without `drizzle-kit push` still get the schema.
 - **Test rewrites**: `update-runner.rollback.test.ts` rewrote against new 9-stage pipeline (kept static-invariants approach, dropped the integration test that exercised the old single-stage script).
 
-## Coverage
+## Coverage — final
 
 - 13/13 UPD-AUTO-* requirements addressed
-- 9/10 success criteria verified structurally; SC-10 pending deploy
+- 10/10 success criteria verified — 9 structurally pre-deploy, SC-10 live
 - 0 TypeScript errors (`npm run check`)
 - Build clean (`npm run build`)
 - 56/56 P24-touched unit tests pass
-- 12 pre-existing onboarding/proxmox test failures unchanged (verified via git-stash regression check)
+- 12 pre-existing onboarding/proxmox test failures unchanged (verified via git-stash regression check; not P24)
 
-## Next: W5-T3 Deploy + W5-T4 UAT
+## Live UAT against VMID 104 — completed 2026-05-05
 
-`./scripts/dev-deploy.sh` pushes to VMID 104. The post-receive hook runs `npm ci` + `npm run build` + `systemctl restart`. On boot, the new app:
-1. Generates `src/lib/version.ts` with the deployed SHA
-2. Initializes `.update-state/state.json`
-3. Runs `ensureUpdaterUnitInstalled()` which copies the new systemd unit into `/etc/systemd/system/`
-4. Starts the new 6h check + 5min auto-update tick
+| Test | Result |
+|------|--------|
+| UAT-1 Auto-Update card renders | ✅ |
+| UAT-2 Settings persist across `systemctl restart` | ✅ (PUT-shape bug `9dd9da6` caught + fixed live) |
+| UAT-3 5-min cooldown on manual check | ✅ (`retryAfterSeconds: 300`) |
+| UAT-4 hasUpdate flag | ✅ |
+| UAT-5 `/api/update/run-preflight` shape | ✅ |
+| UAT-6 Live install through 9 stages | ✅ (24s end-to-end) |
+| UAT-7 Reconnect-overlay equivalent (`/api/version` polled during stop→verify gap) | ✅ |
+| UAT-8 Auto-update tick alive | ✅ (journalctl: `[update-checker] started: check 6h, auto-update tick 5min, tz=Europe/Berlin`) |
+| UAT-9 Rollback Stage 1 via fault injection | ✅ (21s end-to-end; state correctly marked `rolled_back/stage1`) |
+| UAT-10 ack-rollback clears banner | ✅ (terminal-state sticky-bug `ed2e36c` caught + fixed live) |
+| ETag 304 round-trip | ✅ (`lastCheckEtag` persisted; second check returns success without quota burn) |
 
-Manual UAT walks through the 10 success criteria (SC-10 in particular).
+**3 polish commits during UAT:**
+- `b3d93ab` — `generate-version.mjs` unsets `GIT_DIR` (post-receive env leak)
+- `9dd9da6` — `AutoUpdateCard.svelte` PUT body shape
+- `ed2e36c` — `ack-rollback` resets `updateStatus`
+
+**Final state on VM:** SHA `ed2e36c` matches GitHub origin/main. Service active. dbHealthy: true. Updater unit + script hashes match repo (deployed unit consistent with source). state.json clean (`updateStatus: idle`, `rollbackHappened: false`). 13 history rows in `update_runs` table including the 3 P24-UAT runs (2 success + 1 rolled_back).

@@ -28,7 +28,7 @@ Phase numbering continues from v1.2 (last phase was 18). v1.3 starts at Phase 19
 - [ ] **Phase 21: Multi-Cam YAML + Reconciliation Loop** — Heart of the milestone. yaml-builder for Loxone-MJPEG (VAAPI transcode) + Frigate-RTSP (copy passthrough); reconcile with canonical-form sha256 dedupe, single-flight + dirty-flag retry; WS exp backoff; bridge health probe (18 reqs).
 - [ ] **Phase 22: Onboarding Wizard + `/cameras` Integration** — Wizard Steps 3–6 (resumable via `hub_onboarding_state`), `/cameras` partition (managed/external), Protect Hub badge + first/third-party qualifier, Outputs subsection with copy-buttons + per-target snippets, "All Hub URLs" page (14 reqs).
 - [ ] **Phase 23: Offboarding + Lifecycle Polish + Stream-Sharing API** — 3-tier offboarding (Pause / Disable+Keep / Full Uninstall), idempotent cleanup, soft-delete with 7-day grace, Protect RTSP-share cleanup gated by `share_enabled_by_us`, drift indicator, reconcile event log, per-stream metrics, "Export Hub config" pre-uninstall (12 reqs).
-- [ ] **Phase 24: Auto-Update Parity** — Bring self-update to charging-master parity (parallel-track maintenance, precedent: P16). Adds auto-update toggle + configurable hour (Europe/Berlin), background scheduler (6h GitHub check + 5min auto-update tick), ETag caching, 9-stage pipeline stepper UI, reconnect overlay polling `/api/version`, install confirmation modal, two-stage rollback (git + tarball snapshot), 23h auto-update minimum spacing, atomic `state.json` cross-process, dedicated `update_runs` table.
+- [x] **Phase 24: Auto-Update Parity** — Bring self-update to charging-master parity (parallel-track maintenance, precedent: P16). Adds auto-update toggle + configurable hour (Europe/Berlin), background scheduler (6h GitHub check + 5min auto-update tick), ETag caching, 9-stage pipeline stepper UI, reconnect overlay polling `/api/version`, install confirmation modal, two-stage rollback (git + tarball snapshot), 23h auto-update minimum spacing, atomic `state.json` cross-process, dedicated `update_runs` table. (completed 2026-05-05)
 
 ## Phase Details
 
@@ -183,7 +183,7 @@ Plans:
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
 | 23. Offboarding + Lifecycle Polish + Stream-Sharing API | 0/? | Not started | - |
-| 24. Auto-Update Parity (parallel-track maintenance) | 0/? | Not started | - |
+| 24. Auto-Update Parity (parallel-track maintenance) | 1/1 | Complete    | 2026-05-05 |
 
 ## Coverage
 

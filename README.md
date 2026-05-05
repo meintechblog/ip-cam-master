@@ -20,6 +20,7 @@ Built for self-hosters who want to integrate non-ONVIF cameras (Mobotix, Loxone 
 - **Container Health Checks** — Automatic monitoring of go2rtc and ONVIF server status every 5 minutes with event logging on failure
 - **Dynamic Proxmox Config** — Storage and bridge dropdowns loaded from Proxmox API with disk space info
 - **Access Control** — Session-based login with setup wizard, or YOLO mode for homelab simplicity
+- **Auto-Update** — Optional self-update from GitHub on a daily window (Europe/Berlin). 9-stage pipeline with two-stage rollback, ETag-cached check, dedicated systemd unit, conflict-aware install (skips when Hub bridge is starting/stopping). See [Auto-Update](#auto-update)
 - **Responsive UI** — Hamburger menu on mobile, full sidebar on desktop
 
 ## How It Works
@@ -313,6 +314,16 @@ Every container's go2rtc can lock its RTSP-Server (`:8554`) with the camera's ow
 - **Bambu:** container uses the printer's serial as username and the access code as password
 
 When enabled, the card shows the credentials you need in UniFi Protect's adoption dialog (ONVIF tab) and provides a one-click copy of the full `rtsp://user:pass@host:8554/stream` URL for VLC/ffmpeg testing. New onboardings opt in automatically; existing cameras require a manual re-adoption in Protect after flipping the switch.
+
+### Auto-Update
+
+`Settings → Version` lets the app keep itself in sync with `meintechblog/ip-cam-master` on GitHub:
+
+- **Manual check + install** — "Jetzt prüfen" hits the GitHub commits API (ETag-cached, 5-min cooldown). "Jetzt updaten" opens a confirmation modal showing current → target SHA + commit metadata + any active flow conflicts (Hub bridge starting/stopping). Install runs through a 9-stage pipeline: preflight → snapshot → drain → stop → fetch → install → build → start → verify, with a live stage-stepper UI.
+- **Auto-update** — Toggle on + pick a daily hour (Europe/Berlin, default 03:00). The app checks every 6h and applies updates inside the configured hour, skipping if a Hub bridge is starting/stopping or the last auto-update was less than 23h ago. Each run is logged in the **history table** with `manuell` vs `auto` trigger.
+- **Two-stage rollback** — If `verify` fails (sha mismatch or `dbHealthy=false`), Stage 1 does `git reset --hard` to the previous SHA + reinstall; if Stage 1 itself fails, Stage 2 restores from the pre-install tarball snapshot. The rollback banner shows on the next page load until you ack it.
+- **Reconnect overlay** — Mid-install when the service restarts, the UI shows a non-dismissable polling overlay (`/api/version` every 2s, 90s timeout) and auto-closes once the new SHA reports back with `dbHealthy=true`.
+- **Where state lives** — `update_runs` SQLite table (run history, last 10 visible) + `.update-state/state.json` (transient: SHA, ETag, rollback fields, atomic via tmp+rename, shared between Node and the bash updater) + `update.autoUpdate*` keys in `settings`. The dedicated `ip-cam-master-updater.service` (oneshot) lives in a sibling cgroup so the `stop` stage doesn't kill its own driver.
 
 ## Background & References
 
