@@ -96,10 +96,17 @@ Plans:
   9. Stream slugs are derived from MAC, not display name: renaming a cam in Protect updates the displayed name in the UI but the slug (`<mac-slug>-<output-suffix>`) and resulting URLs remain identical — verifiable by editing a cam name in Protect and observing the next reconcile produces a YAML with unchanged stream keys
   10. Self-update (v1.1 feature) returns HTTP 409 if `reconciler.busy=true`; YAML deploy uses `tmp+rename` atomic write, so a SIGTERM mid-deploy leaves the existing YAML intact (no half-written file); SIGTERM grace 30 s lets in-flight reconciles complete
   11. Bridge container health probe extends the existing `healthCheckInterval` in `scheduler.ts` (one extra fetch to bridge:1984 per tick); a sustained failure (>2 min producers=0 on a stream that should be live) emits an event and triggers a UI warning banner
-**Plans**: TBD
+**Plans**: 6 plans (in 5 waves)
+Plans:
+- [ ] 21-01-PLAN.md — Wave 0: protect_hub_reconcile_runs schema + 6 test stubs + [BLOCKING] drizzle-kit push
+- [ ] 21-02-PLAN.md — Wave 1: yaml-builder.ts (pure D-PIPE-02/04 emission + canonicalHash) + 4 golden YAML fixtures + token-redaction security test
+- [ ] 21-03-PLAN.md — Wave 2: reconcile.ts (single-flight + 4-pass orchestration + atomic tmp+rename SSH push + auto-add/soft-delete writeback) + ~14 behavioural tests
+- [ ] 21-04-PLAN.md — Wave 2: ws-manager.ts (exp-backoff [5,10,30,60,120,300]s, single-flight, force-reconcile on success) + fake-timer tests
+- [ ] 21-05-PLAN.md — Wave 3: 3 API routes (POST /reconcile 202, GET /reconcile-runs, PUT /cameras/[id]/outputs with VAAPI cap) + ~12 tests
+- [ ] 21-06-PLAN.md — Wave 4: scheduler 5min tick + 2-strike health probe + update-checker busy-gate + 30s SIGTERM grace + live UAT against vmid 2014
 **Research flags**:
-  - go2rtc reconnect-after-source-disconnect empirical test (PITFALLS #14): does go2rtc auto-redial when the upstream Protect cam reboots, or does it hold a dead consumer connection?
-  - Canonical YAML form choice (PITFALLS #5): exact `yaml.stringify()` options to guarantee byte-identical output for byte-identical input (sortKeys, key normalization, line-ending policy)
+  - go2rtc reconnect-after-source-disconnect empirical test (PITFALLS #14): does go2rtc auto-redial when the upstream Protect cam reboots, or does it hold a dead consumer connection? — DEFERRED to Plan 21-06 live UAT; backend mitigation already in via D-PIPE-05 reconnect flags + D-CAP-03 health probe
+  - Canonical YAML form choice (PITFALLS #5): exact `yaml.stringify()` options to guarantee byte-identical output for byte-identical input — RESOLVED: `yaml@2.6.stringify({sortMapEntries: true})` with stamp-strip canonicalization (Pattern 2 in 21-RESEARCH.md); locked in Plan 21-02
 
 ### Phase 22: Onboarding Wizard + `/cameras` Integration
 **Goal**: A non-developer user can enable the Protect Hub feature via the settings toggle, complete a 6-step wizard end-to-end (resumable across browser closes and app restarts), and see their first-party UniFi cams streaming as Loxone-MJPEG outputs in `/cameras` — inline with their existing managed Mobotix/Loxone/Bambu cams, marked with a "Protect Hub" badge plus a first-party/third-party qualifier — within 5 minutes of clicking the toggle
@@ -179,8 +186,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 19. Data Model + Protect Catalog (Read-Only) | 3/4 | Complete    | 2026-05-02 |
-| 20. Bridge LXC Provisioning + Hello-World YAML | 0/? | Not started | - |
-| 21. Multi-Cam YAML + Reconciliation Loop | 0/? | Not started | - |
+| 20. Bridge LXC Provisioning + Hello-World YAML | 3/3 | Complete    | 2026-05-06 |
+| 21. Multi-Cam YAML + Reconciliation Loop | 0/6 | Planned     | - |
 | 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
 | 23. Offboarding + Lifecycle Polish + Stream-Sharing API | 0/? | Not started | - |
 | 24. Auto-Update Parity (parallel-track maintenance) | 1/1 | Complete    | 2026-05-05 |
