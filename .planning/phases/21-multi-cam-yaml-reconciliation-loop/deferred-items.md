@@ -16,3 +16,10 @@ Confirmed on the wave-base commit (`24b898b` — before any 21-02 changes). 12 f
 **Repro:** `npx vitest --run src/lib/server/services/{backup,proxmox-validate,onboarding,proxmox}.test.ts` on the worktree-base commit reproduces all 12 failures.
 
 **Reported by:** Plan 21-02 executor (worktree-agent-a44bab7e86357a024), 2026-05-06.
+
+## Plan 21-04 worktree observations
+
+- **Same 12 pre-existing test failures** confirmed on the 21-04 base (`38bcd0e` — wave-1 merge). No regression introduced by ws-manager.ts. Out of scope.
+- **`./reconcile` missing-module typecheck error** is BY DESIGN. Plan 21-04 ships `ws-manager.ts` with an `import { reconcile } from './reconcile';` that the parallel Plan 21-03 worktree creates. The error resolves at the wave-2 merge to main. Cyclic-guard verification (`grep -L "ws-manager" src/lib/server/orchestration/protect-hub/reconcile.ts`) is deferred until reconcile.ts lands; the design intent is documented in PATTERNS.md §ws-manager.ts and in the file's header comment.
+
+**Reported by:** Plan 21-04 executor (worktree-agent-a0f8c73d3e2f92469), 2026-05-06.
