@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: milestone
-status: executing
-stopped_at: Completed 20-02-PLAN.md (wizard UI + bridge controls + scheduler health probe)
-last_updated: "2026-05-06T05:49:52.872Z"
-last_activity: 2026-05-06 -- Phase 21 execution started
+status: completed
+stopped_at: P21 ✅ FULLY COMPLETE on 2026-05-06 — Loxone-MJPEG flows live (640×360@10fps from Carport HEVC source via bridge vmid 2014); Frigate-RTSP HEVC passthrough live; 11/11 success criteria green incl. hard-cap 422 + idempotent reconcile + atomic SSH push + ws-manager exp-backoff. 7 code-review WARNINGs (0 blockers); WR-01 mass-archive risk fixed inline; WR-02..WR-07 deferred to gap-closure.
+last_updated: "2026-05-06T08:10:00.000Z"
+last_activity: 2026-05-06 -- P21 closed end-to-end: Loxone-MJPEG + Frigate-RTSP streams live on bridge.
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
-  completed_plans: 8
-  percent: 57
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
-**Current focus:** Phase 21 — Multi-Cam YAML + Reconciliation Loop
+**Current focus:** P21 ✅ closed. Next: P22 (Onboarding Wizard + `/cameras` Integration) and P23 (Offboarding + Lifecycle Polish).
 
 ## Current Position
 
-Phase: 21 (Multi-Cam YAML + Reconciliation Loop) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 21
-Last activity: 2026-05-06 -- Phase 21 execution started
+Phase: 21 — ✅ COMPLETE (live UAT verified 2026-05-06)
+Plan: all 6 of 6 done
+Status: Phase 21 ✅
+Last activity: 2026-05-06 -- P21 closed; live streams flowing on bridge vmid 2014
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
@@ -39,56 +39,44 @@ Shipped milestones:
 - v1.2 — Bambu Lab A1 Camera Integration (code-complete 2026-04-20, formal close pending UAT)
 
 ```
-[####      ] 33% — P19 done (4/4 plans, UAT verified); P20 2/3 plans done; P21-P23 untouched
+[######    ] 50% — P19 ✅ + P20 ✅ + P21 ✅ (15/15 v1.3 plans done); P22 + P23 not started
 ```
 
 ## Toolchain note (2026-05-06)
 
-`gsd-sdk` is on v0.1.0 with a new CLI surface (only `run` / `auto` / `init` —
-no `query` subcommands). All GSD skills that call `gsd-sdk query …` (autonomous,
-plan-phase, execute-phase, discuss-phase, quick, progress, …) are therefore
-non-functional in this repo right now. P19 closeout was done by hand: direct
-ffprobe runs, direct DB queries against the VM, manual STATE.md/SUMMARY edits.
-Either downgrade gsd-sdk to a query-capable version, or update the skills to
-the new CLI surface, before resuming the orchestrated pipeline.
+`gsd-sdk` (`@gsd-build/sdk@0.1.0`) shipped a new CLI surface that dropped
+the `query` subcommand all GSD skills depend on. Restored via a shim at
+`~/.local/bin/gsd-sdk` that translates `gsd-sdk query <ns>.<cmd>` →
+`gsd-tools <ns> <cmd>` (the underlying binary, still functional). PATH
+order puts `~/.local/bin` ahead of `/opt/homebrew/bin`, so the shim wins
+without touching the brew install. The full multi-agent pipeline
+(researcher → pattern-mapper → planner → plan-checker → executor →
+verifier → code-reviewer) is operational again.
 
 ## What's pending for user (in priority order)
 
-### 1. (Optional) Push to GitHub origin
+### 1. P22 — Onboarding Wizard + `/cameras` Integration (UI surface)
 
-Two commits sit on `vm/main` only — they have not been pushed to
-`origin` (GitHub) yet:
+The backend (P21) emits the right streams; P22 builds the wizard Steps
+3–6, the `/cameras` partition (managed/external), the per-cam Outputs
+subsection with copy-buttons, and the "All Hub URLs" page. 14 reqs.
 
-- `375615d` — Protect Hub intro card (Loxone/Frigate Why-card)
-- `c138c3a` — P19-01 TLS spike findings + protect-bridge.ts placeholder patch
+`/gsd:autonomous --only 22` should now run the full pipeline.
 
-Run `git push origin main` whenever ready (SSH, per memory).
+### 2. P23 — Offboarding + Lifecycle Polish + Stream-Sharing API
 
-### 2. P20-03 UAT — provision real bridge LXC against live Proxmox
+3-tier offboarding (Pause / Disable+Keep / Full Uninstall), idempotent
+cleanup, soft-delete with 7-day grace, Protect-side share-toggle cleanup
+gated by `share_enabled_by_us`, drift indicator, reconcile event log
+(P21 already writes the rows), per-stream metrics, "Export Hub config"
+pre-uninstall. 12 reqs.
 
-The wizard at `/settings/protect-hub/onboarding` exposes Step 1 (Protect creds reuse)
-and Step 2 (bridge provisioning trigger). UAT verifies: real LXC from the existing
-Debian-13 + VAAPI template, bridge YAML deployed with idempotency stamp + `api: 0.0.0.0:1984` + `ui_editor: false`, hello-world stream playable on `:1984/api/stream.mjpeg` and `:8554/<test-stream>`, autostart=1 survives host reboot, lifecycle buttons (Start/Stop/Restart) reflect within 10s.
+### 3. (Backlog) P21 code-review gap closure
 
-Either click through the wizard in the browser, or trigger via:
-
-```bash
-curl -X POST http://192.168.3.249/api/protect-hub/bridge/provision \
-  -H 'Content-Type: application/json' -d '{}'
-```
-
-Then verify on Proxmox host: `pct config <vmid>` and `pct exec <vmid> -- curl -s http://localhost:1984/api/streams`.
-
-### 3. P21 — Multi-Cam YAML + Reconciliation Loop (the heart)
-
-This is where Loxone-MJPEG actually starts flowing. yaml-builder (VAAPI transcode for
-MJPEG outputs, copy-passthrough for RTSP), 5min reconcile + force-on-toggle,
-canonical-sha256 dedupe, single-flight + dirty-flag retry, WS exponential backoff,
-bridge health probe.
-
-Cannot be auto-fired via `/gsd:plan-phase 21` until the SDK is fixed. Options:
-(a) downgrade/fix gsd-sdk and run the orchestrated pipeline,
-(b) hand-write plan + execute against ROADMAP §Phase 21.
+REVIEW.md `21-REVIEW.md` lists 6 deferred WARNINGs (WR-02..WR-07) and
+6 INFOs. None is prod-impactful — defense-in-depth + multi-bridge
+hardening + a small types.ts gap. Pick up via
+`/gsd:plan-phase 21 --gaps` once P22/P23 are done.
 
 ## v1.3 Phase Overview
 
@@ -96,7 +84,7 @@ Cannot be auto-fired via `/gsd:plan-phase 21` until the SDK is fixed. Options:
 |---|-------|------|--------|
 | 19 | Data Model + Protect Catalog (Read-Only) | 7 | ✅ **COMPLETE** — 4/4 plans done, UAT 6/7 verified live (SC-5 banner deferred) |
 | 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | ✅ **COMPLETE** — 3/3 plans done, 3 bugs found+fixed during live UAT, 11/11 criteria verified (vmid 2014 @ 192.168.3.139) |
-| 21 | Multi-Cam YAML + Reconciliation Loop | 18 | Not started — multi-agent pipeline ready (gsd-sdk shim live) |
+| 21 | Multi-Cam YAML + Reconciliation Loop | 18 | ✅ **COMPLETE** — 6/6 plans done; live UAT verified Loxone-MJPEG + Frigate-RTSP streams flowing; 4 source bugs found+fixed mid-UAT (Bambu rtsp_transport, channel selection fallback, auto-seed cap, controller-host catalog); WR-01 fixed inline; REVIEW.md captures 6 deferred WARNINGs |
 | 22 | Onboarding Wizard + `/cameras` Integration | 14 | Not started |
 | 23 | Offboarding + Lifecycle Polish + Stream-Sharing API | 12 | Not started |
 

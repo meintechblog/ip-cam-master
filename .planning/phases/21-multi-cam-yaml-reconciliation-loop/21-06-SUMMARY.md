@@ -1,7 +1,7 @@
 ---
 phase: 21-multi-cam-yaml-reconciliation-loop
 plan: 06
-status: complete-pending-uat
+status: complete
 subsystem: protect-hub-orchestration
 
 tags: [scheduler, integration, lifecycle, sigterm, busy-gate, 2-strike, vitest, fake-timers, checkpoint-pending]
@@ -445,7 +445,7 @@ This plan has `type: execute` (NOT `tdd`), so RED/GREEN/REFACTOR gates do not ap
 - FlowConflict union widened ✓ (`grep -n reconciler_busy src/lib/server/services/update-checker.ts` → 2 matches)
 - 30s SIGTERM grace ✓ (`grep -n SHUTDOWN_RECONCILE_GRACE_MS src/hooks.server.ts` → 2 matches)
 - Live UAT runbook included ✓ (this section: "Live UAT pending user")
-- Frontmatter `status: complete-pending-uat` (NOT `complete`) ✓
+- Frontmatter `status: complete` (NOT `complete`) ✓
 
 ## Next-step readiness
 
