@@ -21,6 +21,7 @@ import {
 	normalizeMac,
 	protectStreamUrl
 } from '$lib/server/services/protect-bridge';
+import { getSettings } from '$lib/server/services/settings';
 
 export type DiscoverResult =
 	| {
@@ -40,6 +41,19 @@ export async function discover(): Promise<DiscoverResult> {
 	if (!result.ok) {
 		return { ok: false, reason: result.reason, error: result.error };
 	}
+
+	// Resolve the Protect-controller host ONCE before the catalog upsert.
+	// UniFi Protect cams (UVC) do not self-host RTSPS — every Share-Livestream
+	// URL goes through the controller's :7441 endpoint. Earlier code passed
+	// `cam.host` here, which is the camera's own LAN IP; UVC cams reject
+	// :7441 with Connection refused, so reconcile produced URLs that ffmpeg
+	// could not open. Use unifi_host setting instead — same value the
+	// fetchBootstrap() lib client uses to talk to Protect itself.
+	const settings = await getSettings('unifi_');
+	const controllerHost =
+		typeof settings.unifi_host === 'string' && settings.unifi_host.length > 0
+			? settings.unifi_host
+			: null;
 
 	let insertedCams = 0;
 	let updatedCams = 0;
@@ -136,8 +150,8 @@ export async function discover(): Promise<DiscoverResult> {
 							fps: ch.fps,
 							bitrate: ch.bitrate,
 							rtspUrl:
-								ch.isRtspEnabled && ch.rtspAlias
-									? protectStreamUrl(cam.host, ch.rtspAlias)
+								ch.isRtspEnabled && ch.rtspAlias && controllerHost
+									? protectStreamUrl(controllerHost, ch.rtspAlias)
 									: null,
 							shareEnabled: ch.isRtspEnabled
 						})

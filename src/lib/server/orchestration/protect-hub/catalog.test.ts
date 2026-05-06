@@ -28,6 +28,13 @@ vi.mock('$lib/server/services/protect-bridge', async () => {
 	return { ...actual, fetchBootstrap: mockFetchBootstrap };
 });
 
+// catalog.ts now resolves the Protect controller host via getSettings('unifi_')
+// so it can build correct rtsp:// URLs (instead of cam.host which UVC cams don't
+// self-host on :7441). Stub returns a fixed test controller.
+vi.mock('$lib/server/services/settings', () => ({
+	getSettings: vi.fn().mockResolvedValue({ unifi_host: '192.168.3.1' })
+}));
+
 vi.mock('$lib/server/db/client', () => ({
 	get db() {
 		return memDbRef.db;
