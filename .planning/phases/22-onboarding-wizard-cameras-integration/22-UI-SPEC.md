@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: false
 preset: none
 created: 2026-05-06
+revised: 2026-05-06
 ---
 
 # Phase 22 — UI Design Contract
@@ -58,27 +59,37 @@ Declared values (multiples of 4, mapped to Tailwind classes):
 | xl | 32 | `gap-8`, `mb-8` | Wizard step indicator → step body gap; section-to-section gap on `/kameras` (managed → external) |
 | 2xl | 48 | `mt-12`, `pt-12` | Below page-level h1 on `/settings/protect-hub/all-urls` and `/settings/protect-hub/onboarding` |
 
-**Phase 22 exceptions (justified):**
+**Phase 22 spacing exceptions (justified):**
 
-- **`text-[10px]` and `text-[11px]`** — already used throughout `CameraDetailCard.svelte` for inline metadata (RTSP-Auth hints, Bambu error sub-copy). Phase 22 reuses for: snippet-block code-comment lines, "Adresse:" inline labels, drift-indicator delta text. **Do not introduce new pixel sizes beyond these two.**
 - **`w-2`, `w-2.5`, `w-3.5` icon sizes** (8/10/14 px) — match existing `CameraDetailCard` status dots and lucide icon sizing pattern. Not on the 4-grid for the dot itself but the *box* containing it is 16px (`w-4 h-4`). Acceptable.
+
+**No font-size pixel exceptions.** All text in P22 uses one of the four declared sizes below (12 / 14 / 16 / 24). The previously-considered `text-[10px]` and `text-[11px]` exceptions are explicitly retired — every label, badge, snippet comment, "Adresse:" caption, drift-indicator delta and event-type badge now uses `text-xs` (12 px).
 
 ---
 
 ## Typography
 
+**Exactly 4 sizes, exactly 2 weights.**
+
 | Role | Size | Weight | Line Height | Tailwind | Where used in P22 |
 |------|------|--------|-------------|----------|--------------------|
-| Body | 14 px | 400 (normal) | 1.5 (`leading-normal`) | `text-sm` | Wizard step body copy, Outputs row labels, event-log rows, snippet language |
-| Label / Meta | 12 px | 400 | 1.4 (`leading-snug`) | `text-xs` | Toggle sub-labels ("Loxone-MJPEG"), URL captions ("Adresse:"), event-log timestamps, badge text |
-| Section heading | 16 px | 600 (`font-semibold`) | 1.4 | `text-base font-semibold` | Wizard step heading ("Schritt 4: Kameras auswählen"), `/kameras` section headers ("Eigene Kameras (n)"), Outputs subsection title ("Bridge-Ausgänge") |
-| Page heading | 24 px | 700 (`font-bold`) | 1.2 | `text-2xl font-bold` | `/kameras` h1, `/settings/protect-hub/onboarding` h1, `/settings/protect-hub/all-urls` h1 |
+| Label / Meta | 12 px | 400 (normal) | 1.4 (`leading-snug`) | `text-xs` | Toggle sub-labels ("Loxone-MJPEG"), URL captions ("Adresse:"), event-log timestamps, event-type badges, badge text, snippet `#`-comment lines, drift-indicator delta, third-party qualifier text |
+| Body | 14 px | 400 | 1.5 (`leading-normal`) | `text-sm` | Wizard step body copy, Outputs row labels, event-log row body, snippet language, primary stage labels, step indicator labels |
+| Section heading | 16 px | 600 (`font-semibold`) | 1.4 | `text-base font-semibold` | Wizard step heading ("Schritt 4: Kameras auswählen"), `/kameras` section headers ("Eigene Kameras (n)"), Outputs subsection title ("Bridge-Ausgänge"), Hub-Status panel title, Event log title |
+| Page heading | 24 px | 600 (`font-semibold`) | 1.2 | `text-2xl font-semibold` | Page-level `<h1>` instances **introduced by P22**: `/settings/protect-hub/all-urls` h1, Hub-Tab status-panel section h1 (when rendered as a standalone page heading) |
 
-**Weights: exactly 2.** `font-normal` (400) for body and meta. `font-semibold` (600) for section headings. `font-bold` (700) ONLY for page-level `<h1>` (matches existing `text-2xl font-bold` in `kameras/+page.svelte:35`).
+**Weights — exactly 2:**
+
+- `font-normal` (400) — body, meta, labels, mono URLs, snippet content, badge text
+- `font-semibold` (600) — section headings (`text-base`) and **all new page-level `<h1>` instances P22 introduces**
+
+**Footnote — pre-existing `font-bold` (NOT introduced by P22):**
+
+> The file `src/routes/kameras/+page.svelte` already renders its top-level `<h1>` as `text-2xl font-bold` (line ~35). P22 inherits that file's existing style verbatim — the `/kameras` h1 is **not** modified. P22 introduces zero new `font-bold` usages. Any new `<h1>` P22 adds (all-urls page, hub-tab status panel) MUST use `font-semibold`.
 
 **Hard-floor numeric:** `font-mono` for any URL, slug, MAC, or hash rendered in the UI (`text-xs font-mono` is the pattern). Never display URLs in proportional font.
 
-**Code blocks (snippet display):** `text-xs font-mono leading-relaxed` (1.625) inside `bg-bg-input` or `bg-bg-primary` rounded surfaces.
+**Code blocks (snippet display):** `text-xs font-mono leading-relaxed` (1.625) inside `bg-bg-input` or `bg-bg-primary` rounded surfaces. Snippet `#`-comment lines remain `text-xs font-mono` — the color shifts to `text-text-secondary` to visually de-emphasize, no size change.
 
 ---
 
@@ -90,7 +101,7 @@ Declared values (multiples of 4, mapped to Tailwind classes):
 |------|-------|--------------------|
 | Dominant (60%) | `bg-bg-primary` (#0f1419) | Page background; outer chrome of `/kameras`, wizard, all-urls page |
 | Secondary (30%) | `bg-bg-card` (#1e2433) + `bg-bg-secondary` (#1a1f2e) + `bg-bg-input` (#252b3b) | Cards (CameraDetailCard variants, wizard step container, Outputs subsection panel, ProtectHubGuide block, status panel, event log rows). Inputs and subtle inset surfaces (URL display rows, snippet code blocks) use `bg-bg-input` |
-| Accent (10%) | `bg-accent` (#3b82f6) | **Reserved-for list — exhaustive:** primary CTA button background ("Weiter", "Bridge bereitstellen", "Onboarding fertigstellen", "Sync now"), step indicator current-step ring, copy-button hover state (`hover:text-accent`), resume-banner "Weiter" button, focus rings (`focus:border-accent`), Loxone-MJPEG output toggle ON-state thumb |
+| Accent (10%) | `bg-accent` (#3b82f6) | **Reserved-for list — exhaustive:** primary CTA button background ("Auswahl übernehmen", "Bridge bereitstellen", "Zum Abschluss", "Zur Kameraliste", "Sync now"), step indicator current-step ring, copy-button hover state (`hover:text-accent`), resume-banner "Weiter" button, focus rings (`focus:border-accent`), Loxone-MJPEG output toggle ON-state thumb |
 
 **Semantic colors (NOT counted in 10% accent budget):**
 
@@ -121,15 +132,16 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 
 ### Page-level headings
 
-| Surface | Copy |
-|---------|------|
-| `/kameras` h1 | `Kameras` (unchanged) |
-| `/kameras` managed section header | `Eigene Kameras (N)` |
-| `/kameras` external section header | `Aus UniFi Protect (N)` |
-| Wizard h1 | `Protect Hub — Bridge einrichten` (unchanged from P20) |
-| Wizard subtitle | `Der Bridge-Container stellt go2rtc für alle Hub-Streams bereit.` (unchanged) |
-| All-URLs page h1 | `Hub-Adressen — Übersicht` |
-| All-URLs subtitle | `Alle aktiven Stream-Adressen, gruppiert nach Ausgangstyp.` |
+| Surface | Copy | Tailwind |
+|---------|------|----------|
+| `/kameras` h1 (pre-existing, NOT modified) | `Kameras` | `text-2xl font-bold` (existing — inherited verbatim) |
+| `/kameras` managed section header | `Eigene Kameras (N)` | `text-base font-semibold` |
+| `/kameras` external section header | `Aus UniFi Protect (N)` | `text-base font-semibold` |
+| Wizard h1 (pre-existing from P20, NOT modified) | `Protect Hub — Bridge einrichten` | inherited from P20 verbatim |
+| Wizard subtitle | `Der Bridge-Container stellt go2rtc für alle Hub-Streams bereit.` | `text-sm text-text-secondary` |
+| **All-URLs page h1 (NEW in P22)** | `Hub-Adressen — Übersicht` | `text-2xl font-semibold` |
+| All-URLs subtitle | `Alle aktiven Stream-Adressen, gruppiert nach Ausgangstyp.` | `text-sm text-text-secondary` |
+| **Hub-Tab status panel h2 (NEW in P22)** | `Hub-Status` | `text-base font-semibold` |
 
 ### Wizard Step 3 — Kameras katalogisieren
 
@@ -141,7 +153,7 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 | Loading caption | `Kameras werden gelesen…` |
 | Success summary | `N Kameras gefunden — M erstanbieter, K drittanbieter.` (numbers inline, no extra padding) |
 | Fetch error | `Konnte Kameras nicht laden: {reason}` + Button `Erneut versuchen` |
-| Primary CTA | `Weiter` (right-aligned, accent) |
+| Primary CTA | `Auswahl übernehmen` (right-aligned, accent) — destination-explicit, advances to Step 4 |
 
 ### Wizard Step 4 — Cam selection
 
@@ -173,7 +185,7 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 | Stage 3 done | `Streams laufen` |
 | Stage timeout copy (90 s) | `Hinweis: Das dauert länger als gewöhnlich. Du kannst warten oder im Hintergrund fortfahren.` |
 | Reconcile failed | `Synchronisation fehlgeschlagen: {reason}` + Button `Erneut versuchen` |
-| Primary CTA (after success) | `Weiter` |
+| Primary CTA (after success) | `Zum Abschluss` — destination-explicit, advances to Step 6 |
 
 ### Wizard Step 6 — Done
 
@@ -209,15 +221,16 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 
 | Element | Copy / Token |
 |---------|------|
-| Primary badge | `Protect Hub` — `bg-accent/15 text-accent border border-accent/30 px-2 py-0.5 rounded text-xs font-medium` |
+| Primary badge | `Protect Hub` — `bg-accent/15 text-accent border border-accent/30 px-2 py-0.5 rounded text-xs` |
 | Qualifier — first-party | `UniFi` — `bg-bg-input text-text-primary border border-border px-2 py-0.5 rounded text-xs` |
-| Qualifier — third-party | `Drittanbieter · {camera.manufacturer ?? 'Unbekannt'}` — same neutral token; manufacturer fallback when null. **Always render the manufacturer string, never the modelName** (per CONTEXT.md "specifics") |
+| Qualifier — third-party | `Drittanbieter · {camera.manufacturer ?? 'Unbekannt'}` — same neutral token, `text-xs`; manufacturer fallback when null. **Always render the manufacturer string, never the modelName** (per CONTEXT.md "specifics") |
 | Qualifier — unknown | `Drittanbieter · Unbekannt` |
 | Stream-catalog table header | `Channel · Codec · Auflösung@FPS` (3 columns, `bg-bg-input`, `text-xs text-text-secondary`) |
-| Stream-catalog row | `Low · H.264 · 640×360@15` (font-mono in row body) |
-| Snapshot-area "no preview" copy | `Vorschau nicht verfügbar` (`text-text-secondary/50`) |
-| Snapshot-area "loading" | `Schnappschuss wird geladen…` |
+| Stream-catalog row | `Low · H.264 · 640×360@15` (`text-xs font-mono` in row body) |
+| Snapshot-area "no preview" copy | `Vorschau nicht verfügbar` (`text-xs text-text-secondary/50`) |
+| Snapshot-area "loading" | `Schnappschuss wird geladen…` (`text-xs text-text-secondary`) |
 | Reload-icon tooltip | `Vorschau neu laden` |
+| Reload-icon sr-only label | `<span class="sr-only">Vorschau neu laden</span>` (mirrors copy-button parity pattern) |
 | Action menu — replaces "Löschen" | `Aus Hub entfernen` (the actual destructive flow lives in P23 — in P22 button is **disabled with tooltip "Verfügbar in Phase 23"**) |
 
 ### Outputs subsection — per cam
@@ -225,59 +238,60 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 | Element | Copy |
 |---------|------|
 | Subsection title | `Bridge-Ausgänge` (`text-base font-semibold`) |
-| Loxone-MJPEG row label | `Loxone-MJPEG` |
-| Loxone-MJPEG row sub-label | `640×360 · 10 fps · transcodiert (VAAPI)` |
-| Frigate-RTSP row label | `Frigate-RTSP` |
-| Frigate-RTSP row sub-label | `Passthrough · ohne Audio` |
-| URL caption (when ON) | `Adresse:` (then mono URL + copy button) |
+| Loxone-MJPEG row label | `Loxone-MJPEG` (`text-sm`) |
+| Loxone-MJPEG row sub-label | `640×360 · 10 fps · transcodiert (VAAPI)` (`text-xs text-text-secondary`) |
+| Frigate-RTSP row label | `Frigate-RTSP` (`text-sm`) |
+| Frigate-RTSP row sub-label | `Passthrough · ohne Audio` (`text-xs text-text-secondary`) |
+| URL caption (when ON) | `Adresse:` (`text-xs text-text-secondary`, then mono URL + copy button) |
 | Toggle ON state | switch slides right, accent thumb, status `text-success text-xs`: `aktiv` |
 | Toggle OFF state | switch left, `bg-bg-input`, status `text-text-secondary text-xs`: `aus` |
-| Toggle in-flight | thumb spinner overlay + caption `Vorgang läuft…` (matches existing wizard idiom) + separate explicit `Abbrechen` button **disabled** (visually present but not clickable until terminal state — clarifies "we are working on it, no double-click"). Per CONTEXT.md L-18. |
-| Toggle error | `Konnte Ausgang nicht umschalten: {reason}` (red `text-danger text-xs`) below row |
+| Toggle in-flight | thumb spinner overlay + caption `Vorgang läuft…` (`text-xs text-text-secondary`, matches existing wizard idiom) + separate explicit `Abbrechen` button **disabled** (visually present but not clickable until terminal state — clarifies "we are working on it, no double-click"). Per CONTEXT.md L-18. |
+| Toggle error | `Konnte Ausgang nicht umschalten: {reason}` (`text-xs text-danger`) below row |
 
 ### ProtectHubGuide component (Loxone + Frigate snippets)
 
 | Element | Copy |
 |---------|------|
-| Guide section title | `Anleitung — Stream einbinden` |
-| Loxone tab label | `Loxone (Intercom)` |
-| Frigate tab label | `Frigate (NVR)` |
-| Loxone snippet header | `Benutzerdefinierte Intercom — Konfiguration` |
-| Loxone snippet (German `#`-comments, ready-to-paste): | ```# Adresse: MJPEG-Stream über Hub-Bridge\nURL: http://{bridge-ip}:1984/api/stream.mjpeg?src={cam-slug}-low\n# Hinweis: User-Agent darf leer bleiben. Auth nicht aktiv (LAN-Trust).``` |
-| Frigate snippet header | `cameras: Block für config.yml` |
-| Frigate snippet (per-cam YAML): | ```cameras:\n  {cam-slug}:\n    ffmpeg:\n      inputs:\n        - path: rtsp://{bridge-ip}:8554/{cam-slug}-high\n          roles:\n            - record\n            # - detect   # auskommentiert: Erkennung kostet CPU\n    # detect:\n    #   width: 1280\n    #   height: 720\n    #   fps: 5\n    # record:\n    #   enabled: true\n    #   retain:\n    #     days: 7\n    #     mode: motion``` |
-| Copy button (in snippet header) | `Snippet kopieren` (icon + label, accent on hover) |
-| Copy success flash | `Kopiert` (`text-success`) — 2s timeout matches existing pattern |
+| Guide section title | `Anleitung — Stream einbinden` (`text-base font-semibold`) |
+| Loxone tab label | `Loxone (Intercom)` (`text-sm`) |
+| Frigate tab label | `Frigate (NVR)` (`text-sm`) |
+| Loxone snippet header | `Benutzerdefinierte Intercom — Konfiguration` (`text-sm font-semibold`) |
+| Loxone snippet (German `#`-comments, ready-to-paste, `text-xs font-mono`) | ```# Adresse: MJPEG-Stream über Hub-Bridge\nURL: http://{bridge-ip}:1984/api/stream.mjpeg?src={cam-slug}-low\n# Hinweis: User-Agent darf leer bleiben. Auth nicht aktiv (LAN-Trust).``` |
+| Frigate snippet header | `cameras: Block für config.yml` (`text-sm font-semibold`) |
+| Frigate snippet (per-cam YAML, `text-xs font-mono`) | ```cameras:\n  {cam-slug}:\n    ffmpeg:\n      inputs:\n        - path: rtsp://{bridge-ip}:8554/{cam-slug}-high\n          roles:\n            - record\n            # - detect   # auskommentiert: Erkennung kostet CPU\n    # detect:\n    #   width: 1280\n    #   height: 720\n    #   fps: 5\n    # record:\n    #   enabled: true\n    #   retain:\n    #     days: 7\n    #     mode: motion``` |
+| Copy button (in snippet header) | `Snippet kopieren` (icon + label, `text-xs`, accent on hover) |
+| Copy success flash | `Kopiert` (`text-xs text-success`) — 2s timeout matches existing pattern |
 
 ### `/settings/protect-hub/all-urls` page
 
 | Element | Copy |
 |---------|------|
-| h1 | `Hub-Adressen — Übersicht` |
-| Subtitle | `Alle aktiven Stream-Adressen, gruppiert nach Ausgangstyp.` |
-| Group 1 header | `Loxone-MJPEG (N)` |
-| Group 2 header | `Frigate-RTSP (M)` |
-| Per-row layout | `{cam.name} · {slug}` left, mono URL center, copy button right |
-| Empty group state | `Keine Ausgänge dieses Typs aktiv.` |
-| Empty page state (hub off) | `Protect Hub ist nicht aktiv. → Im Einstellungs-Tab "Protect Hub" aktivieren.` (link) |
-| Back link | `&larr; Zurück zu Einstellungen` (matches wizard pattern) |
+| h1 | `Hub-Adressen — Übersicht` (`text-2xl font-semibold`) |
+| Subtitle | `Alle aktiven Stream-Adressen, gruppiert nach Ausgangstyp.` (`text-sm text-text-secondary`) |
+| Group 1 header | `Loxone-MJPEG (N)` (`text-base font-semibold`) |
+| Group 2 header | `Frigate-RTSP (M)` (`text-base font-semibold`) |
+| Per-row layout | `{cam.name} · {slug}` left (`text-sm`), mono URL center (`text-xs font-mono`), copy button right |
+| Empty group state | `Keine Ausgänge dieses Typs aktiv.` (`text-sm text-text-secondary`) |
+| Empty page state (hub off) | `Protect Hub ist nicht aktiv. → Im Einstellungs-Tab "Protect Hub" aktivieren.` (`text-sm`, link) |
+| Back link | `&larr; Zurück zu Einstellungen` (`text-sm text-accent`, matches wizard pattern) |
 
 ### Settings Hub-Tab status panel + event log
 
 | Element | Copy |
 |---------|------|
-| Status panel title | `Hub-Status` |
-| Bridge state row | `Bridge: {running/stopped/error}` (status dot left, mono right) |
-| Last reconcile row | `Letzte Synchronisation: {relative time}` |
-| Last YAML hash row | `Konfig-Hash: {sha[0:8]}…` (font-mono, `text-text-secondary text-xs`) |
-| Active streams row | `Aktive Streams: {N}` |
-| Drift indicator (warn) | `YAML-Drift erkannt — die Bridge läuft auf einer fremden Konfiguration.` (`bg-yellow-500/10 border-yellow-500/30`) + button `Erneut deployen` |
-| Sync-now button | `Sync now` (accent CTA, primary) |
+| Status panel title | `Hub-Status` (`text-base font-semibold`) |
+| Bridge state row | `Bridge: {running/stopped/error}` (status dot left, mono right) — label `text-sm`, value `text-xs font-mono` |
+| Last reconcile row | `Letzte Synchronisation: {relative time}` (`text-sm`) |
+| Last YAML hash row | `Konfig-Hash: {sha[0:8]}…` (`text-xs font-mono text-text-secondary`) |
+| Active streams row | `Aktive Streams: {N}` (`text-sm`) |
+| Drift indicator (warn) | `YAML-Drift erkannt — die Bridge läuft auf einer fremden Konfiguration.` (`text-xs`, `bg-yellow-500/10 border-yellow-500/30`) + button `Erneut deployen` |
+| Drift-indicator delta text | `{N} Zeile(n) abweichend` (`text-xs text-warning/90`) |
+| Sync-now button | `Sync now` (accent CTA, primary, `text-sm`) |
 | Sync-now in flight | `Synchronisation läuft…` (button text replaces, spinner inline) |
-| Event log title | `Letzte Ereignisse` |
-| Event log empty | `Noch keine Ereignisse aufgezeichnet.` |
-| Event log row format | `{HH:MM:ss} · {type} · {success/failed} · {reconcile-id[0:8]}` (3-col: timestamp · type-badge · status — all mono, `text-xs`) |
-| Event-type badges | `discover` / `reconcile` / `deploy` / `reload` / `error` — all `bg-bg-input text-text-secondary px-1.5 py-0.5 rounded text-[10px] font-mono`; `error` rows tint `text-danger` |
+| Event log title | `Letzte Ereignisse` (`text-base font-semibold`) |
+| Event log empty | `Noch keine Ereignisse aufgezeichnet.` (`text-sm text-text-secondary`) |
+| Event log row format | `{HH:MM:ss} · {type} · {success/failed} · {reconcile-id[0:8]}` (3-col: timestamp · type-badge · status — all `text-xs font-mono`) |
+| Event-type badges | `discover` / `reconcile` / `deploy` / `reload` / `error` — all `bg-bg-input text-text-secondary px-1.5 py-0.5 rounded text-xs font-mono`; `error` rows tint `text-danger` |
 
 ### Destructive actions in Phase 22
 
@@ -306,7 +320,7 @@ Phase 22 ships **no destructive actions**. Offboarding is P23. The "Aus Hub entf
 
 **Modified files:**
 
-- `src/routes/kameras/+page.svelte` — split single list into two sections (managed / external) with conditional rendering on `hubEnabled`
+- `src/routes/kameras/+page.svelte` — split single list into two sections (managed / external) with conditional rendering on `hubEnabled`. **The pre-existing `text-2xl font-bold` on the `<h1>` is preserved verbatim — P22 introduces no font-bold elsewhere.**
 - `src/lib/components/cameras/CameraDetailCard.svelte` — branch on `camera.source === 'external'` and delegate to `<ExternalCamCard>` (or gate the LXC block at line ~385 with the additional source check; component extraction is preferred for clarity per CONTEXT.md)
 - `src/lib/components/settings/ProtectHubTab.svelte` — extend with HubStatusPanel + HubEventLog + Sync-now wiring
 - `src/routes/settings/protect-hub/onboarding/+page.svelte` — refactor to consume WizardStepIndicator + WizardResumeBanner + Step3/4/5/6 components
@@ -331,11 +345,11 @@ State machine: `off → enabling → on` and `on → disabling → off`. UI stat
 
 | State | Visual | Disabled? | Caption |
 |-------|--------|-----------|---------|
-| off | switch left, `bg-bg-input`, thumb `bg-text-secondary` | no | `aus` |
-| enabling | switch sliding, thumb has `<Loader2 class="w-3 h-3 animate-spin">` overlay | YES (per CONTEXT.md L-18) | `Vorgang läuft…` (`text-text-secondary text-xs`) |
-| on | switch right, `bg-accent`, thumb `bg-white` | no | `aktiv` (`text-success`) |
-| disabling | switch sliding back, spinner overlay | YES | `Vorgang läuft…` |
-| error | switch returns to last known stable state | no | `Konnte Ausgang nicht umschalten: {reason}` (`text-danger text-xs`) below row |
+| off | switch left, `bg-bg-input`, thumb `bg-text-secondary` | no | `aus` (`text-xs text-text-secondary`) |
+| enabling | switch sliding, thumb has `<Loader2 class="w-3 h-3 animate-spin">` overlay | YES (per CONTEXT.md L-18) | `Vorgang läuft…` (`text-xs text-text-secondary`) |
+| on | switch right, `bg-accent`, thumb `bg-white` | no | `aktiv` (`text-xs text-success`) |
+| disabling | switch sliding back, spinner overlay | YES | `Vorgang läuft…` (`text-xs text-text-secondary`) |
+| error | switch returns to last known stable state | no | `Konnte Ausgang nicht umschalten: {reason}` (`text-xs text-danger`) below row |
 
 A separate `Abbrechen` button is rendered next to the toggle ONLY when state ∈ {enabling, disabling} **and** the in-flight request is cancellable (P21 reconciler is async-fire-and-poll, so this is wired to AbortController on the fetch). When not cancellable, the button is rendered disabled (matches the locked decision).
 
@@ -345,14 +359,16 @@ A separate `Abbrechen` button is rendered next to the toggle ONLY when state ∈
 - Click: `<Check class="w-4 h-4 text-success">` for 2 seconds (existing `setTimeout(() => copied = false, 2000)` pattern in `CameraDetailCard`)
 - Tooltip: `Kopieren` / on success `Kopiert`
 - Touch target: minimum `w-8 h-8` (32px) clickable area even when icon is 16px — match existing pattern via padding
-- Always next to a `<code class="font-mono">` URL display
+- Always next to a `<code class="font-mono text-xs">` URL display
+- Accessibility: `<span class="sr-only">Adresse kopieren</span>` inside the button
 
 ### Snapshot preview (external cam)
 
 - Single fetch on render via `<img src={snapshotUrl}?t={Date.now()}>` (cache-buster)
 - Reload icon (`<RotateCw class="w-3.5 h-3.5">`) in top-right corner of snapshot area, clickable, triggers re-fetch
+- **Reload button accessibility:** `<span class="sr-only">Vorschau neu laden</span>` inside the button (mirrors copy-button parity pattern). `aria-label="Vorschau neu laden"` on the `<button>` itself.
 - No auto-refresh interval (per CONTEXT.md decision)
-- Loading: `text-text-secondary/50 text-sm` centered "Schnappschuss wird geladen…"
+- Loading: `text-xs text-text-secondary/50` centered "Schnappschuss wird geladen…"
 - Failed: same area, "Vorschau nicht verfügbar"
 
 ### Step 5 health-poll
@@ -380,7 +396,7 @@ A separate `Abbrechen` button is rendered next to the toggle ONLY when state ∈
 - `bg-bg-card border border-border rounded-lg p-6` container
 - 4 status rows in `space-y-3` flex layout: each row `<icon> <label> <value-mono>`
 - Drift indicator: when active, renders below the 4 rows in a `bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4` block with action button
-- Sync-now button: bottom-right of panel, `bg-accent text-white px-4 py-2 rounded-lg` — when in-flight, replaces label with spinner + "Synchronisation läuft…"
+- Sync-now button: bottom-right of panel, `bg-accent text-white px-4 py-2 rounded-lg text-sm` — when in-flight, replaces label with spinner + "Synchronisation läuft…"
 
 ### Event log
 
@@ -425,6 +441,7 @@ No new component libraries introduced. Phase 22 builds on:
 - Step indicator discs render as `<button>` elements (not `<div>`) for backward navigation — keyboard accessible
 - Resume banner buttons must use real `<button>` and `<a>` elements
 - Copy buttons render `<Copy>` with `<span class="sr-only">Adresse kopieren</span>` for screen readers
+- **Snapshot reload buttons render `<RotateCw>` with `<span class="sr-only">Vorschau neu laden</span>` inside (mirrors copy-button parity)**
 - Snippet code blocks use `<pre><code>` with `aria-label="Snippet"` to enable screen-reader copy
 - Focus rings: existing `focus:border-accent` + `focus:outline-none` pattern preserved on inputs; do NOT remove outline globally
 
@@ -442,7 +459,7 @@ No new component libraries introduced. Phase 22 builds on:
 | 2 wizard steps → 6 steps step indicator | P20 wizard `+page.svelte:96-118` (extension pattern) |
 | `Loader2`, `CheckCircle2`, `XCircle` icons for status | P20 wizard imports |
 | `bg-green-500/10 border-green-500/30` success block, `bg-red-500/10 border-red-500/30` error block | P20 wizard styling pattern |
-| `text-2xl font-bold` page heading | `kameras/+page.svelte:35` and wizard h1 |
+| `text-2xl font-bold` page heading on `/kameras` | `kameras/+page.svelte:35` (PRE-EXISTING — inherited verbatim by P22, NOT introduced) |
 | 10s polling cadence on `/kameras` | `kameras/+page.svelte:27` |
 | 1.5s polling cadence for Step 5 health | CONTEXT.md decision (named stages with live-poll) |
 | Two-section partition order: managed first, external second | CONTEXT.md decision (insertion-order, no search bar) |
@@ -456,6 +473,31 @@ No new component libraries introduced. Phase 22 builds on:
 | Frigate snippet per-cam YAML + commented detect/record | CONTEXT.md decision |
 | All-URLs page grouped by output type | CONTEXT.md decision |
 | Manufacturer (not modelName) in third-party qualifier | CONTEXT.md "specifics" |
+| 4-size typography ladder (12/14/16/24) | Revision 2026-05-06 (ui-checker blocking issue 1) |
+| 2-weight typography (400/600), `font-bold` documented as pre-existing only | Revision 2026-05-06 (ui-checker blocking issue 2) |
+| Step 3 CTA `Auswahl übernehmen`, Step 5 CTA `Zum Abschluss` | Revision 2026-05-06 (ui-checker FLAG: explicit destinations) |
+| Snapshot reload sr-only label `Vorschau neu laden` | Revision 2026-05-06 (ui-checker FLAG: parity with copy button) |
+
+---
+
+## Revision Log
+
+### 2026-05-06 — ui-checker blocking-issue resolution
+
+**Issue 1 — Font sizes reduced from 6 to 4.**
+- Removed: `text-[10px]` and `text-[11px]` exceptions
+- Final declared sizes: **12 / 14 / 16 / 24 px** (`text-xs` / `text-sm` / `text-base` / `text-2xl`)
+- All previously-10/11px elements (snippet `#`-comment lines, "Adresse:" inline labels, drift-indicator delta text, event-type badges, third-party qualifier text, badge text, snapshot loading/empty captions) now use `text-xs` (12 px)
+
+**Issue 2 — Font weights reduced from 3 to 2.**
+- Declared for P22: `font-normal` (400) + `font-semibold` (600)
+- `font-bold` (700) is **NOT introduced by P22**. It exists on the pre-existing `<h1>` in `kameras/+page.svelte:35` and is inherited verbatim. P22 introduces zero new `font-bold` usages. New page-level `<h1>` instances P22 introduces (all-urls page, hub-tab status panel) MUST use `font-semibold`.
+
+**Non-blocking FLAGs addressed.**
+- Step 3 CTA changed from bare `Weiter` to `Auswahl übernehmen` (explicit destination — advances to Step 4)
+- Step 5 CTA changed from bare `Weiter` to `Zum Abschluss` (explicit destination — advances to Step 6)
+- Snapshot reload button now declares `<span class="sr-only">Vorschau neu laden</span>` (mirrors copy-button parity)
+- Note: the resume-banner `Weiter` CTA remains `Weiter` because that single button literally means "continue from where I left off" — destination is implicit (the prior step). FLAG was scoped to wizard step CTAs.
 
 ---
 
