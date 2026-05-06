@@ -57,13 +57,21 @@ const RECONNECT_SUFFIX = '#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-recon
 
 /**
  * D-PIPE-02 verbatim: Loxone-MJPEG ffmpeg source. 640x360 @ 10fps, no audio,
- * VAAPI hardware accel. tls_verify=0 because Protect's RTSPS uses a self-
- * signed cert from the UDM.
+ * VAAPI hardware accel.
+ *
+ * Note on TLS: P19-01 spike originally locked tls_verify=0 defensively, but
+ * Debian-13 ffmpeg 7.1.3 (the version inside the bridge LXC) strict-rejects
+ * `-tls_verify` as "Option not found" — that breaks the entire pipeline at
+ * input-open. The macOS ffmpeg 8.0.1 used in the spike was lenient ("skipped
+ * - not known to demuxer") so the bug only surfaced on the live bridge. Per
+ * spike Variant C, the UDM's self-signed cert passes ffmpeg's default TLS
+ * validation, so we drop the flag entirely. If a future firmware tightens
+ * the cert chain and starts failing, swap to per-URL `?tls_verify=0` query
+ * which the demuxer accepts (or use ffmpeg's `-protocol_whitelist tls,...`).
  */
 function buildLoxoneMjpegSource(rtspUrl: string): string {
 	return (
 		`ffmpeg:${rtspUrl}` +
-		'#input=tls_verify=0' +
 		'#video=mjpeg' +
 		'#width=640' +
 		'#height=360' +
@@ -82,7 +90,6 @@ function buildLoxoneMjpegSource(rtspUrl: string): string {
 function buildFrigateRtspSource(rtspUrl: string): string {
 	return (
 		`ffmpeg:${rtspUrl}` +
-		'#input=tls_verify=0' +
 		'#video=copy' +
 		'#raw=-an' +
 		`${RECONNECT_SUFFIX}`

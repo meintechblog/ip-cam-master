@@ -72,7 +72,7 @@ describe('yaml-builder — buildBridgeYaml', () => {
 		const src = getSource(yaml, `${CARPORT_MAC}-low`);
 
 		// All D-PIPE-02 fragments present in the wire-form ffmpeg source.
-		expect(src).toContain('#input=tls_verify=0');
+		expect(src).not.toContain('tls_verify');
 		expect(src).toContain('#video=mjpeg');
 		expect(src).toContain('#width=640');
 		expect(src).toContain('#height=360');
@@ -94,7 +94,7 @@ describe('yaml-builder — buildBridgeYaml', () => {
 		const yaml = buildBridgeYaml([frigateRow(CARPORT_MAC, CARPORT_TOKEN)], TEST_RECONCILE_ID);
 		const src = getSource(yaml, `${CARPORT_MAC}-high`);
 
-		expect(src).toContain('#input=tls_verify=0');
+		expect(src).not.toContain('tls_verify');
 		expect(src).toContain('#video=copy');
 		expect(src).toContain('#raw=-an');
 		// MUST NOT contain VAAPI for Frigate (pure passthrough, zero VAAPI cost per L-26)

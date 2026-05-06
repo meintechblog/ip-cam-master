@@ -11,9 +11,9 @@ rtsp:
   listen: :8554
 streams:
   aabbccddee01-low:
-    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp#input=tls_verify=0#video=mjpeg#width=640#height=360#raw=-r
+    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp#video=mjpeg#width=640#height=360#raw=-r
       10#raw=-an#hardware=vaapi#raw=-reconnect 1#raw=-reconnect_streamed
       1#raw=-reconnect_delay_max 2
   aabbccddee02-high:
-    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-FRONTDOOR>?enableSrtp#input=tls_verify=0#video=copy#raw=-an#raw=-reconnect
+    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-FRONTDOOR>?enableSrtp#video=copy#raw=-an#raw=-reconnect
       1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
