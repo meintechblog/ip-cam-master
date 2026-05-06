@@ -30,7 +30,7 @@
  * `{ ok: false, status, error }` and update the audit row accordingly.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { db, sqlite } from '$lib/server/db/client';
@@ -39,6 +39,7 @@ import {
 	cameraOutputs,
 	protectHubBridges,
 	protectHubReconcileRuns,
+	protectStreamCatalog,
 	events
 } from '$lib/server/db/schema';
 import {
@@ -377,58 +378,83 @@ async function doReconcile(
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Load the OutputRow[] that yaml-builder consumes. Uses raw `sqlite.prepare`
- * for the triple-table JOIN with conditional quality-match — drizzle's join
- * syntax for this shape is verbose; the SQL is tested via in-memory DB in
- * reconcile.test.ts. NOT user-driven SQL: every literal is hardcoded.
+ * Load the OutputRow[] that yaml-builder consumes.
  *
- * Quality-match rule (per plan task step 7):
- *   - Loxone-MJPEG output → `protect_stream_catalog.quality = 'low'`
- *   - Frigate-RTSP output → `protect_stream_catalog.quality = 'high'`
- * If a cam has no matching quality channel, the output is silently skipped
- * (not an error — it just doesn't appear in the YAML). yaml-builder already
- * tolerates an empty array.
+ * Channel selection is preference-ordered, NOT hardcoded — many Protect users
+ * only enable Share-Livestream for a single channel (often Medium) per cam.
+ * The earlier "loxone-mjpeg → quality='low'" / "frigate-rtsp → quality='high'"
+ * mapping silently dropped any cam where the chosen channel didn't have a
+ * shared rtsp_url, leaving the YAML empty. Live UAT against the Carport cam
+ * (only Medium shared) caught this.
+ *
+ * Per output type, prefer the channel whose source quality best fits the
+ * output's downstream use:
+ *   - Loxone-MJPEG (640×360@10fps transcode): low > medium > high — low source
+ *     means cheaper VAAPI work; medium/high are acceptable fallbacks.
+ *   - Frigate-RTSP (passthrough copy): high > medium > low — Frigate wants the
+ *     highest available quality, since `-c:v copy` is zero-cost.
+ *
+ * If a cam has zero shared channels with rtsp_url, the output is silently
+ * skipped (yaml-builder tolerates an empty array). This is intentional — it
+ * lets the user enable an output toggle ahead of enabling Share-Livestream
+ * in Protect, and reconcile picks the cam up automatically once a channel
+ * appears.
  */
-function loadOutputRows(): OutputRow[] {
-	// Cast through a row shape (NOT `any`): the SELECT projects exactly these
-	// 4 columns with these names. The cast is the contract between this raw
-	// SQL and the typed OutputRow consumer.
-	const rows = sqlite
-		.prepare(
-			`
-			SELECT
-				c.id AS cameraId,
-				c.mac AS mac,
-				co.output_type AS outputType,
-				psc.rtsp_url AS rtspUrl
-			FROM camera_outputs co
-			JOIN cameras c ON c.id = co.camera_id
-			JOIN protect_stream_catalog psc ON psc.camera_id = c.id
-			WHERE c.source = 'external'
-				AND co.enabled = 1
-				AND psc.rtsp_url IS NOT NULL
-				AND (
-					(co.output_type = 'loxone-mjpeg' AND psc.quality = 'low')
-					OR (co.output_type = 'frigate-rtsp' AND psc.quality = 'high')
-				)
-			`
-		)
-		.all() as Array<{
-		cameraId: number;
-		mac: string;
-		outputType: string;
-		rtspUrl: string;
-	}>;
+const MJPEG_PREF: ReadonlyArray<string> = ['low', 'medium', 'high'];
+const RTSP_PREF: ReadonlyArray<string> = ['high', 'medium', 'low'];
 
-	// Narrow `outputType: string` to the OutputType union. The SQL WHERE
-	// clause already filters to the two known types; this is just the type
-	// system's view.
-	return rows.map((r) => ({
-		cameraId: r.cameraId,
-		mac: r.mac,
-		outputType: r.outputType as OutputType,
-		rtspUrl: r.rtspUrl
-	}));
+function loadOutputRows(): OutputRow[] {
+	const outputs = db
+		.select({
+			cameraId: cameras.id,
+			mac: cameras.mac,
+			outputType: cameraOutputs.outputType
+		})
+		.from(cameraOutputs)
+		.innerJoin(cameras, eq(cameras.id, cameraOutputs.cameraId))
+		.where(and(eq(cameras.source, 'external'), eq(cameraOutputs.enabled, true)))
+		.all();
+
+	if (outputs.length === 0) return [];
+
+	const catalogRows = db
+		.select({
+			cameraId: protectStreamCatalog.cameraId,
+			quality: protectStreamCatalog.quality,
+			rtspUrl: protectStreamCatalog.rtspUrl
+		})
+		.from(protectStreamCatalog)
+		.where(eq(protectStreamCatalog.shareEnabled, true))
+		.all();
+
+	const channelsByCam = new Map<number, Array<{ quality: string; rtspUrl: string }>>();
+	for (const row of catalogRows) {
+		if (!row.rtspUrl) continue;
+		const arr = channelsByCam.get(row.cameraId) ?? [];
+		arr.push({ quality: row.quality.toLowerCase(), rtspUrl: row.rtspUrl });
+		channelsByCam.set(row.cameraId, arr);
+	}
+
+	const result: OutputRow[] = [];
+	for (const o of outputs) {
+		if (!o.mac) continue;
+		const channels = channelsByCam.get(o.cameraId);
+		if (!channels || channels.length === 0) continue;
+		const pref = o.outputType === 'loxone-mjpeg' ? MJPEG_PREF : RTSP_PREF;
+		let chosen: { quality: string; rtspUrl: string } | undefined;
+		for (const q of pref) {
+			chosen = channels.find((c) => c.quality === q);
+			if (chosen) break;
+		}
+		if (!chosen) continue;
+		result.push({
+			cameraId: o.cameraId,
+			mac: o.mac,
+			outputType: o.outputType as OutputType,
+			rtspUrl: chosen.rtspUrl
+		});
+	}
+	return result;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -437,14 +463,34 @@ function loadOutputRows(): OutputRow[] {
 
 /**
  * For every external first-party cam with no `cameraOutputs` row yet, insert
- * a default Loxone-MJPEG row (enabled=true). Third-party cams stay opted-out
- * by default; user enables them via P22 UI.
+ * a default Loxone-MJPEG row. Third-party cams stay opted-out by default;
+ * user enables them via P22 UI.
  *
- * Per HUB-OUT-05 + HUB-RCN-08 + L-28. Decision (per plan): seeding lives in
- * reconcile.ts (NOT catalog.ts) — keeps catalog.ts a pure read-side helper
- * and keeps the kind-policy change out of the closed P19.
+ * VAAPI-cap-aware seeding: we count currently-enabled mjpeg outputs first,
+ * and seed new cams ENABLED only while there's headroom under the hard cap
+ * (VAAPI_HARD_CAP). Cams beyond that point are seeded `enabled=false` so the
+ * row exists for the UI but reconcile won't auto-attach them. Without this,
+ * a fresh install with 7+ first-party cams would auto-create 7+ enabled
+ * mjpeg outputs and then every subsequent toggle would hit 422 cap errors —
+ * a state caught by live UAT against the Carport bridge.
+ *
+ * Per HUB-OUT-05 + HUB-RCN-08 + L-28 + L-26.
  */
+const VAAPI_HARD_CAP_FOR_SEEDING = 6;
+
 function seedDefaultOutputsForNewCams(): void {
+	const enabledCountRow = db
+		.select({ n: sql<number>`count(*)` })
+		.from(cameraOutputs)
+		.where(
+			and(
+				eq(cameraOutputs.outputType, 'loxone-mjpeg'),
+				eq(cameraOutputs.enabled, true)
+			)
+		)
+		.get();
+	let remainingCap = VAAPI_HARD_CAP_FOR_SEEDING - (enabledCountRow?.n ?? 0);
+
 	const newCams = db
 		.select()
 		.from(cameras)
@@ -461,23 +507,37 @@ function seedDefaultOutputsForNewCams(): void {
 			.get();
 		if (existing) continue; // already has outputs (any type)
 
+		const enabled = remainingCap > 0;
+
 		db.insert(cameraOutputs)
 			.values({
 				cameraId: cam.id,
 				outputType: 'loxone-mjpeg',
-				enabled: true,
+				enabled,
 				config: '{}'
 			})
 			.run();
 
-		insertEvent({
-			cameraId: cam.id,
-			cameraName: cam.name,
-			eventType: 'protect_hub_cam_added',
-			severity: 'info',
-			message: `Protect cam '${cam.name}' added; default Loxone-MJPEG output enabled (first-party)`,
-			source: 'protect_hub'
-		});
+		if (enabled) {
+			remainingCap--;
+			insertEvent({
+				cameraId: cam.id,
+				cameraName: cam.name,
+				eventType: 'protect_hub_cam_added',
+				severity: 'info',
+				message: `Protect cam '${cam.name}' added; default Loxone-MJPEG output enabled (first-party)`,
+				source: 'protect_hub'
+			});
+		} else {
+			insertEvent({
+				cameraId: cam.id,
+				cameraName: cam.name,
+				eventType: 'protect_hub_cam_added',
+				severity: 'warning',
+				message: `Protect cam '${cam.name}' added; Loxone-MJPEG output created OFF (VAAPI hard cap of ${VAAPI_HARD_CAP_FOR_SEEDING} reached — enable manually after disabling another cam)`,
+				source: 'protect_hub'
+			});
+		}
 	}
 }
 

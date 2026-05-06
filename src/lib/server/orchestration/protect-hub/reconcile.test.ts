@@ -231,7 +231,7 @@ function seedCarport(opts: {
 		.get(CARPORT_MAC) as { id: number };
 
 	memDbRef.sqlite!.prepare(
-		`INSERT INTO protect_stream_catalog (camera_id, quality, rtsp_url) VALUES (?, 'low', ?)`
+		`INSERT INTO protect_stream_catalog (camera_id, quality, rtsp_url, share_enabled) VALUES (?, 'low', ?, 1)`
 	).run(cam.id, opts.rtspUrl ?? CARPORT_RTSP_OLD);
 
 	if (opts.enableLoxone) {
@@ -485,6 +485,48 @@ describe('reconcile (Phase 21 Plan 03)', () => {
 			.prepare('SELECT * FROM camera_outputs')
 			.all();
 		expect(outputs).toHaveLength(0);
+	});
+
+	// ── VAAPI-cap-aware auto-add (P21 live-UAT regression) ─────────────────
+	it('auto-add — respects VAAPI hard cap of 6; cams beyond are seeded enabled=false', async () => {
+		// 7 first-party cams, no existing outputs. Auto-seed should mark the
+		// first 6 as enabled=true and the 7th as enabled=false (with a warn
+		// event) so the system never enters a state where every PUT toggle
+		// hits 422 from day one.
+		const bridge = seedBridge();
+		const macs = [
+			'aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc',
+			'dddddddddddd', 'eeeeeeeeeeee', 'ffffffffffff',
+			'aaaaaaaaaaab'
+		];
+		for (let i = 0; i < macs.length; i++) {
+			memDbRef.sqlite!.prepare(
+				`INSERT INTO cameras (name, mac, kind, source, external_id) VALUES (?, ?, 'first-party', 'external', ?)`
+			).run(`Cam-${i}`, macs[i], `external_${macs[i]}`);
+		}
+		mockFetchBootstrap.mockResolvedValue(makeBootstrapResult(macs));
+
+		await reconcile(bridge.id, 'tick');
+
+		const enabledCount = (memDbRef.sqlite!
+			.prepare(
+				"SELECT COUNT(*) as n FROM camera_outputs WHERE output_type='loxone-mjpeg' AND enabled=1"
+			)
+			.get() as { n: number }).n;
+		const disabledCount = (memDbRef.sqlite!
+			.prepare(
+				"SELECT COUNT(*) as n FROM camera_outputs WHERE output_type='loxone-mjpeg' AND enabled=0"
+			)
+			.get() as { n: number }).n;
+		expect(enabledCount).toBe(6);
+		expect(disabledCount).toBe(1);
+
+		const warnEvents = memDbRef.sqlite!
+			.prepare(
+				"SELECT * FROM events WHERE event_type='protect_hub_cam_added' AND severity='warning'"
+			)
+			.all();
+		expect(warnEvents).toHaveLength(1);
 	});
 
 	// ── HUB-RCN-09 + CR-6 ───────────────────────────────────────────────────
