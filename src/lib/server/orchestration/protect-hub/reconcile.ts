@@ -126,10 +126,26 @@ export function isReconcilerBusy(): boolean {
  * Single-flight per-bridge: concurrent callers join the in-flight Promise
  * and set the dirty flag. After the in-flight pass resolves, if dirty was
  * set, ONE follow-up is scheduled via setImmediate.
+ *
+ * @param externalReconcileId  Plan 05: optional caller-supplied id used as
+ *   the `protect_hub_reconcile_runs.reconcile_id` column AND echoed back
+ *   in the result. Allows API callers (POST /api/protect-hub/reconcile) to
+ *   pre-mint the id, return it to the client immediately (202), and have
+ *   the client poll `GET /api/protect-hub/reconcile-runs?reconcileId=…`
+ *   by the same id. When omitted, a fresh UUIDv4 is generated.
+ *
+ *   Single-flight nuance: if a reconcile is already in flight when a caller
+ *   passes externalReconcileId, the new caller still joins the in-flight
+ *   Promise — the in-flight reconcile keeps its own id. The externalReconcileId
+ *   is IGNORED in that join case. Trade-off: API correlation is best-effort,
+ *   single-flight correctness is absolute (per L-13). API clients that need
+ *   guaranteed correlation should retry on the polled-row "not found" case
+ *   (404 from GET /reconcile-runs) — the next reconcile pass will use their id.
  */
 export async function reconcile(
 	bridgeId: number,
-	reason: ReconcileReason
+	reason: ReconcileReason,
+	externalReconcileId?: string
 ): Promise<ReconcileResult> {
 	if (_inFlight) {
 		// Concurrent caller: signal that another pass is needed and return
@@ -137,11 +153,12 @@ export async function reconcile(
 		// The first caller's reconcileId is returned to all joiners — that's
 		// fine because every audit row carries its own reconcileId, and the
 		// caller-side reconcileId is for joining run-history queries only.
+		// (externalReconcileId is intentionally dropped here — see fn doc.)
 		_dirty = true;
 		return _inFlight;
 	}
 
-	const reconcileId = randomUUID();
+	const reconcileId = externalReconcileId ?? randomUUID();
 	const promise = doReconcile(bridgeId, reconcileId, reason);
 	_inFlight = promise;
 

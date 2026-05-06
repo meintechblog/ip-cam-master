@@ -746,4 +746,23 @@ describe('reconcile (Phase 21 Plan 03)', () => {
 			expect(run.deployed_yaml_hash).toBe(result.newHash);
 		}
 	});
+
+	// ── Plan 05 Task 1: API correlation — externalReconcileId honored ───────
+	it('API-correlated id — externalReconcileId is used for the runs row when provided', async () => {
+		const bridge = seedBridge();
+		seedCarport({ enableLoxone: true });
+
+		const externalId = '11111111-2222-3333-4444-555555555555';
+		const result = await reconcile(bridge.id, 'force', externalId);
+
+		// reconcile result echoes the externalReconcileId
+		expect(result.reconcileId).toBe(externalId);
+
+		// Audit row is keyed by the externalReconcileId
+		const row = memDbRef.sqlite!
+			.prepare('SELECT * FROM protect_hub_reconcile_runs WHERE reconcile_id = ?')
+			.get(externalId) as { reconcile_id: string } | undefined;
+		expect(row).toBeDefined();
+		expect(row!.reconcile_id).toBe(externalId);
+	});
 });
