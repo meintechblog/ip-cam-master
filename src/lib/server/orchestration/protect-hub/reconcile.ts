@@ -236,12 +236,39 @@ async function doReconcile(
 		// Decision (per plan task 6): call fetchBootstrap directly here for
 		// the diff — avoids extending discover()'s return signature; lib's
 		// 8-min refresh window absorbs the extra call cost.
+		//
+		// Sanity threshold (WR-01 mitigation, code-review 2026-05-06):
+		// If bootstrap returns OK but the MAC set is suspiciously empty or
+		// drastically smaller than what we have on file, refuse to archive
+		// — the controller is likely mid-restart or returned a partial
+		// response. A real cam removal would not wipe ALL cams in one tick;
+		// the worst real case is a few cams gone at once. Threshold: only
+		// archive if the bootstrap covers >= 50% of our currently-live
+		// external cams.
 		const bootstrap = await fetchBootstrap();
 		if (bootstrap.ok) {
 			const bootstrapMacs = new Set(
 				bootstrap.cameras.map((c) => normalizeMac(c.mac ?? '')).filter((m) => m !== '')
 			);
-			softDeleteMissingCams(bootstrapMacs);
+			const liveExternalCount = db
+				.select({ n: sql<number>`count(*)` })
+				.from(cameras)
+				.where(eq(cameras.source, 'external'))
+				.get()?.n ?? 0;
+			const isSuspiciouslyEmpty =
+				liveExternalCount > 0 &&
+				bootstrapMacs.size < Math.ceil(liveExternalCount / 2);
+			if (isSuspiciouslyEmpty) {
+				emitReconcileEvent(
+					reconcileId,
+					'error',
+					`bootstrap returned ${bootstrapMacs.size} cams vs ${liveExternalCount} on file — skipping soft-delete to avoid mass-archive`,
+					0,
+					null
+				);
+			} else {
+				softDeleteMissingCams(bootstrapMacs);
+			}
 		}
 		// If bootstrap fails here we silently skip soft-delete: discover() above
 		// already succeeded, so this is a transient race; next tick retries.

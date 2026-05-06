@@ -549,6 +549,38 @@ describe('reconcile (Phase 21 Plan 03)', () => {
 		expect(evs).toHaveLength(1);
 	});
 
+	// ── WR-01 mitigation: sanity threshold for soft-delete ──────────────────
+	it('soft-delete — sanity threshold: bootstrap returning <50% of DB cams skips archive', async () => {
+		// 6 external cams in DB. Bootstrap returns only 1 (rest of the world is
+		// "missing" — but realistically that means the controller is mid-restart
+		// or returned a partial response, NOT that 5 cams were genuinely removed).
+		// Without the threshold this would archive 5 cams in one tick → Loxone
+		// tiles go dark across the deployment. Live UAT against real UDM proved
+		// the risk is real (Protect occasionally returns truncated bootstraps
+		// during reload).
+		const bridge = seedBridge();
+		const macs = ['111111111111', '222222222222', '333333333333',
+		              '444444444444', '555555555555', '666666666666'];
+		for (let i = 0; i < macs.length; i++) {
+			memDbRef.sqlite!.prepare(
+				`INSERT INTO cameras (name, mac, kind, source, external_id) VALUES (?, ?, 'first-party', 'external', ?)`
+			).run(`Cam-${i}`, macs[i], `external_${macs[i]}`);
+		}
+		mockFetchBootstrap.mockResolvedValue(makeBootstrapResult([macs[0]]));
+
+		await reconcile(bridge.id, 'tick');
+
+		const archived = memDbRef.sqlite!
+			.prepare("SELECT COUNT(*) as n FROM cameras WHERE source='external_archived'")
+			.get() as { n: number };
+		expect(archived.n).toBe(0);
+
+		const live = memDbRef.sqlite!
+			.prepare("SELECT COUNT(*) as n FROM cameras WHERE source='external'")
+			.get() as { n: number };
+		expect(live.n).toBe(6);
+	});
+
 	// ── HUB-RCN-10 busy gate ────────────────────────────────────────────────
 	it('busy gate — isReconcilerBusy() is true mid-reconcile, false after', async () => {
 		const bridge = seedBridge();
