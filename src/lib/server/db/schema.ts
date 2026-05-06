@@ -216,3 +216,22 @@ export const updateRuns = sqliteTable('update_runs', {
 	backupPath: text('backup_path'),
 	trigger: text('trigger').notNull().default('manual')
 });
+
+// v1.3 Phase 21 — Reconcile run audit log (per D-RCN-04 + L-14).
+// One row per reconcile pass. Drives drift indicator + reconcile log UI in P23.
+// Mirrors the updateRuns shape from P24 — proven cross-process audit pattern.
+// status enum (verbatim per D-RCN-04): running | success | no_op | bridge_unreachable | error
+export type ReconcileRunStatus = 'running' | 'success' | 'no_op' | 'bridge_unreachable' | 'error';
+
+export const protectHubReconcileRuns = sqliteTable('protect_hub_reconcile_runs', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	reconcileId: text('reconcile_id').notNull(),
+	startedAt: text('started_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	completedAt: text('completed_at'),
+	status: text('status').notNull().default('running'),
+	hashChanged: integer('hash_changed', { mode: 'boolean' }).notNull().default(false),
+	deployedYamlHash: text('deployed_yaml_hash'),
+	error: text('error')
+});

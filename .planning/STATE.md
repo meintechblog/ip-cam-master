@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.3
-milestone_name: "Protect Stream Hub"
-status: phase_in_progress
-stopped_at: "P19 ✅ + P20 ✅ FULLY COMPLETE on 2026-05-06. P20-03 live UAT against Proxmox 192.168.3.6 found and fixed 3 source bugs (go2rtc-restart-after-clone, cores override, onboot=1 default), then verified all 11 criteria green on the third re-provision. Bridge live: vmid 2014 at 192.168.3.139. Next: P21 (yaml-builder + reconciler — the heart of v1.3, where Loxone-MJPEG actually starts flowing). Toolchain: gsd-sdk shim at ~/.local/bin restored the legacy `query` API surface — the proper multi-agent pipeline is back."
-last_updated: "2026-05-06T01:40:00.000Z"
-last_activity: 2026-05-06 — P19 + P20 both closed live. Three bridge-provision bugs surfaced and fixed during P20-03 UAT (commits 2b1d44a + 374e8a3): (1) cam-2000 streams persisted in memory after clone because `enable --now` doesn't restart, fixed via explicit `systemctl restart go2rtc`; (2) bridge inherited 1 core from template instead of locked 2, fixed by adding `cores?` override to cloneFromTemplate; (3) bridge had no onboot=1, fixed by setting onboot=1 default in cloneFromTemplate (closed latent per-cam bug too). Final UAT all green on third re-provision (12.2s wall, vmid 2014, ip 192.168.3.139). Also restored gsd-sdk via ~/.local/bin/gsd-sdk shim that translates legacy `query ns.cmd` to `gsd-tools ns cmd` — the multi-agent pipeline (planner, researcher, executor, verifier) is operational again.
+milestone_name: milestone
+status: executing
+stopped_at: Completed 20-02-PLAN.md (wizard UI + bridge controls + scheduler health probe)
+last_updated: "2026-05-06T05:49:52.872Z"
+last_activity: 2026-05-06 -- Phase 21 execution started
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 6
+  completed_phases: 3
+  total_plans: 14
+  completed_plans: 8
+  percent: 57
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** One-click camera onboarding -- discover a camera, and the app handles everything to get its stream into UniFi Protect. v1.3 erweitert das um die *Reverse-Direction*: Protect-Cams ergänzend als Loxone-/Frigate-fähige Streams aus der App heraus bereitstellen.
-**Current focus:** v1.3 P20 — Bridge LXC Provisioning. Plans 01-02 (backend + wizard UI + bridge controls) complete. P19 fully closed (UAT verified live). Next live action: P20-03 (provision real bridge LXC) or jump straight to P21 build.
+**Current focus:** Phase 21 — Multi-Cam YAML + Reconciliation Loop
 
 ## Current Position
 
-Phase: 20
-Plan: 03 (UAT — provision real bridge against live Proxmox)
-Status: Wizard UI Steps 1–2 + bridge status panel + lifecycle controls + scheduler health probe shipped (P20-01, P20-02). P19 100% closed (TLS spike + UAT verified). Awaiting either P20-03 (real-LXC provisioning UAT against Proxmox) or direct progression to P21 (yaml-builder + reconcile loop).
-Last activity: 2026-05-06
+Phase: 21 (Multi-Cam YAML + Reconciliation Loop) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 21
+Last activity: 2026-05-06 -- Phase 21 execution started
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
