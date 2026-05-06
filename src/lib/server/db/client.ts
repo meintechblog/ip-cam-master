@@ -130,3 +130,20 @@ sqlite.exec(`
 	)
 `);
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_update_runs_started_at ON update_runs(started_at DESC)`);
+
+// v1.3 Phase 21 — protect_hub_reconcile_runs (per D-RCN-04).
+// Audit log for every reconcile pass; mirrors update_runs shape.
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS protect_hub_reconcile_runs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		reconcile_id TEXT NOT NULL,
+		started_at TEXT NOT NULL DEFAULT (datetime('now')),
+		completed_at TEXT,
+		status TEXT NOT NULL DEFAULT 'running',
+		hash_changed INTEGER NOT NULL DEFAULT 0,
+		deployed_yaml_hash TEXT,
+		error TEXT
+	)
+`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_hub_reconcile_runs_started_at ON protect_hub_reconcile_runs(started_at DESC)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_hub_reconcile_runs_reconcile_id ON protect_hub_reconcile_runs(reconcile_id)`);
