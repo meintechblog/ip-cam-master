@@ -105,7 +105,7 @@ async function connectAndListen(): Promise<void> {
 		// disconnect (PITFALLS #1 — P21-#1 mitigation).
 		const bridge = db.select().from(protectHubBridges).get();
 		if (bridge) {
-			void reconcile(bridge.id, 'ws_reconnect').catch((err) => {
+			void reconcile(bridge.id, 'ws_reconnect').catch((err: unknown) => {
 				console.error('[ws-manager] reconcile-on-reconnect failed:', err);
 			});
 		}
