@@ -215,6 +215,10 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
+*Capture todos (file-backed in `.planning/todos/pending/`):*
+
+- **2026-05-06** — Default stream_mode per Bambu model — H2C field-test gate (re-evaluate ~2026-05-27). Cam 14 läuft jetzt auf `always_live` als Hotfix; Provisioning-Default in `save-camera/+server.ts:110` flippt nur für A1, nicht H2C. Field-Test-Fenster vor Code-Flip. Reference: `.planning/todos/pending/2026-05-06-default-stream-mode-per-bambu-model-h2c-field-test-gate.md` + `.planning/debug/resolved/bambu-black-frame-protect.md`.
+
 *v1.3 Research Flags (resolve during phase execution):*
 
 - **P19**: TLS spike against actual UDM 192.168.3.1 — confirm `rtspx://` works (vs `tls_verify=0`); confirm `mac` field reliability for first-party AND third-party cams; confirm `bootstrap.cameras[].type` discriminator for first-party detection. Spike artifact: `.planning/research/v1.3/spikes/p19-tls-rtspx.md`.
