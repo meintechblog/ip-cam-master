@@ -19,6 +19,10 @@ import { readUpdateState, writeUpdateState } from './update-state-store';
 import { getSetting } from './settings';
 import { db } from '$lib/server/db/client';
 import { protectHubBridges } from '$lib/server/db/schema';
+// v1.3 Phase 21 (CR-4 + HUB-RCN-10) — gate self-update on the Protect Hub
+// reconciler's busy state. The atomic tmp+rename SSH push in reconcile.ts
+// must not be cut mid-deploy by an updater systemctl restart.
+import { isReconcilerBusy } from '$lib/server/orchestration/protect-hub/reconcile';
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const AUTO_UPDATE_TICK_MS = 5 * 60 * 1000; // 5min
@@ -47,13 +51,19 @@ export function currentHourInBerlin(now: Date = new Date()): number {
 }
 
 /**
- * Reads in-flight Hub state and returns conflicting flows.
+ * Reads in-flight Hub state and returns conflicting flows. The downstream
+ * HTTP 409 + Retry-After:60 wrapper lives in `routes/api/update/run/+server.ts`.
+ *
+ * v1.3 Phase 21 (CR-4 + HUB-RCN-10): widened with `reconciler_busy` so the
+ * self-update flow honours the in-flight Protect Hub reconcile (atomic
+ * tmp+rename inside the bridge LXC must complete before systemctl restart).
  */
-export function getActiveFlowConflicts(): Array<{
-	kind: 'hub_starting' | 'hub_stopping';
-	detail: string;
-}> {
-	const conflicts: Array<{ kind: 'hub_starting' | 'hub_stopping'; detail: string }> = [];
+export type FlowConflict =
+	| { kind: 'hub_starting' | 'hub_stopping'; detail: string }
+	| { kind: 'reconciler_busy'; detail: string };
+
+export function getActiveFlowConflicts(): FlowConflict[] {
+	const conflicts: FlowConflict[] = [];
 	try {
 		const bridge = db.select().from(protectHubBridges).get();
 		if (bridge?.status === 'starting' || bridge?.status === 'stopping') {
@@ -64,6 +74,16 @@ export function getActiveFlowConflicts(): Array<{
 		}
 	} catch {
 		// Hub tables may not exist yet (P19 not deployed) — treat as no conflict
+	}
+	try {
+		if (isReconcilerBusy()) {
+			conflicts.push({
+				kind: 'reconciler_busy',
+				detail: 'Protect Hub reconcile in progress'
+			});
+		}
+	} catch {
+		// reconcile module may not be loaded yet (early boot) — treat as no conflict
 	}
 	return conflicts;
 }
