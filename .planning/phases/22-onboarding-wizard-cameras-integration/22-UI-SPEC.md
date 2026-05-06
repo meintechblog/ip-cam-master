@@ -52,8 +52,8 @@ Declared values (multiples of 4, mapped to Tailwind classes):
 
 | Token | px | Tailwind | Usage in Phase 22 |
 |-------|-----|----------|--------------------|
-| xs | 4 | `gap-1`, `p-1`, `mt-1` | Icon-to-text gaps; checkbox gutters; per-row inline gaps inside Outputs table |
-| sm | 8 | `gap-2`, `p-2` | Toggle row internal gap; copy-button to URL gap; badge horizontal padding |
+| xs | 4 | `gap-1`, `p-1`, `mt-1`, `py-1` | Icon-to-text gaps; checkbox gutters; per-row inline gaps inside Outputs table; badge vertical padding |
+| sm | 8 | `gap-2`, `p-2`, `px-2` | Toggle row internal gap; copy-button to URL gap; badge horizontal padding |
 | md | 16 | `gap-4`, `p-4` | Card internal padding; Outputs subsection content padding; resume-banner padding |
 | lg | 24 | `gap-6`, `p-6`, `mb-6` | Wizard step card padding; section header → first row gap; All-Hub-URLs group block padding |
 | xl | 32 | `gap-8`, `mb-8` | Wizard step indicator → step body gap; section-to-section gap on `/kameras` (managed → external) |
@@ -64,6 +64,8 @@ Declared values (multiples of 4, mapped to Tailwind classes):
 - **`w-2`, `w-2.5`, `w-3.5` icon sizes** (8/10/14 px) — match existing `CameraDetailCard` status dots and lucide icon sizing pattern. Not on the 4-grid for the dot itself but the *box* containing it is 16px (`w-4 h-4`). Acceptable.
 
 **No font-size pixel exceptions.** All text in P22 uses one of the four declared sizes below (12 / 14 / 16 / 24). The previously-considered `text-[10px]` and `text-[11px]` exceptions are explicitly retired — every label, badge, snippet comment, "Adresse:" caption, drift-indicator delta and event-type badge now uses `text-xs` (12 px).
+
+**No badge-padding exceptions.** All inline badges (Protect Hub primary badge, UniFi/Drittanbieter qualifiers, event-type badges) use on-grid `px-2 py-1` (8/4 px). The previously-considered `px-1.5 py-0.5` micro-padding is explicitly retired — pills are 2px taller across the contract, no other section affected.
 
 ---
 
@@ -101,7 +103,7 @@ Declared values (multiples of 4, mapped to Tailwind classes):
 |------|-------|--------------------|
 | Dominant (60%) | `bg-bg-primary` (#0f1419) | Page background; outer chrome of `/kameras`, wizard, all-urls page |
 | Secondary (30%) | `bg-bg-card` (#1e2433) + `bg-bg-secondary` (#1a1f2e) + `bg-bg-input` (#252b3b) | Cards (CameraDetailCard variants, wizard step container, Outputs subsection panel, ProtectHubGuide block, status panel, event log rows). Inputs and subtle inset surfaces (URL display rows, snippet code blocks) use `bg-bg-input` |
-| Accent (10%) | `bg-accent` (#3b82f6) | **Reserved-for list — exhaustive:** primary CTA button background ("Auswahl übernehmen", "Bridge bereitstellen", "Zum Abschluss", "Zur Kameraliste", "Sync now"), step indicator current-step ring, copy-button hover state (`hover:text-accent`), resume-banner "Weiter" button, focus rings (`focus:border-accent`), Loxone-MJPEG output toggle ON-state thumb |
+| Accent (10%) | `bg-accent` (#3b82f6) | **Reserved-for list — exhaustive:** primary CTA button background ("Auswahl übernehmen", "Bridge bereitstellen", "Zum Abschluss", "Zur Kameraliste", "Jetzt synchronisieren"), step indicator current-step ring, copy-button hover state (`hover:text-accent`), resume-banner "Weiter zu Schritt {N}" button, focus rings (`focus:border-accent`), Loxone-MJPEG output toggle ON-state thumb |
 
 **Semantic colors (NOT counted in 10% accent budget):**
 
@@ -204,7 +206,7 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 |---------|------|
 | Heading | `Du warst bei Schritt {N} — weiter?` |
 | Body | `Letzte Aktivität: {relative time, "vor 12 Minuten"}.` |
-| Primary CTA | `Weiter` |
+| Primary CTA | `Weiter zu Schritt {N}` (step number injected at render — destination-explicit) |
 | Secondary | `Zurücksetzen` (text-only, `text-text-secondary hover:text-danger`) |
 
 ### `/kameras` section partition
@@ -221,9 +223,9 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 
 | Element | Copy / Token |
 |---------|------|
-| Primary badge | `Protect Hub` — `bg-accent/15 text-accent border border-accent/30 px-2 py-0.5 rounded text-xs` |
-| Qualifier — first-party | `UniFi` — `bg-bg-input text-text-primary border border-border px-2 py-0.5 rounded text-xs` |
-| Qualifier — third-party | `Drittanbieter · {camera.manufacturer ?? 'Unbekannt'}` — same neutral token, `text-xs`; manufacturer fallback when null. **Always render the manufacturer string, never the modelName** (per CONTEXT.md "specifics") |
+| Primary badge | `Protect Hub` — `bg-accent/15 text-accent border border-accent/30 px-2 py-1 rounded text-xs` |
+| Qualifier — first-party | `UniFi` — `bg-bg-input text-text-primary border border-border px-2 py-1 rounded text-xs` |
+| Qualifier — third-party | `Drittanbieter · {camera.manufacturer ?? 'Unbekannt'}` — same neutral token (`bg-bg-input text-text-primary border border-border px-2 py-1 rounded text-xs`); manufacturer fallback when null. **Always render the manufacturer string, never the modelName** (per CONTEXT.md "specifics") |
 | Qualifier — unknown | `Drittanbieter · Unbekannt` |
 | Stream-catalog table header | `Channel · Codec · Auflösung@FPS` (3 columns, `bg-bg-input`, `text-xs text-text-secondary`) |
 | Stream-catalog row | `Low · H.264 · 640×360@15` (`text-xs font-mono` in row body) |
@@ -286,12 +288,12 @@ All copy is **German, terse, consistent with existing wizard tone** ("Adresse:",
 | Active streams row | `Aktive Streams: {N}` (`text-sm`) |
 | Drift indicator (warn) | `YAML-Drift erkannt — die Bridge läuft auf einer fremden Konfiguration.` (`text-xs`, `bg-yellow-500/10 border-yellow-500/30`) + button `Erneut deployen` |
 | Drift-indicator delta text | `{N} Zeile(n) abweichend` (`text-xs text-warning/90`) |
-| Sync-now button | `Sync now` (accent CTA, primary, `text-sm`) |
+| Sync-now button | `Jetzt synchronisieren` (accent CTA, primary, `text-sm`) |
 | Sync-now in flight | `Synchronisation läuft…` (button text replaces, spinner inline) |
 | Event log title | `Letzte Ereignisse` (`text-base font-semibold`) |
 | Event log empty | `Noch keine Ereignisse aufgezeichnet.` (`text-sm text-text-secondary`) |
 | Event log row format | `{HH:MM:ss} · {type} · {success/failed} · {reconcile-id[0:8]}` (3-col: timestamp · type-badge · status — all `text-xs font-mono`) |
-| Event-type badges | `discover` / `reconcile` / `deploy` / `reload` / `error` — all `bg-bg-input text-text-secondary px-1.5 py-0.5 rounded text-xs font-mono`; `error` rows tint `text-danger` |
+| Event-type badges | `discover` / `reconcile` / `deploy` / `reload` / `error` — all `bg-bg-input text-text-secondary px-2 py-1 rounded text-xs font-mono`; `error` rows tint `text-danger` |
 
 ### Destructive actions in Phase 22
 
@@ -382,7 +384,7 @@ A separate `Abbrechen` button is rendered next to the toggle ONLY when state ∈
 - Rendered ABOVE the step container, full-width within the `max-w-2xl` wizard column
 - `bg-bg-card border-l-4 border-l-accent` (accent left-stripe to draw eye, no full accent fill)
 - `<RotateCcw class="w-5 h-5 text-accent">` icon left
-- Heading + relative-time body, two buttons right: `Weiter` (accent) + `Zurücksetzen` (link-style danger-on-hover)
+- Heading + relative-time body, two buttons right: `Weiter zu Schritt {N}` (accent, step number injected) + `Zurücksetzen` (link-style danger-on-hover)
 
 ### `/kameras` partition rendering
 
@@ -477,12 +479,15 @@ No new component libraries introduced. Phase 22 builds on:
 | 2-weight typography (400/600), `font-bold` documented as pre-existing only | Revision 2026-05-06 (ui-checker blocking issue 2) |
 | Step 3 CTA `Auswahl übernehmen`, Step 5 CTA `Zum Abschluss` | Revision 2026-05-06 (ui-checker FLAG: explicit destinations) |
 | Snapshot reload sr-only label `Vorschau neu laden` | Revision 2026-05-06 (ui-checker FLAG: parity with copy button) |
+| Badge micro-padding on-grid: `px-2 py-1` (8/4 px) replaces `px-1.5 py-0.5` | Revision 2026-05-06 (ui-checker blocking issue: spacing 4-grid) |
+| Resume-banner CTA `Weiter zu Schritt {N}` (step number injected) | Revision 2026-05-06 (ui-checker FLAG: explicit destination) |
+| Hub-Tab Sync-now button copy `Jetzt synchronisieren` (German) | Revision 2026-05-06 (ui-checker FLAG: German consistency) |
 
 ---
 
 ## Revision Log
 
-### 2026-05-06 — ui-checker blocking-issue resolution
+### 2026-05-06 — ui-checker blocking-issue resolution (round 1)
 
 **Issue 1 — Font sizes reduced from 6 to 4.**
 - Removed: `text-[10px]` and `text-[11px]` exceptions
@@ -493,11 +498,27 @@ No new component libraries introduced. Phase 22 builds on:
 - Declared for P22: `font-normal` (400) + `font-semibold` (600)
 - `font-bold` (700) is **NOT introduced by P22**. It exists on the pre-existing `<h1>` in `kameras/+page.svelte:35` and is inherited verbatim. P22 introduces zero new `font-bold` usages. New page-level `<h1>` instances P22 introduces (all-urls page, hub-tab status panel) MUST use `font-semibold`.
 
-**Non-blocking FLAGs addressed.**
+**Non-blocking FLAGs addressed (round 1).**
 - Step 3 CTA changed from bare `Weiter` to `Auswahl übernehmen` (explicit destination — advances to Step 4)
 - Step 5 CTA changed from bare `Weiter` to `Zum Abschluss` (explicit destination — advances to Step 6)
 - Snapshot reload button now declares `<span class="sr-only">Vorschau neu laden</span>` (mirrors copy-button parity)
-- Note: the resume-banner `Weiter` CTA remains `Weiter` because that single button literally means "continue from where I left off" — destination is implicit (the prior step). FLAG was scoped to wizard step CTAs.
+
+### 2026-05-06 — ui-checker blocking-issue resolution (round 2)
+
+**Issue — Spacing: badge micro-padding violates 4-grid.**
+- Replaced all `px-1.5 py-0.5` (6/2 px — off-grid) with `px-2 py-1` (8/4 px — on-grid)
+- Affected elements (3 badge tokens):
+  - External cam `Protect Hub` primary badge
+  - External cam `UniFi` / `Drittanbieter · {manufacturer}` qualifier (first-party, third-party, unknown)
+  - Event-log event-type badges (`discover` / `reconcile` / `deploy` / `reload` / `error`)
+- Visual impact: pills are 2 px taller; no other section requires changes
+- Spacing scale doc updated to declare `px-2` and `py-1` explicitly under sm and xs tokens
+- Spacing-exceptions doc updated to retire `px-1.5 py-0.5` micro-padding
+
+**Non-blocking FLAGs addressed (round 2).**
+- Resume-banner CTA changed from bare `Weiter` to `Weiter zu Schritt {N}` (step number injected at render — explicit destination, consistent with wizard CTA destination-explicitness)
+- Hub-Tab Sync-now button copy changed from English `Sync now` to German `Jetzt synchronisieren` (German-consistency with rest of contract)
+- Accent reserved-for list updated to reflect new copy: `Jetzt synchronisieren` and `Weiter zu Schritt {N}`
 
 ---
 
