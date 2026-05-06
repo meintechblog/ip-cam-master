@@ -180,7 +180,7 @@ export function generateGo2rtcConfigBambu(params: {
   ${streamName}:
     - ${sourceUrl}#video=copy#audio=copy#reconnect_timeout=30
   ${streamName}-low:
-    - ffmpeg:rtsp://127.0.0.1:8554/${streamName}#video=h264#hardware=vaapi#width=840#height=540#raw=-g 30#raw=-maxrate 500k#raw=-bufsize 1000k
+    - ffmpeg:rtsp://127.0.0.1:8554/${streamName}#raw=-rtsp_transport tcp#video=h264#hardware=vaapi#width=840#height=540#raw=-g 30#raw=-maxrate 500k#raw=-bufsize 1000k
 ${rtspServerBlock(rtspAuth)}
 ffmpeg:
   bin: ffmpeg
