@@ -3,7 +3,9 @@
 	import CameraDetailCard from '$lib/components/cameras/CameraDetailCard.svelte';
 	import ExternalCamCard from '$lib/components/cameras/ExternalCamCard.svelte';
 	import type { CameraCardData } from '$lib/types';
-	import { Loader2 } from 'lucide-svelte';
+	import { Loader2, CheckCircle2, X } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let { data } = $props();
 	let cameras = $state<CameraCardData[]>([]);
@@ -16,6 +18,44 @@
 	// external section completely omitted when hub is disabled.
 	let managedCams = $derived(cameras.filter((c) => c.source !== 'external'));
 	let externalCams = $derived(cameras.filter((c) => c.source === 'external'));
+
+	// v1.3 Phase 22 Plan 03 Task 4 — onboarding=success toast (Pitfall #4).
+	// On mount, consume the ?onboarding=success query param ONCE: fetch the
+	// stream count from /api/protect-hub/health, render a green dismissable
+	// banner under the h1 for ~5 s, then strip the param via replaceState so
+	// a refresh doesn't retrigger.
+	let showToast = $state(false);
+	let toastStreamCount = $state<number | null>(null);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	let toastConsumed = $state(false);
+
+	async function consumeOnboardingToast() {
+		if (toastConsumed) return;
+		const v = page.url.searchParams.get('onboarding');
+		if (v !== 'success') return;
+		toastConsumed = true;
+		try {
+			const res = await fetch('/api/protect-hub/health');
+			const body = await res.json();
+			toastStreamCount = body?.streamCount ?? null;
+		} catch {
+			toastStreamCount = null;
+		}
+		showToast = true;
+		// Strip the param so refresh doesn't retrigger the toast.
+		goto(window.location.pathname, { replaceState: true });
+		toastTimer = setTimeout(() => {
+			showToast = false;
+		}, 5000);
+	}
+
+	function dismissToast() {
+		showToast = false;
+		if (toastTimer) {
+			clearTimeout(toastTimer);
+			toastTimer = null;
+		}
+	}
 
 	async function fetchCameras() {
 		try {
@@ -33,8 +73,10 @@
 	$effect(() => {
 		fetchCameras();
 		pollTimer = setInterval(fetchCameras, 10000);
+		consumeOnboardingToast();
 		return () => {
 			if (pollTimer) clearInterval(pollTimer);
+			if (toastTimer) clearTimeout(toastTimer);
 		};
 	});
 </script>
@@ -51,6 +93,27 @@
 		</span>
 	{/if}
 </div>
+
+{#if showToast}
+	<div
+		class="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm text-success flex items-center gap-3 mb-6"
+	>
+		<CheckCircle2 class="w-4 h-4 shrink-0" />
+		<span class="flex-1">
+			Protect Hub aktiv{toastStreamCount !== null
+				? ` — ${toastStreamCount} Streams laufen.`
+				: '.'}
+		</span>
+		<button
+			type="button"
+			onclick={dismissToast}
+			class="text-success hover:text-success/80 cursor-pointer"
+			aria-label="Schließen"
+		>
+			<X class="w-4 h-4" />
+		</button>
+	</div>
+{/if}
 
 {#if data.error}
 	<div class="mb-4">
