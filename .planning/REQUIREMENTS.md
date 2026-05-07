@@ -63,19 +63,19 @@
 - [ ] **HUB-WIZ-06**: Wizard Step 4 lets the user pick which cams join the Hub: first-party cams checkboxes pre-checked with default output type pre-selected; third-party cams checkboxes unchecked with copy "Already producing MJPEG natively? Leave off."
 - [ ] **HUB-WIZ-07**: Wizard Step 5 runs the first reconcile, deploys the initial YAML, and waits for go2rtc to come up healthy on `:1984`.
 - [ ] **HUB-WIZ-08**: Wizard Step 6 redirects to `/cameras` with a confirmation toast; new external cams are visible inline with "Protect Hub" badges.
-- [ ] **HUB-WIZ-09**: Wizard is resumable: if interrupted (browser closed, app restarted, network blip), re-entering the wizard picks up from the last completed step using the `hub_onboarding_state` step-pointer table.
-- [ ] **HUB-WIZ-10**: `settings.protect_hub_enabled` becomes `true` only after Step 6 completes successfully — no half-enabled state where the toggle is on but the catalog/bridge aren't ready.
+- [x] **HUB-WIZ-09**: Wizard is resumable: if interrupted (browser closed, app restarted, network blip), re-entering the wizard picks up from the last completed step using the `hub_onboarding_state` step-pointer table.
+- [x] **HUB-WIZ-10**: `settings.protect_hub_enabled` becomes `true` only after Step 6 completes successfully — no half-enabled state where the toggle is on but the catalog/bridge aren't ready.
 
 ### `/cameras` UI Integration (HUB-UI-*)
 
-- [ ] **HUB-UI-01**: External Protect cams appear inline in the existing `/cameras` list (one merged sorted array from the existing status endpoint).
+- [x] **HUB-UI-01**: External Protect cams appear inline in the existing `/cameras` list (one merged sorted array from the existing status endpoint).
 - [ ] **HUB-UI-02**: External cam cards show a primary "Protect Hub" badge plus a secondary first-party / third-party qualifier badge.
 - [ ] **HUB-UI-03**: External cam detail page shows: read-only native Protect stream catalog (Low/Medium/High with codec/resolution/fps), active Bridge outputs with toggles, copy-buttons per URL, snapshot preview.
 - [ ] **HUB-UI-04**: External cam detail page hides cam-edit and cam-delete buttons (the cam belongs to Protect, not the app).
 - [ ] **HUB-UI-05**: External cam action menu replaces "delete container" with "remove from Hub" (clarity about ownership).
 - [ ] **HUB-UI-06**: A `ProtectHubGuide` component shows Loxone "Benutzerdefinierte Intercom" copy-paste snippet + Frigate `cameras:` config copy-paste snippet, both pre-filled with the user's actual URLs.
 - [ ] **HUB-UI-07**: An "All Hub URLs" page lists every active output URL across all cams in one copy-friendly view (for users provisioning Loxone/Frigate in bulk).
-- [ ] **HUB-UI-08**: Settings page Protect Hub tab shows: Hub status, last reconcile timestamp, container status badge, drift indicator, "Sync now" button, and the last 50 reconcile events.
+- [x] **HUB-UI-08**: Settings page Protect Hub tab shows: Hub status, last reconcile timestamp, container status badge, drift indicator, "Sync now" button, and the last 50 reconcile events.
 
 ### Offboarding (HUB-OFF-*)
 

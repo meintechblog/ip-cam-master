@@ -122,7 +122,14 @@ Plans:
   7. Each output URL has a one-click copy button + a per-target snippet via the new `ProtectHubGuide.svelte` component: pre-filled Loxone "Benutzerdefinierte Intercom" copy-paste config block AND pre-filled Frigate `cameras:` config block, both using the user's actual bridge IP and slug
   8. A new `/settings/protect-hub/all-urls` page (or equivalent route) lists every active output URL across all cams in one copy-friendly view (cam name + slug + URL + per-output copy button), grouped by output type
   9. Settings Protect Hub tab shows: Hub status (state machine label), last reconcile timestamp, container status badge, drift indicator (only when foreign YAML stamp detected), "Sync now" button (force-reconcile), and the last 50 reconcile events from the event log
-**Plans**: TBD
+**Plans**: 6 plans (in 4 waves)
+Plans:
+- [x] 22-01-PLAN.md — Wave 1 (foundation): hub_onboarding_state schema + DDL + drizzle migration + wizard-state.ts service + [BLOCKING] drizzle-kit push (HUB-WIZ-09, HUB-WIZ-10)
+- [x] 22-02-PLAN.md — Wave 2: API extensions — CameraCardData type + /api/cameras/status response + 7 new wizard/health/events/drift endpoints + slug.ts shared util + hub-state.ts derived state + getEvents source-filter (HUB-WIZ-09/10, HUB-UI-01/08)
+- [ ] 22-03-PLAN.md — Wave 3 (parallel): /kameras partition + ExternalCamCard + OutputsSubsection + OutputToggle + ProtectHubGuide + CameraDetailCard source gate (HUB-UI-01..06)
+- [ ] 22-04-PLAN.md — Wave 3 (parallel): Wizard Steps 3-6 + WizardStepIndicator + WizardResumeBanner + onboarding +page refactor (HUB-WIZ-05..10)
+- [ ] 22-05-PLAN.md — Wave 3 (parallel): HubStatusPanel + HubEventLog + ProtectHubTab integration + /settings/protect-hub/all-urls + /kameras toast banner (HUB-UI-07, HUB-UI-08)
+- [ ] 22-06-PLAN.md — Wave 4: Live UAT against VM 192.168.3.178:3000 (all 9 ROADMAP success criteria + 14 reqs verified)
 **UI hint**: yes
 
 ### Phase 23: Offboarding + Lifecycle Polish + Stream-Sharing API
@@ -188,7 +195,7 @@ Plans:
 | 19. Data Model + Protect Catalog (Read-Only) | 3/4 | Complete    | 2026-05-02 |
 | 20. Bridge LXC Provisioning + Hello-World YAML | 3/3 | Complete    | 2026-05-06 |
 | 21. Multi-Cam YAML + Reconciliation Loop | 0/6 | Planned     | - |
-| 22. Onboarding Wizard + `/cameras` Integration | 0/? | Not started | - |
+| 22. Onboarding Wizard + `/cameras` Integration | 2/6 | In Progress|  |
 | 23. Offboarding + Lifecycle Polish + Stream-Sharing API | 0/? | Not started | - |
 | 24. Auto-Update Parity (parallel-track maintenance) | 1/1 | Complete    | 2026-05-05 |
 

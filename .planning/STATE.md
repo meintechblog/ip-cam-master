@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: milestone
-status: completed
-stopped_at: P21 ✅ FULLY COMPLETE on 2026-05-06 — Loxone-MJPEG flows live (640×360@10fps from Carport HEVC source via bridge vmid 2014); Frigate-RTSP HEVC passthrough live; 11/11 success criteria green incl. hard-cap 422 + idempotent reconcile + atomic SSH push + ws-manager exp-backoff. 7 code-review WARNINGs (0 blockers); WR-01 mass-archive risk fixed inline; WR-02..WR-07 deferred to gap-closure.
-last_updated: "2026-05-06T08:10:00.000Z"
-last_activity: 2026-05-06 -- P21 closed end-to-end: Loxone-MJPEG + Frigate-RTSP streams live on bridge.
+status: executing
+stopped_at: Completed 22-02-PLAN.md (api-extensions-and-shared-utils)
+last_updated: "2026-05-07T12:38:58.482Z"
+last_activity: 2026-05-07 -- Plan 22-02 closed; 30 new tests; 99/99 protect-hub green; 0 type errors
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_plans: 20
+  completed_plans: 16
+  percent: 80
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 ## Current Position
 
-Phase: 21 — ✅ COMPLETE (live UAT verified 2026-05-06)
-Plan: all 6 of 6 done
-Status: Phase 21 ✅
-Last activity: 2026-05-06 -- P21 closed; live streams flowing on bridge vmid 2014
+Phase: 22 — Onboarding Wizard + `/cameras` Integration (IN PROGRESS)
+Plan: 2 of 6 done (22-01 wave-0 schema; 22-02 api-extensions-and-shared-utils)
+Status: Phase 22 in progress
+Last activity: 2026-05-07 -- Plan 22-02 closed; 30 new tests; 99/99 protect-hub green; 0 type errors
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
@@ -85,7 +85,7 @@ hardening + a small types.ts gap. Pick up via
 | 19 | Data Model + Protect Catalog (Read-Only) | 7 | ✅ **COMPLETE** — 4/4 plans done, UAT 6/7 verified live (SC-5 banner deferred) |
 | 20 | Bridge LXC Provisioning + Hello-World YAML | 11 | ✅ **COMPLETE** — 3/3 plans done, 3 bugs found+fixed during live UAT, 11/11 criteria verified (vmid 2014 @ 192.168.3.139) |
 | 21 | Multi-Cam YAML + Reconciliation Loop | 18 | ✅ **COMPLETE** — 6/6 plans done; live UAT verified Loxone-MJPEG + Frigate-RTSP streams flowing; 4 source bugs found+fixed mid-UAT (Bambu rtsp_transport, channel selection fallback, auto-seed cap, controller-host catalog); WR-01 fixed inline; REVIEW.md captures 6 deferred WARNINGs |
-| 22 | Onboarding Wizard + `/cameras` Integration | 14 | Not started |
+| 22 | Onboarding Wizard + `/cameras` Integration | 14 | In progress — 2/6 plans done (01 schema + 02 api-extensions); 4/14 reqs (HUB-WIZ-09, HUB-WIZ-10, HUB-UI-01, HUB-UI-08) closed at the API layer (UI lands in 03/04/05) |
 | 23 | Offboarding + Lifecycle Polish + Stream-Sharing API | 12 | Not started |
 
 **Total:** 62/62 v1.3 requirements mapped (100% coverage).
@@ -212,6 +212,9 @@ Recent decisions affecting current work:
 - [Phase 05]: SSH-based provisioning over cloud-init cicustom (simpler, debuggable)
 - [Phase 05]: Settings injected via PUT /api/settings for proper AES-256-GCM encryption
 - [Phase 05]: /api/settings kept public for installer curl POST on fresh install
+- [Phase ?]: Plan 22-02: exported yaml-builder.ts:deriveSlug (was private) so the browser-side slug parity test imports the canonical server-side function
+- [Phase ?]: Plan 22-02: getHubState() is async because getSetting is async; pure semantics preserved (no DB writes)
+- [Phase ?]: Plan 22-02: /api/protect-hub/drift is a P22 stub returning driftDetected:false until P23 lands the cached column write per RESEARCH Pitfall #10
 
 ### Pending Todos
 
@@ -252,9 +255,10 @@ Recent decisions affecting current work:
 | 260323-krt | Phase 4 QA sweep — fix Protect status UI and logic | 2026-03-23 | fe32585 | [260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a](./quick/260323-krt-phase-4-qa-sweep-fix-protect-status-ui-a/) |
 | 260410-c36 | Container-IP prominent im Batch-Onboarding + MAC im LXC-Panel | 2026-04-10 | 569062f | [260410-c36-container-ip-prominent-im-batch-onboardi](./quick/260410-c36-container-ip-prominent-im-batch-onboardi/) |
 | 260502-bzm | LXC + VM start-at-boot fix + release v1.2 | 2026-05-02 | ce37cb6 | [260502-bzm-lxc-vm-onboot-fix-and-release](./quick/260502-bzm-lxc-vm-onboot-fix-and-release/) |
+| Phase 22 P02 | 25min | 4 tasks | 19 files |
 
 ## Session Continuity
 
-Last activity: 2026-05-02
-Stopped at: Completed 20-02-PLAN.md (wizard UI + bridge controls + scheduler health probe)
+Last activity: 2026-05-07
+Stopped at: Completed 22-02-PLAN.md (api-extensions-and-shared-utils)
 Resume file: None
