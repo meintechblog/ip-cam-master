@@ -143,10 +143,17 @@
 		if (stage1Done) {
 			next[1].status = health.go2rtcReady === true ? 'done' : 'in-progress';
 		}
-		// Stage 3 — streams
+		// Stage 3 — streams. WR-04 fix: a no_op reconcile (bridge YAML
+		// unchanged, no SSH deploy) terminates without ever entering
+		// `success`, but pollOnce() advances on `no_op` too. Without
+		// recognising `no_op` as a terminal-success status here, Stage 3
+		// flashes 'in-progress' for one render frame before the component
+		// auto-advances to Step 6. Treat both 'success' and 'no_op' as
+		// stage-3-complete.
 		if (stage1Done && health.go2rtcReady === true) {
+			const terminalOk = run?.status === 'success' || run?.status === 'no_op';
 			next[2].status =
-				(health.streamCount ?? 0) > 0 && run?.status === 'success' ? 'done' : 'in-progress';
+				(health.streamCount ?? 0) > 0 && terminalOk ? 'done' : 'in-progress';
 		}
 		stages = next;
 	}
