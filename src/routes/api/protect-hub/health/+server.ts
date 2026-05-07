@@ -37,8 +37,18 @@ export const GET: RequestHandler = async () => {
 		// not ready — keep go2rtcReady=false, streamCount=0
 	}
 
+	// WR-08 fix — `ok: true` previously meant "request succeeded" even when
+	// go2rtcReady=false, which conflates "request OK" with "bridge healthy".
+	// Today no consumer reads `health.ok` directly (Step5 + HubStatusPanel
+	// read individual fields), but to disambiguate for future callers we add
+	// a derived `bridgeHealthy` boolean. `ok` is preserved for backward
+	// compat: it stays `true` whenever the request itself succeeds (bridge
+	// row exists and responded). The `no_bridge` early-return continues to
+	// emit `ok: false` so wizard UI can detect "bridge not provisioned yet".
+	const bridgeHealthy = go2rtcReady && bridge.status === 'running';
 	return json({
 		ok: true,
+		bridgeHealthy,
 		bridgeStatus: bridge.status,
 		bridgeIp: bridge.containerIp,
 		go2rtcReady,
