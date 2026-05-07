@@ -24,19 +24,26 @@ export function getPointer(): WizardPointer | null {
 	);
 }
 
+// v1.3 Phase 22 CR-03 fix — atomic SQLite UPSERT replaces the prior
+// read-then-(insert|update) pattern. The schema header comment ("id=1
+// always upserted") implied this was already the case, but the
+// implementation did a separate getPointer() + insert/update pair, which
+// allows two concurrent requests (multi-tab, fast double-click) to both
+// observe `existing=null` and both attempt INSERT — the second one
+// throws on the PRIMARY KEY constraint and surfaces as an unhandled 500.
+// `ON CONFLICT(id) DO UPDATE` collapses both branches into a single
+// statement that is correct under any interleaving better-sqlite3 might
+// expose now or in the future.
+
 export function setPointer(step: number, error: string | null = null): void {
-	const existing = getPointer();
 	const now = new Date().toISOString();
-	if (!existing) {
-		db.insert(hubOnboardingState)
-			.values({ id: 1, step, status: 'in_progress', lastActivityAt: now, error })
-			.run();
-	} else {
-		db.update(hubOnboardingState)
-			.set({ step, status: 'in_progress', lastActivityAt: now, error })
-			.where(eq(hubOnboardingState.id, 1))
-			.run();
-	}
+	db.insert(hubOnboardingState)
+		.values({ id: 1, step, status: 'in_progress', lastActivityAt: now, error })
+		.onConflictDoUpdate({
+			target: hubOnboardingState.id,
+			set: { step, status: 'in_progress', lastActivityAt: now, error }
+		})
+		.run();
 }
 
 export function resetPointer(): void {
@@ -45,15 +52,11 @@ export function resetPointer(): void {
 
 export function completePointer(): void {
 	const now = new Date().toISOString();
-	const existing = getPointer();
-	if (!existing) {
-		db.insert(hubOnboardingState)
-			.values({ id: 1, step: 6, status: 'completed', lastActivityAt: now, error: null })
-			.run();
-	} else {
-		db.update(hubOnboardingState)
-			.set({ step: 6, status: 'completed', lastActivityAt: now, error: null })
-			.where(eq(hubOnboardingState.id, 1))
-			.run();
-	}
+	db.insert(hubOnboardingState)
+		.values({ id: 1, step: 6, status: 'completed', lastActivityAt: now, error: null })
+		.onConflictDoUpdate({
+			target: hubOnboardingState.id,
+			set: { step: 6, status: 'completed', lastActivityAt: now, error: null }
+		})
+		.run();
 }
