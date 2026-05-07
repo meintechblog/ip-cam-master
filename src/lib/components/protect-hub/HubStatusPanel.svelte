@@ -52,10 +52,24 @@
 				return;
 			}
 			// Wait for reconcilerBusy to drop. Cap loop at ~120s safety.
+			// WR-01 fix — refresh() is wrapped so a transient network error
+			// inside the loop doesn't break the busy-wait. Without the inner
+			// try/catch, a network blip during the poll would propagate up
+			// and exit syncNow() via finally; but more importantly, the
+			// existing refresh() already swallows fetch errors silently and
+			// keeps the prior `health` value — which would leave
+			// reconcilerBusy stuck `true` from the last good poll until the
+			// 120s cap. Keeping refresh() under the inner try/catch is
+			// defensive: if refresh() ever throws (e.g. a future change
+			// promotes errors), the wait still terminates on cap.
 			const start = Date.now();
 			while (Date.now() - start < 120_000) {
 				await new Promise((r) => setTimeout(r, 1000));
-				await refresh();
+				try {
+					await refresh();
+				} catch {
+					// keep waiting — the loop's hard cap (120 s) bounds the wait.
+				}
 				if (!health?.reconcilerBusy) break;
 			}
 		} finally {
