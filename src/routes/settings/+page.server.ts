@@ -4,6 +4,7 @@ import { getSettings, getSetting, saveSetting } from '$lib/server/services/setti
 import { getUser, createUser, deleteUser, verifyPassword, isYoloMode } from '$lib/server/services/auth';
 import { loadCatalog } from '$lib/server/orchestration/protect-hub/catalog';
 import { getBridgeStatus } from '$lib/server/orchestration/protect-hub/bridge-lifecycle';
+import { getHubState } from '$lib/server/orchestration/protect-hub/hub-state';
 
 export const load: PageServerLoad = async () => {
 	const proxmox = await getSettings('proxmox_');
@@ -18,6 +19,11 @@ export const load: PageServerLoad = async () => {
 	const catalogState = await loadCatalog();
 	const bridge = getBridgeStatus();
 
+	// v1.3 Phase 22 Plan 05 — derived hub_state for L-18 toggle-flap-protection (SC-4).
+	// ProtectHubTab disables the "Protect Hub aktivieren" toggle when this is
+	// 'starting' or 'stopping' and shows an inline spinner + Abbrechen button.
+	const hubState = await getHubState();
+
 	return {
 		proxmox,
 		unifi,
@@ -28,6 +34,7 @@ export const load: PageServerLoad = async () => {
 		hasUser: user !== null,
 		authUsername: user?.username ?? null,
 		isYolo: isYoloMode(),
+		hubState,
 		protectHub: {
 			enabled: hubEnabled,
 			credsConfigured,

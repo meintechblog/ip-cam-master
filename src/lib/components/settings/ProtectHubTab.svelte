@@ -6,9 +6,15 @@
 	// otherwise. Falls back to cached display + orange banner on
 	// controller_unreachable (HUB-CAT-05).
 	//
+	// v1.3 Phase 22 Plan 05 — Embeds <HubStatusPanel> + <HubEventLog>
+	// (HUB-UI-08) and wires the L-18 toggle-flap-protection (SC-4):
+	// while hubState ∈ {starting, stopping}, the "Protect Hub aktivieren"
+	// toggle is disabled, an inline Loader2 + "Vorgang läuft…" caption
+	// renders, and a separate "Abbrechen" button POSTs to
+	// /api/protect-hub/wizard/reset (the only abort path per L-18).
+	//
 	// HUB-WIZ-01 boundary: this tab is the ENTRY POINT, not the wizard.
-	// The toggle widget + provisioning trigger land in P20 alongside the
-	// wizard route (/settings/protect-hub/onboarding).
+	// The wizard lives at /settings/protect-hub/onboarding (P20+P22).
 	import {
 		RefreshCw,
 		AlertTriangle,
@@ -24,8 +30,15 @@
 		Share2
 	} from 'lucide-svelte';
 	import { goto, invalidateAll } from '$app/navigation';
+	import HubStatusPanel from '$lib/components/protect-hub/HubStatusPanel.svelte';
+	import HubEventLog from '$lib/components/protect-hub/HubEventLog.svelte';
 
-	let { hub, switchTab } = $props<{
+	// Mirror of the union exported by hub-state.ts. Duplicated locally
+	// so this file stays browser-safe (no `$lib/server/*` imports leak
+	// into the client bundle).
+	type HubState = 'disabled' | 'starting' | 'enabled' | 'stopping' | 'error';
+
+	let { hub, hubState, switchTab } = $props<{
 		hub: {
 			enabled: boolean;
 			credsConfigured: boolean;
@@ -59,8 +72,35 @@
 				lastHealthCheckAt: string | null;
 			} | null;
 		};
+		hubState: HubState;
 		switchTab: (tab: string) => void;
 	}>();
+
+	// v1.3 Phase 22 Plan 05 — L-18 toggle-flap-protection (SC-4).
+	const toggleDisabled = $derived(hubState === 'starting' || hubState === 'stopping');
+	let cancelInFlight = $state(false);
+
+	async function cancelTransition() {
+		cancelInFlight = true;
+		try {
+			await fetch('/api/protect-hub/wizard/reset', { method: 'POST' });
+			await invalidateAll();
+		} finally {
+			cancelInFlight = false;
+		}
+	}
+
+	async function onToggle() {
+		// Off → On flips the user into the wizard (which atomically saves
+		// protect_hub_enabled='true' on Step 6 via /wizard/complete). Off-flow
+		// (full unwind) is owned by P23 — render a no-op for now when enabled.
+		if (hub.enabled) {
+			// Disabling lives in P23 — keep this a no-op surface. The toggle
+			// remains visually "on" until P23 lands.
+			return;
+		}
+		await goto('/settings/protect-hub/onboarding');
+	}
 
 	let bridgeLoading = $state(false);
 
@@ -156,6 +196,44 @@
 			</button>
 		</div>
 	{:else}
+		<!-- v1.3 Phase 22 Plan 05 — "Protect Hub aktivieren" toggle (SC-4 L-18 surface).
+			 Disabled with inline Loader2 + "Vorgang läuft…" caption and a separate
+			 "Abbrechen" button when hubState ∈ {starting, stopping}. -->
+		<div class="bg-bg-card rounded-lg border border-border p-6">
+			<div class="flex items-center gap-3">
+				<button
+					type="button"
+					role="switch"
+					aria-checked={hub.enabled}
+					aria-disabled={toggleDisabled}
+					disabled={toggleDisabled}
+					onclick={onToggle}
+					class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+						{hub.enabled ? 'bg-accent' : 'bg-bg-input'}
+						disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+				>
+					<span
+						class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+							{hub.enabled ? 'translate-x-6' : 'translate-x-1'}"
+					></span>
+				</button>
+				<span class="text-sm text-text-primary font-medium">Protect Hub aktivieren</span>
+
+				{#if toggleDisabled}
+					<Loader2 class="w-4 h-4 animate-spin text-accent" />
+					<span class="text-xs text-text-secondary">Vorgang läuft…</span>
+					<button
+						type="button"
+						onclick={cancelTransition}
+						disabled={cancelInFlight}
+						class="text-xs text-text-secondary hover:text-danger disabled:opacity-60 disabled:cursor-not-allowed"
+					>
+						Abbrechen
+					</button>
+				{/if}
+			</div>
+		</div>
+
 		<!-- "Why" intro card: erklärt Zweck des Hub + konkrete Use-Cases (Loxone, Frigate, …) -->
 		<div class="bg-bg-card rounded-lg border border-border p-6">
 			<div class="flex items-start gap-3">
@@ -302,6 +380,10 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- v1.3 Phase 22 Plan 05 — Hub-Status + Event-Log panels (HUB-UI-08). -->
+		<HubStatusPanel />
+		<HubEventLog />
 
 		<!-- Status + refresh card -->
 		<div class="bg-bg-card rounded-lg border border-border p-6">
