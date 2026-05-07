@@ -147,3 +147,18 @@ sqlite.exec(`
 `);
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_hub_reconcile_runs_started_at ON protect_hub_reconcile_runs(started_at DESC)`);
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_protect_hub_reconcile_runs_reconcile_id ON protect_hub_reconcile_runs(reconcile_id)`);
+
+// v1.3 Phase 22 — hub_onboarding_state (per L-15 + HUB-WIZ-09 + HUB-WIZ-10).
+// Single-row wizard step-pointer (id=1 always upserted). Persists wizard
+// progress for resumability ("Du warst bei Schritt N — weiter?") and gates
+// the atomic protect_hub_enabled flip in wizard/complete (Plan 02). No index —
+// table only ever holds 0 or 1 row.
+sqlite.exec(`
+	CREATE TABLE IF NOT EXISTS hub_onboarding_state (
+		id INTEGER PRIMARY KEY DEFAULT 1,
+		step INTEGER NOT NULL,
+		status TEXT NOT NULL DEFAULT 'in_progress',
+		last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+		error TEXT
+	)
+`);

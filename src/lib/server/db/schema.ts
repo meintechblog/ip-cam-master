@@ -235,3 +235,22 @@ export const protectHubReconcileRuns = sqliteTable('protect_hub_reconcile_runs',
 	deployedYamlHash: text('deployed_yaml_hash'),
 	error: text('error')
 });
+
+// v1.3 Phase 22 — Wizard step-pointer table (per L-15 + HUB-WIZ-09).
+// Single-row table (logical singleton — id=1 always upserted).
+// Persists wizard progress so resumability survives browser-close + SvelteKit restart.
+// setPointer() upserts; resetPointer() deletes; completePointer() flips status='completed'.
+// HUB-WIZ-10: completePointer() is the gate Plan 02's wizard/complete endpoint flips
+// protect_hub_enabled atomically against — DO NOT delete the row on completion.
+export type HubOnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
+export type HubOnboardingStatus = 'in_progress' | 'completed' | 'reset';
+
+export const hubOnboardingState = sqliteTable('hub_onboarding_state', {
+	id: integer('id').primaryKey().default(1),
+	step: integer('step').notNull(),
+	status: text('status').notNull().default('in_progress'),
+	lastActivityAt: text('last_activity_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	error: text('error')
+});
