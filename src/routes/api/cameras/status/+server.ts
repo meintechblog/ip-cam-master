@@ -170,12 +170,21 @@ export const GET: RequestHandler = async () => {
 					}
 				}
 
+				// v1.3 Phase 22 CR-01 fix — only build cameraWebUrl (which embeds the
+				// decrypted plaintext camera password) for managed cams. External Protect
+				// cams have no valid managed credentials in `cameras` (the catalog upsert
+				// stores whatever Protect provides, which may be empty/UDM admin) and the
+				// ExternalCamCard never renders this field, so omitting it removes the
+				// credential leak from every /api/cameras/status poll. external_archived
+				// is also excluded for the same reason.
 				let cameraWebUrl: string | null = null;
-				try {
-					const decryptedPass = decrypt(cam.password);
-					cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
-				} catch {
-					cameraWebUrl = `http://${cam.ip}`;
+				if (cam.source !== 'external' && cam.source !== 'external_archived') {
+					try {
+						const decryptedPass = decrypt(cam.password);
+						cameraWebUrl = `http://${cam.username}:${encodeURIComponent(decryptedPass)}@${cam.ip}`;
+					} catch {
+						cameraWebUrl = `http://${cam.ip}`;
+					}
 				}
 
 				return {
