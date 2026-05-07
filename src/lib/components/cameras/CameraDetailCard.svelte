@@ -382,8 +382,14 @@
 			</div>
 		</div>
 
-		<!-- LXC Container Info (only for pipeline cameras) -->
-		{#if !isNativeOnvif}
+		<!-- LXC Container Info (only for managed pipeline cameras).
+			 v1.3 Phase 22 Plan 03 Task 1: defensive gate on `camera.source !== 'external'`.
+			 The /kameras partition routes external Protect cams to <ExternalCamCard> instead
+			 of CameraDetailCard, so this branch is unreachable via the normal page render.
+			 The extra check is defense-in-depth: it eliminates the live-VM "LXC 0 + red dot"
+			 bug that surfaced on 22 external rows on prior builds (CONTEXT.md §specifics).
+		-->
+		{#if !isNativeOnvif && camera.source !== 'external'}
 		<div class="lg:w-64 xl:w-72 shrink-0 p-4 bg-bg-primary/30 border-l border-border">
 			<div class="flex items-center gap-2 mb-3">
 				<span class="w-2.5 h-2.5 rounded-full {camera.containerStatus === 'running' ? 'bg-green-400' : 'bg-red-400'}"></span>
