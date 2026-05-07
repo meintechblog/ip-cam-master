@@ -59,10 +59,10 @@
 - [x] **HUB-WIZ-02**: Activating the toggle (when bridge does not yet exist) navigates to a dedicated wizard route `/settings/protect-hub/onboarding` — not a modal.
 - [x] **HUB-WIZ-03**: Wizard Step 1 verifies the Protect connection using existing credentials; missing creds deep-link to the UniFi settings tab.
 - [x] **HUB-WIZ-04**: Wizard Step 2 provisions the Bridge LXC (long-running 30–90 s) with progress events streamed to the UI; provision failure leaves the bridge row in `status='failed'` and is retryable from the wizard.
-- [ ] **HUB-WIZ-05**: Wizard Step 3 fetches Protect cams and populates the stream catalog; preview shows discovered cams grouped by `kind`.
-- [ ] **HUB-WIZ-06**: Wizard Step 4 lets the user pick which cams join the Hub: first-party cams checkboxes pre-checked with default output type pre-selected; third-party cams checkboxes unchecked with copy "Already producing MJPEG natively? Leave off."
-- [ ] **HUB-WIZ-07**: Wizard Step 5 runs the first reconcile, deploys the initial YAML, and waits for go2rtc to come up healthy on `:1984`.
-- [ ] **HUB-WIZ-08**: Wizard Step 6 redirects to `/cameras` with a confirmation toast; new external cams are visible inline with "Protect Hub" badges.
+- [x] **HUB-WIZ-05**: Wizard Step 3 fetches Protect cams and populates the stream catalog; preview shows discovered cams grouped by `kind`.
+- [x] **HUB-WIZ-06**: Wizard Step 4 lets the user pick which cams join the Hub: first-party cams checkboxes pre-checked with default output type pre-selected; third-party cams checkboxes unchecked with copy "Already producing MJPEG natively? Leave off."
+- [x] **HUB-WIZ-07**: Wizard Step 5 runs the first reconcile, deploys the initial YAML, and waits for go2rtc to come up healthy on `:1984`.
+- [x] **HUB-WIZ-08**: Wizard Step 6 redirects to `/cameras` with a confirmation toast; new external cams are visible inline with "Protect Hub" badges.
 - [x] **HUB-WIZ-09**: Wizard is resumable: if interrupted (browser closed, app restarted, network blip), re-entering the wizard picks up from the last completed step using the `hub_onboarding_state` step-pointer table.
 - [x] **HUB-WIZ-10**: `settings.protect_hub_enabled` becomes `true` only after Step 6 completes successfully — no half-enabled state where the toggle is on but the catalog/bridge aren't ready.
 

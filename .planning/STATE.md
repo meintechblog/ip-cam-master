@@ -4,14 +4,14 @@ milestone: v1.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 22-02-PLAN.md (api-extensions-and-shared-utils)
-last_updated: "2026-05-07T12:52:40.638Z"
+last_updated: "2026-05-07T12:55:02.100Z"
 last_activity: 2026-05-07
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 17
-  percent: 85
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 ## Current Position
 
 Phase: 22 — Onboarding Wizard + `/cameras` Integration (IN PROGRESS)
-Plan: 3 of 6 done (22-01 wave-0 schema; 22-02 api-extensions-and-shared-utils)
+Plan: 4 of 6 done (22-01 wave-0 schema; 22-02 api-extensions-and-shared-utils)
 Status: Ready to execute
 Last activity: 2026-05-07
 
@@ -218,6 +218,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Plan 22-05: added Protect Hub toggle as Rule 2 missing functionality required for SC-4
 - [Phase ?]: Plan 22-05: HubState union duplicated locally in ProtectHubTab — SvelteKit blocks $lib/server/* imports in client bundles
 - [Phase ?]: Plan 22-05: Sync-now poll has 120s safety cap above P21 reconciler 90s timeout to prevent indefinite UI freeze
+- [Phase ?]: Banner Continue invalidateAll-only — never POSTs pointer rewrite (Plan 22-04)
+- [Phase ?]: Local-step override + invalidateAll() reconciliation pattern for client-server step sync
 
 ### Pending Todos
 
@@ -260,6 +262,7 @@ Recent decisions affecting current work:
 | 260502-bzm | LXC + VM start-at-boot fix + release v1.2 | 2026-05-02 | ce37cb6 | [260502-bzm-lxc-vm-onboot-fix-and-release](./quick/260502-bzm-lxc-vm-onboot-fix-and-release/) |
 | Phase 22 P02 | 25min | 4 tasks | 19 files |
 | Phase 22 P05 | 30min | 3 tasks | 10 files |
+| Phase 22 P04 | 25min | 4 tasks | 10 files |
 
 ## Session Continuity
 
