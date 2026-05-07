@@ -93,3 +93,55 @@ describe('P22 wizard structure (HUB-WIZ-05..10)', () => {
 		);
 	});
 });
+
+describe('P22 wizard host page (Task 4 additions)', () => {
+	const hostPage = read('src/routes/settings/protect-hub/onboarding/+page.svelte');
+	const hostServer = read('src/routes/settings/protect-hub/onboarding/+page.server.ts');
+
+	it('jumpToStep posts pointer rewrite (explicit backward navigation)', () => {
+		expect(hostPage).toMatch(/jumpToStep[\s\S]{0,300}\/api\/protect-hub\/wizard\//);
+		expect(hostPage).toMatch(/jumpToStep[\s\S]{0,300}method:\s*['"]POST['"]/);
+	});
+
+	it('continuePointer does NOT POST a pointer rewrite (only invalidateAll)', () => {
+		// Extract the continuePointer function body and assert it does not contain a POST.
+		const m = hostPage.match(/(?:async\s+)?function\s+continuePointer[\s\S]{0,400}?\n\s*\}/);
+		expect(m, 'continuePointer function not found').toBeTruthy();
+		expect(m![0]).not.toMatch(/method:\s*['"]POST['"]/);
+		expect(m![0]).toMatch(/invalidateAll\(\)/);
+	});
+
+	it('+page.server.ts uses loadCatalog (or inlines a fallback drizzle SELECT)', () => {
+		// Either named import OR inline drizzle SELECT against the cameras table.
+		const usesLoadCatalog = /import\s+\{[^}]*loadCatalog[^}]*\}/.test(hostServer);
+		const inlinesSelect = /db\.select\(\)[\s\S]{0,200}from\(cameras\)/.test(hostServer);
+		expect(
+			usesLoadCatalog || inlinesSelect,
+			'must import loadCatalog OR inline a drizzle SELECT fallback'
+		).toBe(true);
+	});
+
+	it('host page wires WizardStepIndicator with onStepClick={jumpToStep}', () => {
+		expect(hostPage).toMatch(/onStepClick=\{jumpToStep\}/);
+	});
+
+	it('host page wires WizardResumeBanner Continue → continuePointer', () => {
+		expect(hostPage).toMatch(/onContinue=\{continuePointer\}/);
+	});
+
+	it('host page renders Step3..6 conditionally on currentStep', () => {
+		expect(hostPage).toMatch(/currentStep === 3[\s\S]{0,200}<Step3/);
+		expect(hostPage).toMatch(/currentStep === 4[\s\S]{0,200}<Step4/);
+		expect(hostPage).toMatch(/currentStep === 5[\s\S]{0,200}<Step5/);
+		expect(hostPage).toMatch(/currentStep === 6[\s\S]{0,200}<Step6/);
+	});
+
+	it('+page.server.ts no longer redirects on bridge.status=running (P22 change)', () => {
+		// The P20 redirect on bridge?.status==='running' is removed; only the
+		// post-onboarding redirect (enabled flag + null/completed pointer) remains.
+		const redirectMatches = hostServer.match(/redirect\(/g) ?? [];
+		// Exactly one redirect call (the new post-onboarding gate).
+		expect(redirectMatches.length).toBe(1);
+		expect(hostServer).toMatch(/protect_hub_enabled/);
+	});
+});
