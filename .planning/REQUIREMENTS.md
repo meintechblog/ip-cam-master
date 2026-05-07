@@ -69,11 +69,11 @@
 ### `/cameras` UI Integration (HUB-UI-*)
 
 - [x] **HUB-UI-01**: External Protect cams appear inline in the existing `/cameras` list (one merged sorted array from the existing status endpoint).
-- [ ] **HUB-UI-02**: External cam cards show a primary "Protect Hub" badge plus a secondary first-party / third-party qualifier badge.
-- [ ] **HUB-UI-03**: External cam detail page shows: read-only native Protect stream catalog (Low/Medium/High with codec/resolution/fps), active Bridge outputs with toggles, copy-buttons per URL, snapshot preview.
-- [ ] **HUB-UI-04**: External cam detail page hides cam-edit and cam-delete buttons (the cam belongs to Protect, not the app).
-- [ ] **HUB-UI-05**: External cam action menu replaces "delete container" with "remove from Hub" (clarity about ownership).
-- [ ] **HUB-UI-06**: A `ProtectHubGuide` component shows Loxone "Benutzerdefinierte Intercom" copy-paste snippet + Frigate `cameras:` config copy-paste snippet, both pre-filled with the user's actual URLs.
+- [x] **HUB-UI-02**: External cam cards show a primary "Protect Hub" badge plus a secondary first-party / third-party qualifier badge.
+- [x] **HUB-UI-03**: External cam detail page shows: read-only native Protect stream catalog (Low/Medium/High with codec/resolution/fps), active Bridge outputs with toggles, copy-buttons per URL, snapshot preview.
+- [x] **HUB-UI-04**: External cam detail page hides cam-edit and cam-delete buttons (the cam belongs to Protect, not the app).
+- [x] **HUB-UI-05**: External cam action menu replaces "delete container" with "remove from Hub" (clarity about ownership).
+- [x] **HUB-UI-06**: A `ProtectHubGuide` component shows Loxone "Benutzerdefinierte Intercom" copy-paste snippet + Frigate `cameras:` config copy-paste snippet, both pre-filled with the user's actual URLs.
 - [x] **HUB-UI-07**: An "All Hub URLs" page lists every active output URL across all cams in one copy-friendly view (for users provisioning Loxone/Frigate in bulk).
 - [x] **HUB-UI-08**: Settings page Protect Hub tab shows: Hub status, last reconcile timestamp, container status badge, drift indicator, "Sync now" button, and the last 50 reconcile events.
 
