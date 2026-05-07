@@ -21,6 +21,12 @@
 <script lang="ts">
 	import { Copy, Check } from 'lucide-svelte';
 	import { copyToClipboard } from '$lib/utils/clipboard';
+	// v1.3 Phase 22 CR-04 fix — use the shared deriveSlug() so the snippets
+	// stay byte-identical with the YAML key the bridge actually serves
+	// (Pitfall #9). The previous implementation hardcoded `${mac}-low` /
+	// `${mac}-high` which silently diverges if D-PIPE-06 changes the suffix
+	// mapping.
+	import { deriveSlug } from '$lib/protect-hub/slug';
 
 	let {
 		bridgeIp,
@@ -35,15 +41,18 @@
 	let copiedLoxone = $state(false);
 	let copiedFrigate = $state(false);
 
+	const loxoneSlug = $derived(mac ? deriveSlug(mac, 'loxone-mjpeg') : '');
+	const frigateSlug = $derived(mac ? deriveSlug(mac, 'frigate-rtsp') : '');
+
 	const loxoneSnippet = $derived(
 		bridgeIp && mac
-			? `# Adresse: MJPEG-Stream über Hub-Bridge\nURL: http://${bridgeIp}:1984/api/stream.mjpeg?src=${mac}-low\n# Hinweis: User-Agent darf leer bleiben. Auth nicht aktiv (LAN-Trust).`
+			? `# Adresse: MJPEG-Stream über Hub-Bridge\nURL: http://${bridgeIp}:1984/api/stream.mjpeg?src=${loxoneSlug}\n# Hinweis: User-Agent darf leer bleiben. Auth nicht aktiv (LAN-Trust).`
 			: ''
 	);
 
 	const frigateSnippet = $derived(
 		bridgeIp && mac
-			? `cameras:\n  ${mac}-high:\n    ffmpeg:\n      inputs:\n        - path: rtsp://${bridgeIp}:8554/${mac}-high\n          roles:\n            - record\n            # - detect   # auskommentiert: Erkennung kostet CPU\n    # detect:\n    #   width: 1280\n    #   height: 720\n    #   fps: 5\n    # record:\n    #   enabled: true\n    #   retain:\n    #     days: 7\n    #     mode: motion`
+			? `cameras:\n  ${frigateSlug}:\n    ffmpeg:\n      inputs:\n        - path: rtsp://${bridgeIp}:8554/${frigateSlug}\n          roles:\n            - record\n            # - detect   # auskommentiert: Erkennung kostet CPU\n    # detect:\n    #   width: 1280\n    #   height: 720\n    #   fps: 5\n    # record:\n    #   enabled: true\n    #   retain:\n    #     days: 7\n    #     mode: motion`
 			: ''
 	);
 
