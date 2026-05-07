@@ -147,6 +147,14 @@
 			<div class="space-y-4">
 				{#each managedCams as camera (camera.id)}
 					<CameraDetailCard {camera} />
+				{:else}
+					<!-- WR-03 fix — when the user has zero managed cams but multiple
+					     external cams (hub enabled), the outer cameras.length===0
+					     guard does not fire and the section header reads
+					     "Eigene Kameras (0)" with an empty card list. Surface a
+					     short empty-state caption so the section's intent is
+					     unmistakable. -->
+					<p class="text-sm text-text-secondary">Keine Kameras eingerichtet.</p>
 				{/each}
 			</div>
 		</section>
@@ -160,7 +168,15 @@
 					{#each externalCams as camera (camera.id)}
 						<ExternalCamCard {camera} bridgeIp={data.bridgeIp} />
 					{:else}
-						<p class="text-sm text-text-secondary">Noch keine Protect-Kameras erkannt.</p>
+						<!-- WR-05 fix — append "Letzte Synchronisation" timestamp per
+						     UI-SPEC line 219. lastDiscoveredAt comes from
+						     loadCatalog() in +page.server.ts (MAX(cachedAt) across
+						     protect_stream_catalog). Render only when present. -->
+						<p class="text-sm text-text-secondary">
+							Noch keine Protect-Kameras erkannt.{#if data.lastDiscoveredAt}
+								Letzte Synchronisation: {new Date(data.lastDiscoveredAt).toLocaleString('de-DE')}.
+							{/if}
+						</p>
 					{/each}
 				</div>
 			</section>
