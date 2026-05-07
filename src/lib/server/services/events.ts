@@ -52,6 +52,7 @@ export function getEvents(filters?: {
 	cameraId?: number;
 	severity?: EventSeverity;
 	eventType?: EventType;
+	source?: string;
 	since?: string;
 	until?: string;
 	limit?: number;
@@ -67,6 +68,13 @@ export function getEvents(filters?: {
 	}
 	if (filters?.eventType) {
 		conditions.push(eq(events.eventType, filters.eventType));
+	}
+	// v1.3 Phase 22 Plan 02 — additive `source` filter so /api/protect-hub/events
+	// can scope the read to source='protect_hub' (reconcile + cam-archived events).
+	// Matches the live INSERT path in reconcile.ts:721-733 which writes raw strings
+	// outside the legacy EventSource union — typed as `string` here for that reason.
+	if (filters?.source) {
+		conditions.push(eq(events.source, filters.source));
 	}
 	if (filters?.since) {
 		conditions.push(gt(events.timestamp, filters.since));
