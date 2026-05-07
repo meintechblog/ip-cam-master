@@ -16,7 +16,14 @@
 	// (only when data.hubEnabled). Per UI-SPEC §kameras-partition + CONTEXT.md
 	// decisions: insertion-order preserved within each section, no search bar,
 	// external section completely omitted when hub is disabled.
-	let managedCams = $derived(cameras.filter((c) => c.source !== 'external'));
+	//
+	// CR-05 fix — `c.source !== 'external'` previously matched
+	// 'external_archived' (P21 soft-delete state) and rendered those rows in
+	// the managed section with the full LXC/pipeline UI, which is meaningless
+	// for archived Protect cams. Use positive matches on both sections so
+	// 'external_archived' is excluded from both and surfaces only when
+	// P23 ships an archive view.
+	let managedCams = $derived(cameras.filter((c) => c.source === 'managed'));
 	let externalCams = $derived(cameras.filter((c) => c.source === 'external'));
 
 	// v1.3 Phase 22 Plan 03 Task 4 — onboarding=success toast (Pitfall #4).
