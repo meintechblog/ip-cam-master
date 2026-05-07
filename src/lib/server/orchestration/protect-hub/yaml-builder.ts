@@ -105,7 +105,11 @@ function buildFrigateRtspSource(rtspUrl: string): string {
  * the existing `generateGo2rtcConfigLoxone` / `generateGo2rtcConfigBambu`
  * naming convention in `src/lib/server/services/go2rtc.ts`.
  */
-function deriveSlug(row: OutputRow): string {
+// v1.3 Phase 22 Plan 02 — exported so the browser-shareable
+// `src/lib/protect-hub/slug.ts` parity test can import this canonical
+// server-side implementation directly. Behavior unchanged; signature
+// unchanged (still consumes OutputRow internally).
+export function deriveSlug(row: OutputRow): string {
 	const suffix = row.outputType === 'loxone-mjpeg' ? 'low' : 'high';
 	return `${row.mac}-${suffix}`;
 }
