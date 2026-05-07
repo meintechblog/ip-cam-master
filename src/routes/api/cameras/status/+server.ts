@@ -230,6 +230,13 @@ export const GET: RequestHandler = async () => {
 					modelName: cam.modelName ?? null,
 					externalId: cam.externalId ?? null,
 					hubBridgeId: cam.hubBridgeId ?? null,
+					// v1.3 Phase 22 Plan 03 (Rule 3 deviation) — surface the cam MAC so
+					// ExternalCamCard / ProtectHubGuide / OutputsSubsection can derive the
+					// go2rtc slug via deriveSlug(mac, outputType). Plan 02 omitted this when
+					// adding the 6 hub fields; without it the slug pipeline is unusable on
+					// the client. For external Protect cams this is the Protect-side MAC
+					// (lowercase hex, no separators per the catalog upsert convention).
+					mac: cam.mac ?? null,
 					// v1.3 Phase 22 — Catalog + outputs arrays consumed by Plan 03 ExternalCamCard.
 					// Empty for managed cams (lookup miss → []).
 					streamCatalog: catalogByCam.get(cam.id) ?? [],

@@ -181,6 +181,13 @@ export interface CameraCardData {
 	modelName: string | null;
 	externalId: string | null;
 	hubBridgeId: number | null;
+	// Cam MAC (cameras.mac column — not the LXC container MAC at lxcMac).
+	// For external Protect cams: required by Plan 03 ExternalCamCard / ProtectHubGuide
+	// / OutputsSubsection to derive go2rtc stream slug via deriveSlug(mac, outputType).
+	// For managed cams: typically null (the LXC's mac is at lxcMac instead).
+	// Added in Plan 03 Task 2 (Rule 3 deviation — Plan 02 missed this when extending
+	// the type with the 6 hub fields above; the slug pipeline is unusable without it).
+	mac: string | null;
 
 	// v1.3 Phase 22 — Catalog + outputs arrays consumed by /kameras ExternalCamCard (Plan 03).
 	// Empty for managed cams (no extra DB cost — batched JOIN filters by source='external').
