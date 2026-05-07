@@ -170,7 +170,47 @@ export interface CameraCardData {
 	// Present only for Bambu cameras (derived from cameras.model via
 	// PRINTER_CAPABILITIES in the /api/cameras/status endpoint).
 	capabilities?: PrinterCapabilities;
+
+	// v1.3 Phase 22 — Hub-related scalar fields exposed via /api/cameras/status.
+	// Populated for every cam row (managed defaults to source='managed', kind='unknown').
+	// Plan 03's `/kameras` partition reads `source` to split managed vs external sections;
+	// ExternalCamCard reads kind/manufacturer/modelName/externalId/hubBridgeId for badges.
+	source: CameraSource;
+	kind: CameraKind;
+	manufacturer: string | null;
+	modelName: string | null;
+	externalId: string | null;
+	hubBridgeId: number | null;
+
+	// v1.3 Phase 22 — Catalog + outputs arrays consumed by /kameras ExternalCamCard (Plan 03).
+	// Empty for managed cams (no extra DB cost — batched JOIN filters by source='external').
+	streamCatalog: StreamCatalogRow[];
+	outputs: CameraOutputRow[];
 }
+
+/**
+ * Per-cam Protect bootstrap stream catalog row, projected into the wire shape
+ * consumed by Plan 03 ExternalCamCard's read-only catalog table.
+ * Narrower than `protectStreamCatalog.$inferSelect` (drops cameraId, rtspUrl,
+ * shareEnabled, cachedAt — those are server-only join + caching metadata).
+ */
+export type StreamCatalogRow = {
+	quality: string;
+	codec: string | null;
+	width: number | null;
+	height: number | null;
+	fps: number | null;
+	bitrate: number | null;
+};
+
+/**
+ * Per-cam output configuration row, projected for /kameras OutputsSubsection initial state.
+ * Narrower than `cameraOutputs.$inferSelect` (drops cameraId, config blob, timestamps).
+ */
+export type CameraOutputRow = {
+	outputType: 'loxone-mjpeg' | 'frigate-rtsp';
+	enabled: boolean;
+};
 
 /**
  * Discriminator for the v1.3 cameras table extension (Phase 19, per L-2).

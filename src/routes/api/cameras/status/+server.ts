@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
+import { inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/client';
-import { cameras } from '$lib/server/db/schema';
+import { cameras, cameraOutputs, protectStreamCatalog } from '$lib/server/db/schema';
 import { listContainers } from '$lib/server/services/proxmox';
 import { getSettings } from '$lib/server/services/settings';
 import { decrypt } from '$lib/server/services/crypto';
@@ -9,7 +10,14 @@ import { getProtectStatus } from '$lib/server/services/protect';
 import { getFlappingCameras } from '$lib/server/services/events';
 import { getBambuState } from '$lib/server/services/bambu-mqtt';
 import { PRINTER_CAPABILITIES } from '$lib/server/services/bambu-discovery';
-import type { CameraCardData, ProtectCameraMatch } from '$lib/types';
+import type {
+	CameraCardData,
+	ProtectCameraMatch,
+	CameraSource,
+	CameraKind,
+	StreamCatalogRow,
+	CameraOutputRow
+} from '$lib/types';
 
 export const GET: RequestHandler = async () => {
 	try {
@@ -25,6 +33,65 @@ export const GET: RequestHandler = async () => {
 			containerMap = new Map(containers.map((c) => [c.vmid, c]));
 		} catch {
 			// Proxmox unreachable
+		}
+
+		// v1.3 Phase 22 Plan 02 — batched load of stream catalog + outputs for external cams.
+		// Plan 03's ExternalCamCard reads `streamCatalog` (read-only catalog table) and
+		// `outputs` (OutputsSubsection initial state) directly from the cam row — keep this
+		// here to avoid an extra round-trip from the browser. Managed cams get empty arrays
+		// (no leakage; the WHERE filters by id list which excludes managed cams).
+		const externalCamIds: number[] = allCameras
+			.filter((c: any) => c.source === 'external')
+			.map((c: any) => c.id as number);
+
+		const allCatalog = externalCamIds.length
+			? db
+					.select({
+						cameraId: protectStreamCatalog.cameraId,
+						quality: protectStreamCatalog.quality,
+						codec: protectStreamCatalog.codec,
+						width: protectStreamCatalog.width,
+						height: protectStreamCatalog.height,
+						fps: protectStreamCatalog.fps,
+						bitrate: protectStreamCatalog.bitrate
+					})
+					.from(protectStreamCatalog)
+					.where(inArray(protectStreamCatalog.cameraId, externalCamIds))
+					.all()
+			: [];
+		const allOutputs = externalCamIds.length
+			? db
+					.select({
+						cameraId: cameraOutputs.cameraId,
+						outputType: cameraOutputs.outputType,
+						enabled: cameraOutputs.enabled
+					})
+					.from(cameraOutputs)
+					.where(inArray(cameraOutputs.cameraId, externalCamIds))
+					.all()
+			: [];
+
+		const catalogByCam = new Map<number, StreamCatalogRow[]>();
+		for (const r of allCatalog) {
+			const arr = catalogByCam.get(r.cameraId) ?? [];
+			arr.push({
+				quality: r.quality,
+				codec: r.codec,
+				width: r.width,
+				height: r.height,
+				fps: r.fps,
+				bitrate: r.bitrate
+			});
+			catalogByCam.set(r.cameraId, arr);
+		}
+		const outputsByCam = new Map<number, CameraOutputRow[]>();
+		for (const r of allOutputs) {
+			const arr = outputsByCam.get(r.cameraId) ?? [];
+			arr.push({
+				outputType: r.outputType as 'loxone-mjpeg' | 'frigate-rtsp',
+				enabled: !!r.enabled
+			});
+			outputsByCam.set(r.cameraId, arr);
 		}
 
 		// Collect live data for each camera in parallel
@@ -154,7 +221,19 @@ export const GET: RequestHandler = async () => {
 					capabilities:
 						cam.cameraType === 'bambu'
 							? (PRINTER_CAPABILITIES[cam.model ?? 'H2C'] ?? PRINTER_CAPABILITIES['H2C'])
-							: undefined
+							: undefined,
+					// v1.3 Phase 22 — Hub-related scalar fields (HUB-UI-01).
+					// Defaults guard against legacy rows pre-dating P19; new rows always populate these.
+					source: ((cam.source ?? 'managed') as CameraSource),
+					kind: ((cam.kind ?? 'unknown') as CameraKind),
+					manufacturer: cam.manufacturer ?? null,
+					modelName: cam.modelName ?? null,
+					externalId: cam.externalId ?? null,
+					hubBridgeId: cam.hubBridgeId ?? null,
+					// v1.3 Phase 22 — Catalog + outputs arrays consumed by Plan 03 ExternalCamCard.
+					// Empty for managed cams (lookup miss → []).
+					streamCatalog: catalogByCam.get(cam.id) ?? [],
+					outputs: outputsByCam.get(cam.id) ?? []
 				} satisfies CameraCardData;
 			})
 		);
