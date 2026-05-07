@@ -50,6 +50,21 @@
 
 	const inFlight = $derived(toggleState === 'enabling' || toggleState === 'disabling');
 
+	// v1.3 Phase 22 WR-02 fix — abort any in-flight PUT when the component is
+	// destroyed. Without this, navigating away from /kameras (or letting the
+	// poll-driven re-render swap the cam card) leaves the fetch running against
+	// a detached signal: the server processes the toggle, but no component
+	// instance is left to receive the response, so the new instance can read
+	// stale outputs from the next /api/cameras/status poll.
+	$effect(() => {
+		return () => {
+			if (abortController) {
+				abortController.abort();
+				abortController = null;
+			}
+		};
+	});
+
 	async function toggle() {
 		if (inFlight) return;
 
