@@ -50,7 +50,7 @@
 				type="button"
 				onclick={() => handleClick(step)}
 				disabled={!isCompleted(step) || step > currentStep}
-				class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors
+				class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors
 					{isCompleted(step)
 					? 'bg-green-500/20 text-green-400 border border-green-500/40 cursor-pointer hover:bg-green-500/30'
 					: isCurrent(step)
