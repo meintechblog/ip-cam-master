@@ -4,14 +4,14 @@ milestone: v1.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 22-02-PLAN.md (api-extensions-and-shared-utils)
-last_updated: "2026-05-07T12:38:58.482Z"
-last_activity: 2026-05-07 -- Plan 22-02 closed; 30 new tests; 99/99 protect-hub green; 0 type errors
+last_updated: "2026-05-07T12:52:40.638Z"
+last_activity: 2026-05-07
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 ## Current Position
 
 Phase: 22 — Onboarding Wizard + `/cameras` Integration (IN PROGRESS)
-Plan: 2 of 6 done (22-01 wave-0 schema; 22-02 api-extensions-and-shared-utils)
-Status: Phase 22 in progress
-Last activity: 2026-05-07 -- Plan 22-02 closed; 30 new tests; 99/99 protect-hub green; 0 type errors
+Plan: 3 of 6 done (22-01 wave-0 schema; 22-02 api-extensions-and-shared-utils)
+Status: Ready to execute
+Last activity: 2026-05-07
 
 Phase numbering: continues from v1.2 (last phase was 18). v1.3 starts at Phase 19.
 
@@ -215,6 +215,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Plan 22-02: exported yaml-builder.ts:deriveSlug (was private) so the browser-side slug parity test imports the canonical server-side function
 - [Phase ?]: Plan 22-02: getHubState() is async because getSetting is async; pure semantics preserved (no DB writes)
 - [Phase ?]: Plan 22-02: /api/protect-hub/drift is a P22 stub returning driftDetected:false until P23 lands the cached column write per RESEARCH Pitfall #10
+- [Phase ?]: Plan 22-05: added Protect Hub toggle as Rule 2 missing functionality required for SC-4
+- [Phase ?]: Plan 22-05: HubState union duplicated locally in ProtectHubTab — SvelteKit blocks $lib/server/* imports in client bundles
+- [Phase ?]: Plan 22-05: Sync-now poll has 120s safety cap above P21 reconciler 90s timeout to prevent indefinite UI freeze
 
 ### Pending Todos
 
@@ -256,6 +259,7 @@ Recent decisions affecting current work:
 | 260410-c36 | Container-IP prominent im Batch-Onboarding + MAC im LXC-Panel | 2026-04-10 | 569062f | [260410-c36-container-ip-prominent-im-batch-onboardi](./quick/260410-c36-container-ip-prominent-im-batch-onboardi/) |
 | 260502-bzm | LXC + VM start-at-boot fix + release v1.2 | 2026-05-02 | ce37cb6 | [260502-bzm-lxc-vm-onboot-fix-and-release](./quick/260502-bzm-lxc-vm-onboot-fix-and-release/) |
 | Phase 22 P02 | 25min | 4 tasks | 19 files |
+| Phase 22 P05 | 30min | 3 tasks | 10 files |
 
 ## Session Continuity
 

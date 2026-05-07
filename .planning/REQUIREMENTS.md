@@ -74,7 +74,7 @@
 - [ ] **HUB-UI-04**: External cam detail page hides cam-edit and cam-delete buttons (the cam belongs to Protect, not the app).
 - [ ] **HUB-UI-05**: External cam action menu replaces "delete container" with "remove from Hub" (clarity about ownership).
 - [ ] **HUB-UI-06**: A `ProtectHubGuide` component shows Loxone "Benutzerdefinierte Intercom" copy-paste snippet + Frigate `cameras:` config copy-paste snippet, both pre-filled with the user's actual URLs.
-- [ ] **HUB-UI-07**: An "All Hub URLs" page lists every active output URL across all cams in one copy-friendly view (for users provisioning Loxone/Frigate in bulk).
+- [x] **HUB-UI-07**: An "All Hub URLs" page lists every active output URL across all cams in one copy-friendly view (for users provisioning Loxone/Frigate in bulk).
 - [x] **HUB-UI-08**: Settings page Protect Hub tab shows: Hub status, last reconcile timestamp, container status badge, drift indicator, "Sync now" button, and the last 50 reconcile events.
 
 ### Offboarding (HUB-OFF-*)
