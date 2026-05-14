@@ -66,23 +66,33 @@ describe('yaml-builder — buildBridgeYaml', () => {
 		return sources[0];
 	}
 
-	// HUB-OUT-02: Loxone-MJPEG ffmpeg form per D-PIPE-02
-	it('loxone — emits #video=mjpeg#width=640#height=360#raw=-r 10#raw=-an#hardware=vaapi (D-PIPE-02 verbatim)', () => {
+	// HUB-OUT-02: Loxone-MJPEG ffmpeg form per D-PIPE-02 (amended P22-UAT 2026-05-15)
+	// Switched from go2rtc's `ffmpeg:` shorthand to `exec:` after the shorthand
+	// produced 0 bytes on the live bridge — see yaml-builder.ts buildLoxoneMjpegSource
+	// header comment for the root cause + fix rationale.
+	it('loxone — emits exec: ffmpeg with VAAPI hw_device init + 640x360@10fps mjpeg_vaapi pipeline', () => {
 		const yaml = buildBridgeYaml([loxoneRow(CARPORT_MAC, CARPORT_TOKEN)], TEST_RECONCILE_ID);
 		const src = getSource(yaml, `${CARPORT_MAC}-low`);
 
-		// All D-PIPE-02 fragments present in the wire-form ffmpeg source.
 		expect(src).not.toContain('tls_verify');
-		expect(src).toContain('#video=mjpeg');
-		expect(src).toContain('#width=640');
-		expect(src).toContain('#height=360');
-		expect(src).toContain('#raw=-r 10');
-		expect(src).toContain('#raw=-an');
-		expect(src).toContain('#hardware=vaapi');
+		// exec: source bypasses go2rtc's auto-construction.
+		expect(src.startsWith('exec:ffmpeg ')).toBe(true);
+		// Manual VAAPI device init (the part go2rtc's shorthand got wrong).
+		expect(src).toContain('-init_hw_device vaapi=intel:/dev/dri/renderD128');
+		expect(src).toContain('-filter_hw_device intel');
+		// Encoder + filter graph: software decode → format=nv12|vaapi → hwupload → scale_vaapi → mjpeg_vaapi.
+		expect(src).toContain('-vf format=nv12|vaapi,hwupload,scale_vaapi=640:360');
+		expect(src).toContain('-c:v mjpeg_vaapi');
+		expect(src).toContain('-f mjpeg -');
+		// 10fps, no audio (D-PIPE-02 spirit retained).
+		expect(src).toContain('-r 10');
+		expect(src).toContain('-an');
 		// D-PIPE-05: reconnect flags on every output, regardless of type.
-		expect(src).toContain('#raw=-reconnect 1');
-		expect(src).toContain('#raw=-reconnect_streamed 1');
-		expect(src).toContain('#raw=-reconnect_delay_max 2');
+		expect(src).toContain('-reconnect 1');
+		expect(src).toContain('-reconnect_streamed 1');
+		expect(src).toContain('-reconnect_delay_max 2');
+		// RTSP transport pinned to TCP (was -rtsp_flags prefer_tcp under shorthand).
+		expect(src).toContain('-rtsp_transport tcp');
 		// D-PIPE-06: slug pattern <mac>-low for loxone-mjpeg
 		expect(yaml).toContain(`${CARPORT_MAC}-low:`);
 		// CR-2: rtsps:// URL passed through unchanged (no rewrite step).

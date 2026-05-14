@@ -56,29 +56,42 @@ const WARNING_LINE = '# WARNING: do not edit by hand — managed by ip-cam-maste
 const RECONNECT_SUFFIX = '#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2';
 
 /**
- * D-PIPE-02 verbatim: Loxone-MJPEG ffmpeg source. 640x360 @ 10fps, no audio,
- * VAAPI hardware accel.
+ * Loxone-MJPEG source — 640x360 @ 10fps, no audio, VAAPI hardware accel.
  *
- * Note on TLS: P19-01 spike originally locked tls_verify=0 defensively, but
- * Debian-13 ffmpeg 7.1.3 (the version inside the bridge LXC) strict-rejects
- * `-tls_verify` as "Option not found" — that breaks the entire pipeline at
- * input-open. The macOS ffmpeg 8.0.1 used in the spike was lenient ("skipped
- * - not known to demuxer") so the bug only surfaced on the live bridge. Per
- * spike Variant C, the UDM's self-signed cert passes ffmpeg's default TLS
- * validation, so we drop the flag entirely. If a future firmware tightens
- * the cert chain and starts failing, swap to per-URL `?tls_verify=0` query
- * which the demuxer accepts (or use ffmpeg's `-protocol_whitelist tls,...`).
+ * P22 live UAT (2026-05-15) found go2rtc 1.9.14's `ffmpeg:` shorthand for
+ * `#video=mjpeg#hardware=vaapi` emits a broken filter chain — it sets both
+ * `-hwaccel vaapi -hwaccel_output_format vaapi` AND `-vf format=vaapi|nv12,
+ * hwupload,scale_vaapi=…`, which double-uploads an already-GPU frame and
+ * fails with `Impossible to convert between the formats supported by the
+ * filter 'graph -1 input from stream 0:0' and the filter 'auto_scale_0'`.
+ * The wire produced 0 MJPEG bytes regardless of consumer.
+ *
+ * Fix per P22-UAT: switch to go2rtc's `exec:` source, which runs the literal
+ * ffmpeg argv (execv, no shell) and bypasses go2rtc's auto-construction.
+ * Manual pipeline matches a known-good invocation verified on the bridge:
+ * software-decode the RTSPS source, then `format=nv12|vaapi,hwupload,
+ * scale_vaapi` lifts the frame to GPU once before `mjpeg_vaapi` encodes.
+ * Produced ~880 KB MJPEG / 5 s on a Büro stream during UAT.
+ *
+ * TLS: P19-01 spike result still applies — UDM's self-signed cert passes
+ * ffmpeg 7.1.3's default validation, no `-tls_verify` flag needed (the flag
+ * is rejected by 7.1.3's demuxer anyway). `-rtsp_transport tcp` matches the
+ * `-rtsp_flags prefer_tcp` go2rtc previously used.
  */
 function buildLoxoneMjpegSource(rtspUrl: string): string {
 	return (
-		`ffmpeg:${rtspUrl}` +
-		'#video=mjpeg' +
-		'#width=640' +
-		'#height=360' +
-		'#raw=-r 10' +
-		'#raw=-an' +
-		'#hardware=vaapi' +
-		`${RECONNECT_SUFFIX}`
+		'exec:ffmpeg' +
+		' -hide_banner -loglevel error' +
+		' -fflags nobuffer -flags low_delay' +
+		' -rtsp_transport tcp' +
+		' -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2' +
+		' -init_hw_device vaapi=intel:/dev/dri/renderD128' +
+		' -filter_hw_device intel' +
+		` -i ${rtspUrl}` +
+		' -an -r 10' +
+		' -vf format=nv12|vaapi,hwupload,scale_vaapi=640:360' +
+		' -c:v mjpeg_vaapi' +
+		' -f mjpeg -'
 	);
 }
 
