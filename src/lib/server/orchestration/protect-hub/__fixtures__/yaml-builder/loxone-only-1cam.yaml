@@ -12,8 +12,7 @@ rtsp:
 streams:
   aabbccddee01-low:
     - exec:ffmpeg -hide_banner -loglevel error -fflags nobuffer -flags low_delay
-      -rtsp_transport tcp -reconnect 1 -reconnect_streamed 1
-      -reconnect_delay_max 2 -init_hw_device vaapi=intel:/dev/dri/renderD128
+      -rtsp_transport tcp -init_hw_device vaapi=intel:/dev/dri/renderD128
       -filter_hw_device intel -i
       rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp -an -r 10 -vf
       format=nv12|vaapi,hwupload,scale_vaapi=640:360 -c:v mjpeg_vaapi -f mjpeg -

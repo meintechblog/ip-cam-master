@@ -87,10 +87,10 @@ describe('yaml-builder — buildBridgeYaml', () => {
 		// 10fps, no audio (D-PIPE-02 spirit retained).
 		expect(src).toContain('-r 10');
 		expect(src).toContain('-an');
-		// D-PIPE-05: reconnect flags on every output, regardless of type.
-		expect(src).toContain('-reconnect 1');
-		expect(src).toContain('-reconnect_streamed 1');
-		expect(src).toContain('-reconnect_delay_max 2');
+		// D-PIPE-05 amended (P22-UAT 2026-05-15): `-reconnect` flags are HTTP-only
+		// in ffmpeg 7.1.3 and fatal-rejected by the RTSP demuxer ("Option not
+		// found"). Reconnect now handled by go2rtc's exec-respawn lifecycle.
+		expect(src).not.toContain('-reconnect');
 		// RTSP transport pinned to TCP (was -rtsp_flags prefer_tcp under shorthand).
 		expect(src).toContain('-rtsp_transport tcp');
 		// D-PIPE-06: slug pattern <mac>-low for loxone-mjpeg

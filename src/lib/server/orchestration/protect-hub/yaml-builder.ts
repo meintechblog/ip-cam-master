@@ -79,12 +79,17 @@ const RECONNECT_SUFFIX = '#raw=-reconnect 1#raw=-reconnect_streamed 1#raw=-recon
  * `-rtsp_flags prefer_tcp` go2rtc previously used.
  */
 function buildLoxoneMjpegSource(rtspUrl: string): string {
+	// NOTE on -reconnect* flags: D-PIPE-05 mandated reconnect 1/streamed 1/
+	// delay_max 2. These work ONLY for ffmpeg's HTTP family demuxers. The RTSP
+	// demuxer in ffmpeg 7.1.3 rejects them with "Option not found" — fatal at
+	// input-open. Recovery on upstream loss is instead handled by go2rtc's
+	// `exec:` lifecycle: ffmpeg exits → go2rtc respawns it on next consumer
+	// demand. The RTSP demuxer itself also retries TCP transport internally.
 	return (
 		'exec:ffmpeg' +
 		' -hide_banner -loglevel error' +
 		' -fflags nobuffer -flags low_delay' +
 		' -rtsp_transport tcp' +
-		' -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2' +
 		' -init_hw_device vaapi=intel:/dev/dri/renderD128' +
 		' -filter_hw_device intel' +
 		` -i ${rtspUrl}` +
