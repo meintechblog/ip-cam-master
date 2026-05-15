@@ -24,22 +24,41 @@
 
 	let { camera, bridgeIp }: { camera: CameraCardData; bridgeIp: string | null } = $props();
 
-	// Snapshot fetched once on render via go2rtc's frame.jpeg API. Cache-buster
-	// (?t=…) is bumped by the reload button so the same render keeps a stable
-	// URL for the browser cache, but the user can force a fresh frame on demand.
-	let snapshotKey = $state(Date.now());
+	// P22-UAT 2026-05-15 — switch from frame.jpeg single-shot to stream.mjpeg
+	// live view. <img src=stream.mjpeg> streams a continuous MJPEG animation
+	// natively in every modern browser, no JS playback layer needed.
+	let streamKey = $state(Date.now());
 	let snapshotError = $state(false);
 
-	const lowSlug = $derived(camera.mac ? deriveSlug(camera.mac, 'loxone-mjpeg') : null);
-	const snapshotUrl = $derived(
+	// Prefer the loxone-mjpeg output (640x360 transcode — bandwidth-friendly).
+	// Fall back to frigate-rtsp slug only as a stream hint (RTSP isn't playable
+	// in <img>; for that we keep showing the MJPEG-only thumbnail placeholder
+	// when no MJPEG is enabled).
+	const lowSlug = $derived(
+		camera.mac && (camera.outputs ?? []).some((o) => o.enabled && o.outputType === 'loxone-mjpeg')
+			? deriveSlug(camera.mac, 'loxone-mjpeg')
+			: null
+	);
+	const liveStreamUrl = $derived(
 		bridgeIp && lowSlug
-			? `http://${bridgeIp}:1984/api/frame.jpeg?src=${lowSlug}&t=${snapshotKey}`
+			? `http://${bridgeIp}:1984/api/stream.mjpeg?src=${lowSlug}&t=${streamKey}`
 			: null
 	);
 
 	function reloadSnapshot() {
-		snapshotKey = Date.now();
+		streamKey = Date.now();
 		snapshotError = false;
+	}
+
+	let mjpegCopied = $state(false);
+	async function copyMjpegLink() {
+		// Copy without cache-buster so the URL is reusable in other consumers.
+		if (!liveStreamUrl) return;
+		const cleanUrl = liveStreamUrl.replace(/&t=\d+$/, '');
+		if (await copyToClipboard(cleanUrl)) {
+			mjpegCopied = true;
+			setTimeout(() => (mjpegCopied = false), 2000);
+		}
 	}
 
 	const qualifierLabel = $derived(
@@ -77,31 +96,34 @@
 
 	<!-- Two-column: snapshot (left) + stream catalog (right). Stacks on small screens. -->
 	<div class="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-6">
-		<!-- Snapshot preview -->
+		<!-- Live MJPEG preview — streamed from the bridge LXC, no transcoding
+		     loop. Fallback to placeholder when the cam has no MJPEG output
+		     (only frigate-rtsp passthrough, which <img> can't play). -->
 		<div class="relative bg-bg-input rounded-lg overflow-hidden aspect-video">
-			{#if snapshotUrl && !snapshotError}
+			{#if liveStreamUrl && !snapshotError}
 				<img
-					src={snapshotUrl}
+					src={liveStreamUrl}
 					alt={camera.name}
 					class="w-full h-full object-cover"
 					onerror={() => (snapshotError = true)}
 				/>
 			{:else}
 				<div
-					class="absolute inset-0 flex items-center justify-center text-xs text-text-secondary/50"
+					class="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs text-text-secondary/60 px-4 text-center"
 				>
-					Vorschau nicht verfügbar
+					<span>Kein MJPEG-Output aktiv</span>
+					<span class="text-text-secondary/40">Für eine Live-View aktiviere unten den Loxone-MJPEG-Toggle.</span>
 				</div>
 			{/if}
 			<button
 				type="button"
 				onclick={reloadSnapshot}
 				class="absolute top-2 right-2 p-2 bg-bg-card/80 rounded-full hover:bg-bg-card text-text-secondary hover:text-text-primary cursor-pointer"
-				aria-label="Vorschau neu laden"
-				title="Vorschau neu laden"
+				aria-label="Stream neu verbinden"
+				title="Stream neu verbinden"
 			>
 				<RotateCw class="w-3.5 h-3.5" />
-				<span class="sr-only">Vorschau neu laden</span>
+				<span class="sr-only">Stream neu verbinden</span>
 			</button>
 		</div>
 

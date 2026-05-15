@@ -3,8 +3,94 @@
 	import { ExternalLink, Copy, Check, Play, Square, RotateCw, Trash2, Pencil, KeyRound, Loader2, Power, Lock, LockOpen, Eye, EyeOff } from 'lucide-svelte';
 	import AdoptionGuide from './AdoptionGuide.svelte';
 	import { copyToClipboard } from '$lib/utils/clipboard';
+	import { deriveSlug } from '$lib/protect-hub/slug';
 
-	let { camera }: { camera: CameraCardData } = $props();
+	let {
+		camera,
+		hubAugment = null,
+		bridgeIp = null
+	}: {
+		camera: CameraCardData;
+		hubAugment?: CameraCardData | null;
+		bridgeIp?: string | null;
+	} = $props();
+
+	// P22-UAT 2026-05-15: when this managed cam is also represented in Protect
+	// Hub (matching protectId), the parent /kameras passes the external row
+	// here as `hubAugment`. We compute the Hub-bridge RTSP/MJPEG URLs and
+	// render them in an additional info block. Keyed by output type → slug.
+	const hubBridgeUrls = $derived.by(() => {
+		if (!hubAugment || !bridgeIp || !hubAugment.mac) return null;
+		const out: Array<{ outputType: 'loxone-mjpeg' | 'frigate-rtsp'; url: string; label: string }> = [];
+		for (const o of hubAugment.outputs ?? []) {
+			if (!o.enabled) continue;
+			const slug = deriveSlug(hubAugment.mac, o.outputType);
+			if (o.outputType === 'loxone-mjpeg') {
+				out.push({
+					outputType: 'loxone-mjpeg',
+					url: `http://${bridgeIp}:1984/api/stream.mjpeg?src=${slug}`,
+					label: 'Loxone MJPEG (640x360@10fps)'
+				});
+			} else {
+				out.push({
+					outputType: 'frigate-rtsp',
+					url: `rtsp://${bridgeIp}:8554/${slug}`,
+					label: 'RTSP-Passthrough (Frigate / NVR)'
+				});
+			}
+		}
+		return out.length > 0 ? out : null;
+	});
+
+	let hubCopied = $state<string | null>(null);
+	async function copyHubUrl(url: string) {
+		if (await copyToClipboard(url)) {
+			hubCopied = url;
+			setTimeout(() => (hubCopied = null), 2000);
+		}
+	}
+
+	// P22-UAT 2026-05-15: when the cam has no LXC (mobotix-onvif → native
+	// Protect ONVIF adoption, no container), the old placeholder showed
+	// "Container gestoppt" — misleading because no container is *expected*.
+	// If a Hub-bridge MJPEG output exists for the cam, use it as the live
+	// view source; otherwise show a clear "native Protect" caption.
+	const hubMjpegSlug = $derived.by(() => {
+		if (!hubAugment || !hubAugment.mac) return null;
+		const has = (hubAugment.outputs ?? []).some(
+			(o) => o.enabled && o.outputType === 'loxone-mjpeg'
+		);
+		return has ? deriveSlug(hubAugment.mac, 'loxone-mjpeg') : null;
+	});
+	const hubLiveStreamUrl = $derived(
+		bridgeIp && hubMjpegSlug
+			? `http://${bridgeIp}:1984/api/stream.mjpeg?src=${hubMjpegSlug}`
+			: null
+	);
+
+	// P22-UAT 2026-05-15 — Live MJPEG URL for managed cams. Each managed cam
+	// has its own go2rtc inside the LXC; stream.mjpeg streams natively in
+	// every modern browser via <img src>. User feedback: "Mobotix S15 gibt
+	// direkt MJPEG aus — nur den link" → expose the URL prominently.
+	const managedMjpegUrl = $derived(
+		camera.go2rtcWebUrl && camera.streamName
+			? `${camera.go2rtcWebUrl}/api/stream.mjpeg?src=${camera.streamName}`
+			: null
+	);
+
+	// Single source of truth for the in-card live view: hub mjpeg first
+	// (when set, e.g. mobotix-onvif cam 11), else the cam's own LXC go2rtc.
+	const liveViewUrl = $derived(hubLiveStreamUrl ?? managedMjpegUrl);
+
+	let mjpegUrlCopied = $state(false);
+	async function copyMjpegUrl() {
+		const url = liveViewUrl;
+		if (!url) return;
+		if (await copyToClipboard(url)) {
+			mjpegUrlCopied = true;
+			setTimeout(() => (mjpegUrlCopied = false), 2000);
+		}
+	}
 	let copied = $state(false);
 	let editing = $state(false);
 	let editName = $state(camera.name);
@@ -326,18 +412,41 @@
 <div class="bg-bg-card border border-border rounded-lg overflow-hidden w-full">
 	<!-- Top: Stream + LXC info side by side -->
 	<div class="flex flex-col lg:flex-row">
-		<!-- Live Stream -->
-		<div class="flex-1 relative bg-black {!isRunning ? 'opacity-40' : ''}" style="aspect-ratio: {camera.width || 16}/{camera.height || 9};">
+		<!-- Live Stream. P22-UAT 2026-05-15 amendment:
+		     1. Default: live MJPEG via <img src=stream.mjpeg> (browser-native MJPEG
+		        animation). Replaces the 10 s snapshot poll that produced a still image.
+		     2. mobotix-onvif (no LXC): Hub-bridge MJPEG used when available.
+		     3. Pure native-onvif without Hub: clear caption.
+		-->
+		<div
+			class="flex-1 relative bg-black {!liveViewUrl && !isRunning && !isNativeOnvif
+				? 'opacity-40'
+				: ''}"
+			style="aspect-ratio: {camera.width || 16}/{camera.height || 9};"
+		>
 			{#if rebooting}
 				<div class="absolute inset-0 flex flex-col items-center justify-center text-warning text-sm gap-2">
 					<Loader2 class="w-6 h-6 animate-spin" />
 					<span>Kamera startet neu...</span>
 				</div>
-			{:else if snapshotSrc && isRunning}
-				<img src={snapshotSrc} alt={camera.name} class="w-full h-full object-contain" />
+			{:else if liveViewUrl && (isRunning || hubLiveStreamUrl)}
+				<!-- Browser streams <img src=stream.mjpeg> as a continuous MJPEG
+				     animation natively — no JS playback layer needed. The cache-
+				     buster ensures each card mount starts a fresh connection. -->
+				<img
+					src={liveViewUrl}
+					alt={camera.name}
+					class="w-full h-full object-contain"
+				/>
 			{:else}
 				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">
-					{isRunning ? 'Bild wird geladen...' : 'Container gestoppt'}
+					{#if isNativeOnvif && !hubLiveStreamUrl}
+						Native UniFi Protect · kein lokales MJPEG verfügbar
+					{:else if isRunning}
+						Bild wird geladen...
+					{:else}
+						Container gestoppt
+					{/if}
 				</div>
 			{/if}
 			<div class="absolute top-3 left-3 flex items-center gap-2">
@@ -793,6 +902,24 @@
 			</div>
 		</div>
 
+		<!-- MJPEG URL bar — P22-UAT 2026-05-15. The browser-streamable URL the
+		     user can paste into any consumer (Loxone Intercom, dashboards, OBS).
+		     Always rendered when a live MJPEG stream is available — whether from
+		     the cam's own LXC go2rtc or from the Protect Hub bridge. -->
+		{#if liveViewUrl}
+			<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2">
+				<span class="text-xs text-text-secondary shrink-0">MJPEG</span>
+				<code class="text-xs text-text-primary font-mono flex-1 truncate">{liveViewUrl}</code>
+				<button onclick={copyMjpegUrl} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="MJPEG-URL kopieren">
+					{#if mjpegUrlCopied}
+						<Check class="w-4 h-4 text-green-400" />
+					{:else}
+						<Copy class="w-4 h-4" />
+					{/if}
+				</button>
+			</div>
+		{/if}
+
 		<!-- RTSP URL bar — always the actually-usable URL.
 		     When RTSP-Auth is off: plain rtsp://host:port/stream.
 		     When RTSP-Auth is on:  rtsp://user:pw@host:port/stream (password masked on screen,
@@ -910,6 +1037,44 @@
 			{/if}
 		{/if}
 	</div>
+	{/if}
+
+	<!-- P22-UAT 2026-05-15 — Protect Hub URLs (merged from external twin).
+	     Renders only when this managed cam ALSO has a matching Hub output
+	     (same protectId on both sides). User can then copy the Hub bridge
+	     URL for external/Loxone/Frigate consumers alongside the LXC URL. -->
+	{#if hubBridgeUrls && hubBridgeUrls.length > 0}
+		<div class="border-t border-border px-4 py-3 bg-bg-primary/30">
+			<div class="flex items-center gap-2 mb-2">
+				<span class="bg-accent/15 text-accent border border-accent/30 px-2 py-0.5 rounded text-xs">
+					Protect Hub
+				</span>
+				<span class="text-xs text-text-secondary">
+					zusätzlicher Zugriff über die Bridge-LXC
+				</span>
+			</div>
+			<div class="space-y-2">
+				{#each hubBridgeUrls as h (h.outputType)}
+					<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2">
+						<span class="text-xs text-text-secondary shrink-0 w-16">{h.outputType === 'loxone-mjpeg' ? 'MJPEG' : 'RTSP'}</span>
+						<code class="text-xs text-text-primary font-mono flex-1 truncate" title={h.label}>
+							{h.url}
+						</code>
+						<button
+							onclick={() => copyHubUrl(h.url)}
+							class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer"
+							title={h.label}
+						>
+							{#if hubCopied === h.url}
+								<Check class="w-4 h-4 text-green-400" />
+							{:else}
+								<Copy class="w-4 h-4" />
+							{/if}
+						</button>
+					</div>
+				{/each}
+			</div>
+		</div>
 	{/if}
 </div>
 

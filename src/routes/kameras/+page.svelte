@@ -24,18 +24,57 @@
 	// 'external_archived' is excluded from both and surfaces only when
 	// P23 ships an archive view.
 	//
-	// P22-UAT 2026-05-15 amendment: filter external section to cams that have
-	// at least one ENABLED output (loxone-mjpeg or frigate-rtsp). Hub discovery
-	// pulls every Protect-managed cam — including Mobotix-via-adoption rows
-	// that duplicate this app's own managed LXC cams. Without this filter the
-	// section also shows ~11 third-party rows with no outputs and no working
-	// stream — useless noise per "only show what's actually working".
+	// P22-UAT 2026-05-15 amendment 1: filter external section to cams that have
+	// at least one ENABLED output. Hub discovery pulls every Protect-managed
+	// cam — including Mobotix-via-adoption rows that duplicate this app's own
+	// managed LXC cams. Without filter the section also shows ~11 third-party
+	// rows with no outputs/no working stream — useless noise.
+	//
+	// P22-UAT 2026-05-15 amendment 2: when a managed cam was *also* adopted
+	// into Protect (matching protectStatus.protectId on both sides), MERGE the
+	// external row's Hub data (outputs + catalog + mac) into the managed
+	// card's `hubAugment` prop and HIDE the external row from its own section.
+	// User feedback: "wenn es eine kamera schon gibt in der liste dann sollen
+	// die zusatzinfos da auftauchen" — one physical cam = one card, even when
+	// it has both a managed LXC pipeline AND a Protect Hub output.
 	let managedCams = $derived(cameras.filter((c) => c.source === 'managed'));
+
+	// External cams with outputs, keyed by protectId for merge into managed
+	// cards. Externals without a managed counterpart (pure UniFi UVC cams)
+	// render as own cards in the external section.
+	const externalByProtectId = $derived.by(() => {
+		const map = new Map<string, CameraCardData>();
+		for (const c of cameras) {
+			if (c.source !== 'external') continue;
+			if (!(c.outputs ?? []).some((o) => o.enabled)) continue;
+			const pid = c.protectStatus?.protectId;
+			if (pid) map.set(pid, c);
+		}
+		return map;
+	});
+
+	// Set of protectIds claimed by a managed cam — used to hide the external
+	// duplicate from its section.
+	const managedProtectIds = $derived(
+		new Set(managedCams.map((c) => c.protectStatus?.protectId).filter((p): p is string => !!p))
+	);
+
 	let externalCams = $derived(
 		cameras.filter(
-			(c) => c.source === 'external' && (c.outputs ?? []).some((o) => o.enabled)
+			(c) =>
+				c.source === 'external' &&
+				(c.outputs ?? []).some((o) => o.enabled) &&
+				!managedProtectIds.has(c.protectStatus?.protectId ?? '')
 		)
 	);
+
+	// Helper for the managed render loop — returns the matching external row
+	// (with hub data) when available, else null.
+	function getHubAugment(managedCam: CameraCardData): CameraCardData | null {
+		const pid = managedCam.protectStatus?.protectId;
+		if (!pid) return null;
+		return externalByProtectId.get(pid) ?? null;
+	}
 
 	// v1.3 Phase 22 Plan 03 Task 4 — onboarding=success toast (Pitfall #4).
 	// On mount, consume the ?onboarding=success query param ONCE: fetch the
@@ -157,7 +196,7 @@
 			</h2>
 			<div class="space-y-4">
 				{#each managedCams as camera (camera.id)}
-					<CameraDetailCard {camera} />
+					<CameraDetailCard {camera} hubAugment={getHubAugment(camera)} bridgeIp={data.bridgeIp} />
 				{:else}
 					<!-- WR-03 fix — when the user has zero managed cams but multiple
 					     external cams (hub enabled), the outer cameras.length===0
