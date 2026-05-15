@@ -23,8 +23,19 @@
 	// for archived Protect cams. Use positive matches on both sections so
 	// 'external_archived' is excluded from both and surfaces only when
 	// P23 ships an archive view.
+	//
+	// P22-UAT 2026-05-15 amendment: filter external section to cams that have
+	// at least one ENABLED output (loxone-mjpeg or frigate-rtsp). Hub discovery
+	// pulls every Protect-managed cam — including Mobotix-via-adoption rows
+	// that duplicate this app's own managed LXC cams. Without this filter the
+	// section also shows ~11 third-party rows with no outputs and no working
+	// stream — useless noise per "only show what's actually working".
 	let managedCams = $derived(cameras.filter((c) => c.source === 'managed'));
-	let externalCams = $derived(cameras.filter((c) => c.source === 'external'));
+	let externalCams = $derived(
+		cameras.filter(
+			(c) => c.source === 'external' && (c.outputs ?? []).some((o) => o.enabled)
+		)
+	);
 
 	// v1.3 Phase 22 Plan 03 Task 4 — onboarding=success toast (Pitfall #4).
 	// On mount, consume the ?onboarding=success query param ONCE: fetch the
