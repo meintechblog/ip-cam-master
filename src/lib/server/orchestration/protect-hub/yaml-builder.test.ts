@@ -99,34 +99,22 @@ describe('yaml-builder — buildBridgeYaml', () => {
 		expect(src).toContain(`rtsps://192.168.3.1:7441/${CARPORT_TOKEN}?enableSrtp`);
 	});
 
-	// HUB-OUT-03: Frigate-RTSP exec form per D-PIPE-04 (amended P22-UAT 2026-05-16)
-	// Switched from `ffmpeg:` shorthand to `exec:` for the same reason loxone-mjpeg
-	// did — the shorthand attached `-reconnect` flags that interacted poorly with
-	// older Protect cam models (UVC G3 Instant: TLS session invalidated; G6 PTZ
-	// works). See yaml-builder.ts buildFrigateRtspSource header.
-	it('frigate — emits exec: ffmpeg with H.264 copy + mpegts pipe (zero VAAPI cost)', () => {
+	// HUB-OUT-03: Frigate-RTSP ffmpeg form per D-PIPE-04
+	it('frigate — emits #video=copy#raw=-an passthrough + reconnect flags (D-PIPE-04 + D-PIPE-05)', () => {
 		const yaml = buildBridgeYaml([frigateRow(CARPORT_MAC, CARPORT_TOKEN)], TEST_RECONCILE_ID);
 		const src = getSource(yaml, `${CARPORT_MAC}-high`);
 
 		expect(src).not.toContain('tls_verify');
-		// exec: source bypasses go2rtc's auto-construction.
-		expect(src.startsWith('exec:ffmpeg ')).toBe(true);
-		// H.264 passthrough (no transcode).
-		expect(src).toContain('-c:v copy');
-		expect(src).toContain('-an');
+		expect(src).toContain('#video=copy');
+		expect(src).toContain('#raw=-an');
 		// MUST NOT contain VAAPI for Frigate (pure passthrough, zero VAAPI cost per L-26)
-		expect(src).not.toContain('vaapi');
-		// D-PIPE-05 amendment: -reconnect flags removed (HTTP-only in ffmpeg 7.1.3;
-		// go2rtc's exec respawn lifecycle handles upstream loss instead).
-		expect(src).not.toContain('-reconnect');
-		// MPEG-TS pipe output (go2rtc picks up frames, republishes as RTSP).
-		expect(src).toContain('-f mpegts pipe:1');
-		// RTSP transport pinned to TCP.
-		expect(src).toContain('-rtsp_transport tcp');
+		expect(src).not.toContain('#hardware=vaapi');
+		// D-PIPE-05 reconnect flags also apply to Frigate per "every output, regardless of type"
+		expect(src).toContain('#raw=-reconnect 1');
+		expect(src).toContain('#raw=-reconnect_streamed 1');
+		expect(src).toContain('#raw=-reconnect_delay_max 2');
 		// D-PIPE-06: slug pattern <mac>-high for frigate-rtsp
 		expect(yaml).toContain(`${CARPORT_MAC}-high:`);
-		// CR-2: rtsps:// URL passed through unchanged.
-		expect(src).toContain(`rtsps://192.168.3.1:7441/${CARPORT_TOKEN}?enableSrtp`);
 	});
 
 	it('mixed — 2 cams × 2 output types each → 4 stream entries with all 4 slugs', () => {

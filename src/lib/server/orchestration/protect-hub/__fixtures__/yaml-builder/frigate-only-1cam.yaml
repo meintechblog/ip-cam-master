@@ -11,7 +11,5 @@ rtsp:
   listen: :8554
 streams:
   aabbccddee01-high:
-    - exec:ffmpeg -hide_banner -loglevel error -fflags nobuffer -flags low_delay
-      -rtsp_transport tcp -i
-      rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp -an -c:v copy -f
-      mpegts pipe:1
+    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp#video=copy#raw=-an#raw=-reconnect
+      1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2

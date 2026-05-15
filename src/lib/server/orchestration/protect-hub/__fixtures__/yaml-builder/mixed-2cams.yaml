@@ -17,7 +17,5 @@ streams:
       rtsps://192.168.3.1:7441/<TEST-TOKEN-CARPORT>?enableSrtp -an -r 10 -vf
       format=nv12|vaapi,hwupload,scale_vaapi=640:360 -c:v mjpeg_vaapi -f mjpeg -
   aabbccddee02-high:
-    - exec:ffmpeg -hide_banner -loglevel error -fflags nobuffer -flags low_delay
-      -rtsp_transport tcp -i
-      rtsps://192.168.3.1:7441/<TEST-TOKEN-FRONTDOOR>?enableSrtp -an -c:v copy
-      -f mpegts pipe:1
+    - ffmpeg:rtsps://192.168.3.1:7441/<TEST-TOKEN-FRONTDOOR>?enableSrtp#video=copy#raw=-an#raw=-reconnect
+      1#raw=-reconnect_streamed 1#raw=-reconnect_delay_max 2
