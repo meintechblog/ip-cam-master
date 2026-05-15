@@ -4,10 +4,11 @@
 	// Renders two sections (Erstanbieter / Drittanbieter) of camera rows; each row
 	// has a checkbox + output dropdown (loxone-mjpeg | frigate-rtsp). First-party
 	// cams default to selected=true, third-party default to false. Client-side
-	// VAAPI cap mirrors the server-side hard-cap (6) at /api/cameras/[id]/outputs:
-	// once 6 Loxone-MJPEG outputs are selected, additional MJPEG checkboxes are
-	// disabled with the exact server tooltip ("Maximal 6 ..."). At 4 selections
-	// a soft-warning surfaces.
+	// VAAPI cap mirrors the server-side hard-cap (12, raised 2026-05-16 — see
+	// /api/cameras/[id]/outputs header for hardware rationale) at
+	// /api/cameras/[id]/outputs: once VAAPI_HARD_CAP Loxone-MJPEG outputs are
+	// selected, additional MJPEG checkboxes are disabled with the exact server
+	// tooltip ("Maximal 12 ..."). At VAAPI_SOFT_CAP a soft-warning surfaces.
 	//
 	// CTA "Auswahl übernehmen": iterate selections, PUT /api/cameras/[id]/outputs
 	// per cam; on 422 (vaapi_hard_cap_exceeded — server projects across all cams,
@@ -62,8 +63,10 @@
 	const mjpegCount = $derived(
 		Object.values(selections).filter((s) => s.selected && s.outputType === 'loxone-mjpeg').length
 	);
-	const mjpegCapHit = $derived(mjpegCount >= 6);
-	const mjpegCapWarn = $derived(mjpegCount >= 4 && mjpegCount < 6);
+	const VAAPI_HARD_CAP = 12; // kept in sync with /api/cameras/[id]/outputs
+	const mjpegCapHit = $derived(mjpegCount >= VAAPI_HARD_CAP);
+	const VAAPI_SOFT_CAP = 10;
+	const mjpegCapWarn = $derived(mjpegCount >= VAAPI_SOFT_CAP && mjpegCount < VAAPI_HARD_CAP);
 
 	function toggleSelected(camId: number, nextSelected: boolean) {
 		const cur = selections[camId];
@@ -150,7 +153,7 @@
 			<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
 				<AlertTriangle class="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
 				<p class="text-xs text-text-secondary">
-					{mjpegCount} von 6 Loxone-MJPEG-Slots belegt. VAAPI-Hardware-Limit erreicht bei 6.
+					{mjpegCount} von {VAAPI_HARD_CAP} Loxone-MJPEG-Slots belegt. VAAPI-Hardware-Limit erreicht bei {VAAPI_HARD_CAP}.
 				</p>
 			</div>
 		{/if}
@@ -158,7 +161,7 @@
 			<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
 				<AlertTriangle class="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
 				<p class="text-xs text-text-secondary">
-					Maximal 6 Loxone-MJPEG-Streams gleichzeitig (VAAPI-Limit). Weitere Auswahl deaktiviert.
+					Maximal {VAAPI_HARD_CAP} Loxone-MJPEG-Streams gleichzeitig (VAAPI-Limit). Weitere Auswahl deaktiviert.
 				</p>
 			</div>
 		{/if}
@@ -182,7 +185,7 @@
 								onchange={(e) => toggleSelected(cam.id, e.currentTarget.checked)}
 								class="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
 								title={disableMjpeg
-									? 'Maximal 6 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich'
+									? 'Maximal 12 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich'
 									: ''}
 							/>
 							<div class="flex-1 min-w-0">
@@ -230,7 +233,7 @@
 								onchange={(e) => toggleSelected(cam.id, e.currentTarget.checked)}
 								class="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
 								title={disableMjpeg
-									? 'Maximal 6 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich'
+									? 'Maximal 12 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich'
 									: ''}
 							/>
 							<div class="flex-1 min-w-0">

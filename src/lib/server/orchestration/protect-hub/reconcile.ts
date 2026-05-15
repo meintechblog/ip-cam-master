@@ -503,7 +503,10 @@ function loadOutputRows(): OutputRow[] {
  *
  * Per HUB-OUT-05 + HUB-RCN-08 + L-28 + L-26.
  */
-const VAAPI_HARD_CAP_FOR_SEEDING = 6;
+// P22-UAT 2026-05-16: kept in sync with VAAPI_HARD_CAP in
+// /api/cameras/[id]/outputs (raised 6 → 12; see that file's header comment
+// for hardware rationale — Intel Core Ultra 7 255H Arrow Lake-P).
+const VAAPI_HARD_CAP_FOR_SEEDING = 12;
 
 function seedDefaultOutputsForNewCams(): void {
 	const enabledCountRow = db

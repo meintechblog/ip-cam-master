@@ -488,16 +488,18 @@ describe('reconcile (Phase 21 Plan 03)', () => {
 	});
 
 	// ── VAAPI-cap-aware auto-add (P21 live-UAT regression) ─────────────────
-	it('auto-add — respects VAAPI hard cap of 6; cams beyond are seeded enabled=false', async () => {
-		// 7 first-party cams, no existing outputs. Auto-seed should mark the
-		// first 6 as enabled=true and the 7th as enabled=false (with a warn
+	// Cap raised 6 → 12 on 2026-05-16 after Arrow Lake-P GPU was identified.
+	it('auto-add — respects VAAPI hard cap of 12; cams beyond are seeded enabled=false', async () => {
+		// 13 first-party cams, no existing outputs. Auto-seed should mark the
+		// first 12 as enabled=true and the 13th as enabled=false (with a warn
 		// event) so the system never enters a state where every PUT toggle
 		// hits 422 from day one.
 		const bridge = seedBridge();
 		const macs = [
-			'aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc',
-			'dddddddddddd', 'eeeeeeeeeeee', 'ffffffffffff',
-			'aaaaaaaaaaab'
+			'aaaaaaaaaa01', 'aaaaaaaaaa02', 'aaaaaaaaaa03', 'aaaaaaaaaa04',
+			'aaaaaaaaaa05', 'aaaaaaaaaa06', 'aaaaaaaaaa07', 'aaaaaaaaaa08',
+			'aaaaaaaaaa09', 'aaaaaaaaaa10', 'aaaaaaaaaa11', 'aaaaaaaaaa12',
+			'aaaaaaaaaa13'
 		];
 		for (let i = 0; i < macs.length; i++) {
 			memDbRef.sqlite!.prepare(
@@ -518,7 +520,7 @@ describe('reconcile (Phase 21 Plan 03)', () => {
 				"SELECT COUNT(*) as n FROM camera_outputs WHERE output_type='loxone-mjpeg' AND enabled=0"
 			)
 			.get() as { n: number }).n;
-		expect(enabledCount).toBe(6);
+		expect(enabledCount).toBe(12);
 		expect(disabledCount).toBe(1);
 
 		const warnEvents = memDbRef.sqlite!

@@ -1,9 +1,10 @@
 // v1.3 Phase 21 Plan 05 — PUT /api/cameras/[id]/outputs.
 //
 // Replace-strategy per D-API-02: deletes all camera_outputs rows for the cam,
-// then inserts the requested ones. Enforces VAAPI cap (soft 4, hard 6) per
-// D-CAP-01/02 + L-26 — Frigate-RTSP outputs are NOT counted (passthrough is
-// zero VAAPI cost).
+// then inserts the requested ones. Enforces VAAPI cap (soft 10, hard 12,
+// raised 2026-05-16 from 4/6 after the actual GPU was identified — Intel
+// Core Ultra 7 255H Arrow Lake-P) per D-CAP-01/02 + L-26 — Frigate-RTSP
+// outputs are NOT counted (passthrough is zero VAAPI cost).
 //
 // Triggers force-reconcile via reconcile.ts (HUB-RCN-02) AFTER the DB write,
 // fire-and-forget so the UI gets an immediate 200 (D-API-01 spirit applied
@@ -26,8 +27,15 @@ import { reconcile } from '$lib/server/orchestration/protect-hub/reconcile';
 import { storeEvent } from '$lib/server/services/events';
 import type { CameraEvent } from '$lib/types';
 
-const VAAPI_HARD_CAP = 6;
-const VAAPI_SOFT_CAP = 4;
+// P22-UAT 2026-05-16 — raised from 6 → 12 after user added a 7th cam (G6
+// Pro Entry doorbell with shared Medium + Package channels). Original cap
+// was set conservatively during P21 planning before the actual GPU was
+// known. Live bridge runs on Intel Core Ultra 7 255H (Arrow Lake-P), whose
+// Quick Sync media engine handles 12+ simultaneous MJPEG-VAAPI encodes
+// at 640x360@10fps trivially (Loxone-MJPEG is the lightest Quick Sync
+// workload there is). Re-derive if/when a smaller GPU is targeted.
+const VAAPI_HARD_CAP = 12;
+const VAAPI_SOFT_CAP = 10;
 const ALLOWED_OUTPUT_TYPES = new Set(['loxone-mjpeg', 'frigate-rtsp']);
 
 interface OutputInput {
@@ -100,7 +108,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			{
 				ok: false,
 				reason: 'vaapi_hard_cap_exceeded',
-				message: `Maximal 6 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich. Aktuell: ${projectedTotal}.`
+				message: `Maximal ${VAAPI_HARD_CAP} gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich. Aktuell: ${projectedTotal}.`
 			},
 			{ status: 422 }
 		);

@@ -50,10 +50,11 @@ describe('P22 wizard structure (HUB-WIZ-05..10)', () => {
 		expect(step3).toMatch(/UniFi Controller nicht erreichbar/);
 		expect(step3).toMatch(/\/api\/protect-hub\/wizard\/3/);
 	});
-	it('Step4: enforces VAAPI cap client-side at 6 + soft-warn at 4 + Maximal 6 copy', () => {
+	// Cap raised 6 → 12 on 2026-05-16 (Arrow Lake-P GPU).
+	it('Step4: enforces VAAPI cap client-side at 12 + soft-warn at 10 + Maximal 12 copy', () => {
 		expect(step4).toMatch(/mjpegCount/);
-		expect(step4).toMatch(/>=\s*6/);
-		expect(step4).toMatch(/Maximal 6/);
+		expect(step4).toMatch(/VAAPI_HARD_CAP\s*=\s*12/);
+		expect(step4).toMatch(/Maximal 12/);
 		expect(step4).toMatch(/\/api\/cameras\/.+\/outputs/);
 		expect(step4).toMatch(/\/api\/protect-hub\/wizard\/4/);
 	});

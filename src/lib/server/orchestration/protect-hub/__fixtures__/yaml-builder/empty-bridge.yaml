@@ -1,4 +1,4 @@
-# managed by ip-cam-master, reconcile-id 00000000-0000-0000-0000-000000000001, ts 2026-05-15T00:00:00.000Z
+# managed by ip-cam-master, reconcile-id 00000000-0000-0000-0000-000000000001, ts 2026-05-16T00:00:00.000Z
 # WARNING: do not edit by hand — managed by ip-cam-master reconcile loop
 api:
   listen: 0.0.0.0:1984

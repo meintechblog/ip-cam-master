@@ -101,16 +101,31 @@ function buildLoxoneMjpegSource(rtspUrl: string): string {
 }
 
 /**
- * D-PIPE-04 verbatim: Frigate-RTSP ffmpeg source. Pure passthrough, zero
- * VAAPI cost. `-an` per L-27 (no audio in the Hub pipeline). D-PIPE-05
- * reconnect flags applied per "every output, regardless of type".
+ * Frigate-RTSP source — pure passthrough, zero VAAPI cost.
+ *
+ * P22-UAT 2026-05-16 amendment: switched from go2rtc's `ffmpeg:` shorthand
+ * to `exec:` for consistency with loxone-mjpeg AND to drop the `-reconnect`
+ * flags. Same root cause: the shorthand passes `#raw=-reconnect 1` etc.
+ * which ffmpeg 7.1.3 silently tolerates as output options but they're
+ * no-ops for RTSP and may interact poorly with some upstream camera models
+ * (G3 Instant observed: TLS session invalidated on frame-pull while G6 PTZ
+ * works on the same UDM/Protect setup). Go2rtc's exec respawn lifecycle
+ * handles upstream reconnect.
+ *
+ * The exec command pulls the RTSPS source and emits an MPEG-TS stream on
+ * stdout (`-f mpegts pipe:1`). go2rtc picks up the H.264 frames and
+ * republishes as RTSP at `:8554/<slug>-high`. MPEG-TS over pipe is the
+ * pattern go2rtc uses internally for the same goal.
  */
 function buildFrigateRtspSource(rtspUrl: string): string {
 	return (
-		`ffmpeg:${rtspUrl}` +
-		'#video=copy' +
-		'#raw=-an' +
-		`${RECONNECT_SUFFIX}`
+		'exec:ffmpeg' +
+		' -hide_banner -loglevel error' +
+		' -fflags nobuffer -flags low_delay' +
+		' -rtsp_transport tcp' +
+		` -i ${rtspUrl}` +
+		' -an -c:v copy' +
+		' -f mpegts pipe:1'
 	);
 }
 

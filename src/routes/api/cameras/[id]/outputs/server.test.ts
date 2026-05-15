@@ -114,10 +114,11 @@ describe('PUT /api/cameras/[id]/outputs (Plan 05)', () => {
 		expect(insertRun).toHaveBeenCalledTimes(1);
 	});
 
-	// HUB-OUT-04 — D-CAP-02 hard cap: projected total > 6 → 422 with exact German wording
-	it('422 — projected total > 6 MJPEG → vaapi_hard_cap_exceeded with D-CAP-02 message', async () => {
-		// 6 already enabled on OTHER cams + 1 requested = 7 → over cap
-		selectChain.get = vi.fn().mockReturnValueOnce(camRow).mockReturnValueOnce({ n: 6 });
+	// HUB-OUT-04 — D-CAP-02 hard cap: projected total > VAAPI_HARD_CAP → 422
+	// with exact German wording. Cap raised 6 → 12 on 2026-05-16 (Arrow Lake-P).
+	it('422 — projected total > 12 MJPEG → vaapi_hard_cap_exceeded with D-CAP-02 message', async () => {
+		// 12 already enabled on OTHER cams + 1 requested = 13 → over cap
+		selectChain.get = vi.fn().mockReturnValueOnce(camRow).mockReturnValueOnce({ n: 12 });
 
 		const { PUT } = await import('./+server');
 		const res = (await PUT(
@@ -130,7 +131,7 @@ describe('PUT /api/cameras/[id]/outputs (Plan 05)', () => {
 		expect(body.reason).toBe('vaapi_hard_cap_exceeded');
 		// D-CAP-02 EXACT prefix match (German). Number is dynamic (=projectedTotal).
 		expect(body.message).toBe(
-			'Maximal 6 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich. Aktuell: 7.'
+			'Maximal 12 gleichzeitige Loxone-MJPEG-Transkodierungen pro Bridge möglich. Aktuell: 13.'
 		);
 
 		// Cap rejected BEFORE any DB write or reconcile
@@ -141,12 +142,12 @@ describe('PUT /api/cameras/[id]/outputs (Plan 05)', () => {
 
 	// L-26 / D-CAP-02 — Frigate-RTSP outputs are NOT counted toward the cap
 	it('200 — Frigate-RTSP outputs do NOT count toward VAAPI cap', async () => {
-		// 6 already enabled on OTHER cams (would be at the cap for MJPEG)
-		// + 1 requested Frigate-RTSP → 6 projected MJPEG, OK because passthrough is zero VAAPI cost
+		// 12 already enabled on OTHER cams (at the MJPEG cap)
+		// + 1 requested Frigate-RTSP → 12 projected MJPEG, OK because passthrough is zero VAAPI cost
 		selectChain.get = vi
 			.fn()
 			.mockReturnValueOnce(camRow)
-			.mockReturnValueOnce({ n: 6 })
+			.mockReturnValueOnce({ n: 12 })
 			.mockReturnValueOnce(bridgeRow);
 
 		const { PUT } = await import('./+server');
@@ -156,17 +157,17 @@ describe('PUT /api/cameras/[id]/outputs (Plan 05)', () => {
 
 		expect(res.status).toBe(200);
 		const body = await res.json();
-		expect(body.projectedMjpegCount).toBe(6); // unchanged; frigate doesn't add
+		expect(body.projectedMjpegCount).toBe(12); // unchanged; frigate doesn't add
 		expect(mockReconcile).toHaveBeenCalledTimes(1);
 	});
 
-	// D-CAP-01 — soft cap: projected total >= 4 emits vaapi_soft_cap_warning event AFTER write
-	it('emits vaapi_soft_cap_warning event when projected total >= 4', async () => {
-		// 3 enabled elsewhere + 1 requested = 4 → soft cap
+	// D-CAP-01 — soft cap: projected total >= VAAPI_SOFT_CAP emits vaapi_soft_cap_warning event AFTER write
+	it('emits vaapi_soft_cap_warning event when projected total >= 10', async () => {
+		// 9 enabled elsewhere + 1 requested = 10 → soft cap
 		selectChain.get = vi
 			.fn()
 			.mockReturnValueOnce(camRow)
-			.mockReturnValueOnce({ n: 3 })
+			.mockReturnValueOnce({ n: 9 })
 			.mockReturnValueOnce(bridgeRow);
 
 		const { PUT } = await import('./+server');
@@ -190,8 +191,8 @@ describe('PUT /api/cameras/[id]/outputs (Plan 05)', () => {
 		);
 	});
 
-	// Soft cap NOT emitted when projected total < 4
-	it('does NOT emit vaapi_soft_cap_warning when projected total < 4', async () => {
+	// Soft cap NOT emitted when projected total < 10
+	it('does NOT emit vaapi_soft_cap_warning when projected total < 10', async () => {
 		selectChain.get = vi
 			.fn()
 			.mockReturnValueOnce(camRow)
