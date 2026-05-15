@@ -68,25 +68,45 @@
 			: null
 	);
 
-	// P22-UAT 2026-05-15 — Live MJPEG URL for managed cams. Each managed cam
-	// has its own go2rtc inside the LXC; stream.mjpeg streams natively in
-	// every modern browser via <img src>. User feedback: "Mobotix S15 gibt
-	// direkt MJPEG aus — nur den link" → expose the URL prominently.
-	const managedMjpegUrl = $derived(
-		camera.go2rtcWebUrl && camera.streamName
-			? `${camera.go2rtcWebUrl}/api/stream.mjpeg?src=${camera.streamName}`
-			: null
-	);
+	// P22-UAT 2026-05-15 — In-card live view URL (for <img src>):
+	//   * mobotix-onvif (no LXC) + Hub augment → bridge MJPEG (works)
+	//   * managed LXC with running container → null here (use the existing
+	//     snapshotSrc poll path, which calls /api/cameras/{id}/snapshot
+	//     under the hood = go2rtc frame.jpeg. The LXC's stream.mjpeg path
+	//     would require an H.264→MJPEG transcode that hits the same
+	//     go2rtc 1.9.14 VAAPI filter-chain bug as the loxone-mjpeg
+	//     pipeline — proven 0-byte response during this UAT).
+	const liveViewUrl = $derived(hubLiveStreamUrl);
 
-	// Single source of truth for the in-card live view: hub mjpeg first
-	// (when set, e.g. mobotix-onvif cam 11), else the cam's own LXC go2rtc.
-	const liveViewUrl = $derived(hubLiveStreamUrl ?? managedMjpegUrl);
+	// User-copyable MJPEG link. User feedback: "Mobotix S15 gibt direkt
+	// MJPEG aus — nur den link". Three sources:
+	//   1. Hub bridge MJPEG (when augmented)            → known-working
+	//   2. Mobotix native cam MJPEG (cam-direct)         → works in VLC/ffmpeg;
+	//      embedded creds work in <img> only on older browsers, but the link
+	//      is still copyable for any consumer.
+	//   3. otherwise null (don't render a misleading bar)
+	const cameraMjpegUrl = $derived.by(() => {
+		if (hubAugment && hubAugment.mac && bridgeIp) {
+			const has = (hubAugment.outputs ?? []).some(
+				(o) => o.enabled && o.outputType === 'loxone-mjpeg'
+			);
+			if (has) {
+				return `http://${bridgeIp}:1984/api/stream.mjpeg?src=${deriveSlug(hubAugment.mac, 'loxone-mjpeg')}`;
+			}
+		}
+		if (
+			(camera.cameraType === 'mobotix' || camera.cameraType === 'mobotix-onvif') &&
+			camera.cameraWebUrl
+		) {
+			return `${camera.cameraWebUrl.replace(/\/$/, '')}/control/faststream.jpg?stream=full&fps=20`;
+		}
+		return null;
+	});
 
 	let mjpegUrlCopied = $state(false);
 	async function copyMjpegUrl() {
-		const url = liveViewUrl;
-		if (!url) return;
-		if (await copyToClipboard(url)) {
+		if (!cameraMjpegUrl) return;
+		if (await copyToClipboard(cameraMjpegUrl)) {
 			mjpegUrlCopied = true;
 			setTimeout(() => (mjpegUrlCopied = false), 2000);
 		}
@@ -902,14 +922,14 @@
 			</div>
 		</div>
 
-		<!-- MJPEG URL bar — P22-UAT 2026-05-15. The browser-streamable URL the
-		     user can paste into any consumer (Loxone Intercom, dashboards, OBS).
-		     Always rendered when a live MJPEG stream is available — whether from
-		     the cam's own LXC go2rtc or from the Protect Hub bridge. -->
-		{#if liveViewUrl}
+		<!-- MJPEG URL bar — P22-UAT 2026-05-15. The MJPEG link the user can
+		     paste into Loxone Intercom, dashboards, OBS, etc. For Mobotix the
+		     cam-direct URL (no transcoding, native MJPEG); for cams augmented
+		     by a Hub MJPEG output the bridge stream URL. -->
+		{#if cameraMjpegUrl}
 			<div class="flex items-center gap-2 bg-bg-primary rounded-lg px-3 py-2">
 				<span class="text-xs text-text-secondary shrink-0">MJPEG</span>
-				<code class="text-xs text-text-primary font-mono flex-1 truncate">{liveViewUrl}</code>
+				<code class="text-xs text-text-primary font-mono flex-1 truncate">{cameraMjpegUrl}</code>
 				<button onclick={copyMjpegUrl} class="text-text-secondary hover:text-text-primary shrink-0 cursor-pointer" title="MJPEG-URL kopieren">
 					{#if mjpegUrlCopied}
 						<Check class="w-4 h-4 text-green-400" />
