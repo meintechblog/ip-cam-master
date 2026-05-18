@@ -458,6 +458,15 @@
 					alt={camera.name}
 					class="w-full h-full object-contain"
 				/>
+			{:else if snapshotSrc && isRunning}
+				<!-- Fallback for managed cams without hub-bridge MJPEG: the 10s
+				     snapshotSrc poll fetches JPEG via /api/cameras/{id}/snapshot
+				     (go2rtc frame.jpeg with Mobotix-direct cam-fetch fallback). -->
+				<img
+					src={snapshotSrc}
+					alt={camera.name}
+					class="w-full h-full object-contain"
+				/>
 			{:else}
 				<div class="absolute inset-0 flex items-center justify-center text-text-secondary/50 text-sm">
 					{#if isNativeOnvif && !hubLiveStreamUrl}
