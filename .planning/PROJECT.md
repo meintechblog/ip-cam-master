@@ -43,7 +43,7 @@ One-click camera onboarding: discover a camera in the network, and the app handl
 ### Infrastructure
 
 - **Proxmox Host (proxi3):** 192.168.3.16 — runs LXC containers and the app VM
-- **App VM:** 192.168.3.233 / ip-cam-master.local — hosts the webapp
+- **App VM:** 192.168.3.249 / ip-cam-master.local — hosts the webapp (was .178 / .233 in earlier rebuilds; re-verify via `ssh ip-cam-master "ip -4 addr show eth0"` if uncertain)
 - **UniFi Dream Machine:** 192.168.3.1 — runs UniFi Protect, SSH access available
 - **Architecture:** One LXC container per camera on Proxmox, each running go2rtc (and nginx for Loxone Intercom)
 
